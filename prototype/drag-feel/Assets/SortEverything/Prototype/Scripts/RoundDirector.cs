@@ -49,10 +49,18 @@ namespace SortEverything.Prototype
         int noteIndex;
         float lastCorrect = -10f;
 
+        // Library object ids used in the last rounds, so consecutive rounds don't repeat objects.
+        const int RecentRounds = 2;
+        readonly Queue<List<string>> recentRounds = new Queue<List<string>>();
+
+        /// <summary>Content mode the current round was actually built with (falls back to Shapes if the pool is too small).</summary>
+        public ContentMode RoundMode { get; private set; }
+
         void Awake()
         {
             objectMaterial = new PhysicsMaterial2D("Toy") { friction = 0.7f, bounciness = 0.08f };
             staticMaterial = new PhysicsMaterial2D("Static") { friction = 0.6f, bounciness = 0f };
+            RoundMode = ContentSettings.Mode;
         }
 
         public int NextPileOrder() { return ++pileOrder; }
@@ -79,6 +87,7 @@ namespace SortEverything.Prototype
             BuildStatics();
             BuildBinsAndObjects();
             StartCoroutine(Intro());
+            StartCoroutine(PrewarmArt());
         }
 
         void ComputeLayout()
@@ -136,8 +145,24 @@ namespace SortEverything.Prototype
 
         void BuildBinsAndObjects()
         {
+            var mode = ContentSettings.Mode;
+            var pool = ContentSettings.Pool;
+
             // Three of the five colour categories.
             var cats = new List<int> { 0, 1, 2, 3, 4 };
+            if (mode != ContentMode.Shapes)
+            {
+                // Only colours with enough library objects to fill a 4-object bin without repeating an object.
+                cats.Clear();
+                foreach (var c in RoundContent.ColorsWithAtLeast(pool, 4)) cats.Add((int)c);
+                if (cats.Count < BinsPerRound)
+                {
+                    Debug.LogWarning("Object pool too small for a real-object round; using shapes.");
+                    mode = ContentMode.Shapes;
+                    cats = new List<int> { 0, 1, 2, 3, 4 };
+                }
+            }
+            RoundMode = mode;
             Shuffle(cats);
             cats.RemoveRange(BinsPerRound, cats.Count - BinsPerRound);
             cats.Sort();
@@ -165,18 +190,51 @@ namespace SortEverything.Prototype
                 for (int k = 0; k < counts[i]; k++) categories.Add(cats[i]);
             Shuffle(categories);
 
+            // Real / Mixed: ask the object library which recognisable objects fill which slots.
+            RoundSlot[] plan = null;
+            if (mode != ContentMode.Shapes)
+            {
+                var real = new bool[ObjectsPerRound];
+                var order = new List<int>();
+                for (int i = 0; i < ObjectsPerRound; i++) order.Add(i);
+                Shuffle(order);
+                int realCount = mode == ContentMode.RealObjects ? ObjectsPerRound : ObjectsPerRound / 2;
+                for (int i = 0; i < realCount; i++) real[order[i]] = true;
+
+                var colors = new SortColor[ObjectsPerRound];
+                for (int i = 0; i < ObjectsPerRound; i++) colors[i] = (SortColor)categories[i];
+                var recent = new HashSet<string>();
+                foreach (var ids in recentRounds) recent.UnionWith(ids);
+                plan = RoundContent.Fill(colors, real, pool, recent, n => Random.Range(0, n));
+            }
+
             var shapes = (ShapeKind[])System.Enum.GetValues(typeof(ShapeKind));
             float baseSize = Units.DpToWorld(56f);
+            var usedIds = new List<string>();
             for (int i = 0; i < ObjectsPerRound; i++)
             {
-                int m = masses[i];
-                float size = baseSize * (1f + 0.075f * (m - 1)); // 56 dp .. ~73 dp
-                var shape = shapes[Random.Range(0, shapes.Length)];
-                var o = SortObject.Create(i, categories[i], categories[i], Palette[categories[i]], shape, m, size,
-                    new Vector2(-1000f, -1000f), objectMaterial, NextPileOrder(), worldRoot);
+                SortObject o = null;
+                if (plan != null && plan[i].def != null)
+                {
+                    var def = plan[i].def;
+                    o = SortObject.CreateFromDef(i, def, Palette[categories[i]], baseSize * def.SizeScale,
+                        new Vector2(-1000f, -1000f), objectMaterial, NextPileOrder(), worldRoot);
+                    if (o != null) usedIds.Add(def.id);
+                }
+                if (o == null)
+                {
+                    int m = masses[i];
+                    float size = baseSize * (1f + 0.075f * (m - 1)); // 56 dp .. ~73 dp
+                    var shape = shapes[Random.Range(0, shapes.Length)];
+                    o = SortObject.Create(i, categories[i], categories[i], Palette[categories[i]], shape, m, size,
+                        new Vector2(-1000f, -1000f), objectMaterial, NextPileOrder(), worldRoot);
+                }
                 o.gameObject.SetActive(false);
                 Objects.Add(o);
             }
+
+            recentRounds.Enqueue(usedIds);
+            while (recentRounds.Count > RecentRounds) recentRounds.Dequeue();
 
             melody = MakeMelody(ObjectsPerRound);
         }
@@ -200,6 +258,27 @@ namespace SortEverything.Prototype
                 o.rb.SetVelocity(new Vector2(Random.Range(-1.5f, 1.5f), -2f));
                 o.rb.angularVelocity = Random.Range(-200f, 200f);
                 yield return new WaitForSeconds(0.05f);
+            }
+        }
+
+        /// <summary>
+        /// Rasterise the rest of the current pool's art in the background (one object per frame), so later rounds
+        /// don't pay for it during their build.
+        /// </summary>
+        IEnumerator PrewarmArt()
+        {
+            if (ContentSettings.Mode == ContentMode.Shapes) yield break;
+            yield return new WaitForSeconds(1.5f);
+            var all = ObjectLibrary.All;
+            for (int i = 0; i < all.Count; i++)
+            {
+                var d = all[i];
+                if (!d.ColorSortable || !d.InPool(ContentSettings.Pool) || ObjectArt.IsCached(d.id)) continue;
+                while (Proto.Drag != null && Proto.Drag.IsHolding) yield return null; // never hitch a drag
+                Sprite sprite;
+                Vector2[] hull;
+                ObjectArt.TryGet(d, out sprite, out hull);
+                yield return null;
             }
         }
 

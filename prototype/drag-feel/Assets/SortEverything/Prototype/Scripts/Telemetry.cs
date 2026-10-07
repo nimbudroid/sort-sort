@@ -18,6 +18,10 @@ namespace SortEverything.Prototype
         public float speedDp;
         public int mass;
         public string outcome;       // correct | wrong | missed | repositioned
+        // Captured at release so rows stay complete even if the object is destroyed before the drop resolves.
+        public string objectKey;
+        public string objectCategory;
+        public int sortColor;
     }
 
     [Serializable]
@@ -45,7 +49,17 @@ namespace SortEverything.Prototype
         public float avgDragSeconds;
         public float avgNextTapSeconds;
         public string stopReason;
+        public string contentMode;
+        public string objectPool;
         public FeelConfig config;
+    }
+
+    /// <summary>Per-object counters, written to dragfeel_objects_&lt;session&gt;.csv.</summary>
+    public class ObjectStats
+    {
+        public string objectKey, objectCategory;
+        public int sortColor;
+        public int pickups, releases, correct, wrong, missed, assisted, flicks;
     }
 
     /// <summary>
@@ -62,6 +76,7 @@ namespace SortEverything.Prototype
         public string FolderPath { get { return Application.persistentDataPath; } }
 
         readonly List<DropRecord> pending = new List<DropRecord>();
+        readonly Dictionary<string, ObjectStats> objectStats = new Dictionary<string, ObjectStats>();
         StreamWriter csv;
         float sessionStart;
         float lastInput = -999f;
@@ -82,7 +97,8 @@ namespace SortEverything.Prototype
             {
                 string path = Path.Combine(FolderPath, "dragfeel_" + Summary.sessionId + ".csv");
                 csv = new StreamWriter(path, false, Encoding.UTF8);
-                csv.WriteLine("t,event,variant,objectId,mass,type,containerZone,dragSeconds,dragDistanceDp,speedDp,outcome,detail");
+                csv.WriteLine("t,event,variant,objectId,mass,type,containerZone,dragSeconds,dragDistanceDp,speedDp,outcome,detail," +
+                              "objectKey,objectCategory,sortColor,contentMode");
                 csv.Flush();
             }
             catch (Exception e)
@@ -104,6 +120,7 @@ namespace SortEverything.Prototype
             dragSecondsTotal = roundSecondsTotal = nextTapTotal = 0f;
             nextTaps = 0;
             pending.Clear();
+            objectStats.Clear();
             written = false;
             Log("reset", null, null, "");
         }
@@ -113,6 +130,7 @@ namespace SortEverything.Prototype
         public void OnPickup(SortObject o)
         {
             Summary.pickups++;
+            Stats(o.objectKey, o.objectCategory, o.category).pickups++;
             Log("pickup", o, null, "");
         }
 
@@ -120,6 +138,16 @@ namespace SortEverything.Prototype
         {
             Summary.releases++;
             dragSecondsTotal += r.dragSeconds;
+            if (r.obj != null)
+            {
+                r.objectKey = r.obj.objectKey;
+                r.objectCategory = r.obj.objectCategory;
+                r.sortColor = r.obj.category;
+            }
+            var st = Stats(r.objectKey, r.objectCategory, r.sortColor);
+            st.releases++;
+            if (r.type == "assisted") st.assisted++;
+            if (r.type.StartsWith("flick", StringComparison.Ordinal)) st.flicks++;
             if (r.containerZone) Summary.containerZoneDrops++;
             if (r.type == "assisted") Summary.assistedDrops++;
             if (r.type.StartsWith("flick", StringComparison.Ordinal)) Summary.flicks++;
@@ -129,6 +157,8 @@ namespace SortEverything.Prototype
         public void OnSorted(SortObject o, bool correct)
         {
             if (correct) Summary.correct++; else Summary.wrong++;
+            var st = Stats(o.objectKey, o.objectCategory, o.category);
+            if (correct) st.correct++; else st.wrong++;
             var r = o.pendingDrop;
             if (r != null && r.outcome == null)
             {
@@ -162,11 +192,20 @@ namespace SortEverything.Prototype
             Log("variant", null, null, variant);
         }
 
+        public void OnContentChanged(string content)
+        {
+            Log("content", null, null, content);
+        }
+
         void Resolve(DropRecord r, string outcome)
         {
             r.outcome = outcome;
             pending.Remove(r);
-            if (outcome == "missed") Summary.missedDrops++;
+            if (outcome == "missed")
+            {
+                Summary.missedDrops++;
+                Stats(r.objectKey, r.objectCategory, r.sortColor).missed++;
+            }
             Log("release", r.obj, r, "");
         }
 
@@ -195,6 +234,40 @@ namespace SortEverything.Prototype
             Summary.avgDragSeconds = Summary.releases > 0 ? dragSecondsTotal / Summary.releases : 0f;
             Summary.avgRoundSeconds = Summary.roundsCompleted > 0 ? roundSecondsTotal / Summary.roundsCompleted : 0f;
             Summary.avgNextTapSeconds = nextTaps > 0 ? nextTapTotal / nextTaps : 0f;
+            Summary.contentMode = ContentSettings.Mode.ToString();
+            Summary.objectPool = ContentSettings.Pool.ToString();
+        }
+
+        ObjectStats Stats(string key, string category, int sortColor)
+        {
+            if (string.IsNullOrEmpty(key)) key = "unknown";
+            ObjectStats st;
+            if (!objectStats.TryGetValue(key, out st))
+            {
+                st = new ObjectStats { objectKey = key, objectCategory = category, sortColor = sortColor };
+                objectStats[key] = st;
+            }
+            return st;
+        }
+
+        static string ColorName(int sortColor)
+        {
+            return sortColor >= 0 && sortColor <= 4 ? ((SortColor)sortColor).ToString() : "";
+        }
+
+        void WriteObjectStats()
+        {
+            if (objectStats.Count == 0) return;
+            var sb = new StringBuilder();
+            sb.AppendLine("sessionId,objectKey,objectCategory,sortColor,pickups,releases,correct,wrong,missed,assisted,flicks");
+            foreach (var st in objectStats.Values)
+            {
+                sb.Append(Summary.sessionId).Append(',').Append(st.objectKey).Append(',').Append(st.objectCategory).Append(',')
+                    .Append(ColorName(st.sortColor)).Append(',').Append(st.pickups).Append(',').Append(st.releases).Append(',')
+                    .Append(st.correct).Append(',').Append(st.wrong).Append(',').Append(st.missed).Append(',')
+                    .Append(st.assisted).Append(',').Append(st.flicks).AppendLine();
+            }
+            File.WriteAllText(Path.Combine(FolderPath, "dragfeel_objects_" + Summary.sessionId + ".csv"), sb.ToString());
         }
 
         public string SummaryText()
@@ -205,11 +278,12 @@ namespace SortEverything.Prototype
                 "Variant {0}{1} · session {2} · active play {3}\n" +
                 "Rounds {4} (avg {5:F1}s) · sorts {6} ✓ / {7} ✗\n" +
                 "Container drops {8} · missed {9} ({10:P0}) · assisted {11}\n" +
-                "Flicks {12} (hits {13}) · avg drag {14:F2}s",
+                "Flicks {12} (hits {13}) · avg drag {14:F2}s\n" +
+                "Content {15} · pool {16}",
                 s.variant, s.customTuning ? " (custom)" : "", Clock(s.sessionSeconds), Clock(s.activeSeconds),
                 s.roundsCompleted, s.avgRoundSeconds, s.correct, s.wrong,
                 s.containerZoneDrops, s.missedDrops, s.misDropRate, s.assistedDrops,
-                s.flicks, s.flickHits, s.avgDragSeconds);
+                s.flicks, s.flickHits, s.avgDragSeconds, s.contentMode, s.objectPool);
         }
 
         public string SummaryJson()
@@ -237,6 +311,7 @@ namespace SortEverything.Prototype
                 lines.RemoveAll(l => l.Contains(marker));
                 lines.Add(line);
                 File.WriteAllLines(path, lines.ToArray());
+                WriteObjectStats();
                 written = true;
             }
             catch (Exception e)
@@ -267,7 +342,12 @@ namespace SortEverything.Prototype
             {
                 sb.Append(",,,,,,");
             }
-            sb.Append(detail.Replace(',', ';'));
+            sb.Append(detail.Replace(',', ';')).Append(',');
+            string key = r != null ? r.objectKey : o != null ? o.objectKey : null;
+            string cat = r != null ? r.objectCategory : o != null ? o.objectCategory : null;
+            int color = r != null ? r.sortColor : o != null ? o.category : -1;
+            sb.Append(key ?? "").Append(',').Append(cat ?? "").Append(',').Append(ColorName(color)).Append(',');
+            sb.Append(Proto.Director != null ? Proto.Director.RoundMode.ToString() : "");
             try
             {
                 csv.WriteLine(sb.ToString());

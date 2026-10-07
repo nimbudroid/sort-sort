@@ -158,6 +158,18 @@ namespace SortEverything.Prototype
             if (d.RoundComplete && d.StampTime > d.CompleteTime) DrawStamp(d);
             if (d.ShowNext) DrawNext(d);
 
+            if (Proto.Config.debugOverlay && !PanelOpen)
+            {
+                for (int i = 0; i < d.Objects.Count; i++)
+                {
+                    var o = d.Objects[i];
+                    if (!o.gameObject.activeInHierarchy || o.state == ObjState.Sorted) continue;
+                    Vector2 g = Units.WorldToGui(o.Position + Vector2.down * o.HalfExtent);
+                    GUI.Label(new Rect(g.x - 60 * u, g.y, 120 * u, 18 * u), o.displayName,
+                        new GUIStyle(small) { alignment = TextAnchor.UpperCenter, fontSize = Px(10) });
+                }
+            }
+
             if (toast != null && Time.unscaledTime < toastUntil)
                 GUI.Label(new Rect(0, safe.yMax - 80 * u, Screen.width, 30 * u), toast, new GUIStyle(title) { alignment = TextAnchor.MiddleCenter });
 
@@ -240,6 +252,21 @@ namespace SortEverything.Prototype
             }
             y += row + 6 * u;
 
+            // Content: what the rounds are made of. Switching starts a new round straight away.
+            GUI.Label(new Rect(0, y, w, row * 0.7f), "Content  (round: " + ContentSettings.ModeLabel(Proto.Director.RoundMode) + ")", label);
+            y += row * 0.75f;
+            float cw = w / 4f;
+            for (int i = 0; i < 3; i++)
+            {
+                var m = (ContentMode)i;
+                var s = new GUIStyle(button);
+                if (ContentSettings.Mode == m) s.normal.textColor = new Color(1f, 0.75f, 0.2f);
+                if (GUI.Button(new Rect(i * cw + 2, y, cw - 4, row - 4), ContentSettings.ModeLabel(m), s)) SelectContent(m, ContentSettings.Pool);
+            }
+            if (GUI.Button(new Rect(3 * cw + 2, y, cw - 4, row - 4), ContentSettings.PoolLabel(ContentSettings.Pool), button))
+                SelectContent(ContentSettings.Mode, (ObjectPool)(((int)ContentSettings.Pool + 1) % 3));
+            y += row + 6 * u;
+
             var c = Proto.Config;
             bool changed = false;
             changed |= Slider(ref y, w, row, "Lift offset", ref c.liftOffsetDp, 0f, 80f, "F0", " dp");
@@ -317,6 +344,16 @@ namespace SortEverything.Prototype
             if (!GUI.Button(r, name + (v ? ": ON" : ": off"), s)) return false;
             v = !v;
             return true;
+        }
+
+        void SelectContent(ContentMode mode, ObjectPool pool)
+        {
+            ContentSettings.Mode = mode;
+            ContentSettings.Pool = pool;
+            ContentSettings.Save();
+            Proto.Telemetry.OnContentChanged(ContentSettings.ModeLabel(mode) + "/" + pool);
+            Proto.Director.StartRound();
+            Toast(ContentSettings.ModeLabel(mode) + " · " + ContentSettings.PoolLabel(pool));
         }
 
         void SelectVariant(FeelVariant v)

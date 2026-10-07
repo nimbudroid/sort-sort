@@ -34,6 +34,7 @@ namespace SortEverything.Prototype
             FeelConfig config;
             bool custom;
             FeelConfig.Load(out variant, out config, out custom);
+            ContentSettings.Load();
             Proto.Variant = variant;
             Proto.Config = config;
             Proto.CustomTuning = custom;
@@ -48,6 +49,7 @@ namespace SortEverything.Prototype
             Proto.Drag = gameObject.AddComponent<DragController>();
             Proto.Hud = gameObject.AddComponent<Hud>();
             Proto.Telemetry.OnVariantChanged(variant + (custom ? "*" : ""));
+            Proto.Telemetry.OnContentChanged(ContentSettings.ModeLabel(ContentSettings.Mode) + "/" + ContentSettings.Pool);
         }
 
         void Start()

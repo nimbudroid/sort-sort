@@ -18,12 +18,18 @@ namespace SortEverything.Prototype
     public class SortObject : MonoBehaviour
     {
         public int id;
-        public int category;
+        public int category;    // bin colour index (SortColor value); bins match on this
         public int mass;        // 1..5 (GDD mass classes)
         public float size;      // world units
         public ShapeKind shape;
         public Color color;
         public ObjState state;
+
+        // Content identity, for telemetry and debug labels. Shapes use "shape_circle" etc.
+        public ObjectDef def;           // null for geometric shapes
+        public string objectKey;
+        public string displayName;
+        public string objectCategory;
 
         public Rigidbody2D rb;
         public Collider2D col;
@@ -38,33 +44,16 @@ namespace SortEverything.Prototype
         public float HalfExtent { get { return size * 0.5f; } }
         public Vector2 Position { get { return transform.position; } }
 
+        /// <summary>Original P1 geometric shape (tinted, patterned sprite and primitive collider).</summary>
         public static SortObject Create(int id, int category, int pattern, Color baseColor, ShapeKind shape, int mass,
             float size, Vector2 pos, PhysicsMaterial2D material, int order, Transform parent)
         {
-            var go = new GameObject("Obj" + id + "_" + shape + "_m" + mass);
-            go.transform.SetParent(parent, false);
-            go.transform.position = pos;
-            go.transform.rotation = Quaternion.Euler(0f, 0f, Random.Range(-25f, 25f));
-            go.transform.localScale = new Vector3(size, size, 1f);
-
-            var so = go.AddComponent<SortObject>();
-            so.id = id;
-            so.category = category;
-            so.mass = mass;
-            so.size = size;
+            var so = CreateRoot("Obj" + id + "_" + shape + "_m" + mass, id, category, baseColor, mass, size, pos, order, parent);
+            var go = so.gameObject;
             so.shape = shape;
-            // Heavier objects are slightly darker: a weight tell that doesn't fight the colour category.
-            so.color = Color.Lerp(baseColor, Color.black, 0.05f * (mass - 1));
-            so.color.a = 1f;
-            so.baseOrder = order;
-
-            var rb = go.AddComponent<Rigidbody2D>();
-            rb.mass = 0.5f + 0.5f * mass;
-            rb.gravityScale = 1f;
-            rb.interpolation = RigidbodyInterpolation2D.Interpolate;
-            rb.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
-            rb.SetDamping(0.05f, 1.5f);
-            so.rb = rb;
+            so.objectKey = "shape_" + shape.ToString().ToLowerInvariant();
+            so.displayName = shape.ToString();
+            so.objectCategory = "Shape";
 
             switch (shape)
             {
@@ -110,6 +99,72 @@ namespace SortEverything.Prototype
             so.spring = vis.AddComponent<Springy>();
 
             so.state = ObjState.Pile;
+            return so;
+        }
+
+        /// <summary>
+        /// A recognisable library object: full-colour vector sprite and a convex collider traced from its silhouette.
+        /// Physics, mass and everything the drag uses are set up exactly as for shapes.
+        /// </summary>
+        public static SortObject CreateFromDef(int id, ObjectDef def, Color binColor, float size, Vector2 pos,
+            PhysicsMaterial2D material, int order, Transform parent)
+        {
+            Sprite sprite;
+            Vector2[] hull;
+            if (!ObjectArt.TryGet(def, out sprite, out hull)) return null;
+
+            var so = CreateRoot("Obj" + id + "_" + def.id + "_m" + def.mass, id, (int)def.sortColor, binColor, def.mass, size,
+                pos, order, parent);
+            so.def = def;
+            so.shape = ShapeKind.Circle; // unused for library objects
+            so.objectKey = def.id;
+            so.displayName = def.displayName;
+            so.objectCategory = def.category.ToString();
+
+            var c = so.gameObject.AddComponent<PolygonCollider2D>();
+            c.SetPath(0, hull);
+            c.sharedMaterial = material;
+            so.col = c;
+
+            var vis = new GameObject("Visual");
+            vis.transform.SetParent(so.transform, false);
+            so.sr = vis.AddComponent<SpriteRenderer>();
+            so.sr.sprite = sprite;
+            // Same subtle "heavier = darker" weight tell as shapes, applied to the full-colour art.
+            so.sr.color = Color.Lerp(Color.white, Color.black, 0.05f * (def.mass - 1));
+            so.sr.sortingOrder = order;
+            so.spring = vis.AddComponent<Springy>();
+
+            so.state = ObjState.Pile;
+            return so;
+        }
+
+        static SortObject CreateRoot(string name, int id, int category, Color baseColor, int mass, float size, Vector2 pos,
+            int order, Transform parent)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(parent, false);
+            go.transform.position = pos;
+            go.transform.rotation = Quaternion.Euler(0f, 0f, Random.Range(-25f, 25f));
+            go.transform.localScale = new Vector3(size, size, 1f);
+
+            var so = go.AddComponent<SortObject>();
+            so.id = id;
+            so.category = category;
+            so.mass = mass;
+            so.size = size;
+            // Heavier objects are slightly darker: a weight tell that doesn't fight the colour category.
+            so.color = Color.Lerp(baseColor, Color.black, 0.05f * (mass - 1));
+            so.color.a = 1f;
+            so.baseOrder = order;
+
+            var rb = go.AddComponent<Rigidbody2D>();
+            rb.mass = 0.5f + 0.5f * mass;
+            rb.gravityScale = 1f;
+            rb.interpolation = RigidbodyInterpolation2D.Interpolate;
+            rb.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
+            rb.SetDamping(0.05f, 1.5f);
+            so.rb = rb;
             return so;
         }
 

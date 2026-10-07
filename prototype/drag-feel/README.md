@@ -30,6 +30,44 @@ The prototype contains no rules beyond colour, no timer and no fail state. It's 
 
 Everything (sprites, sounds, scene) is generated from code. There are no art or audio assets to import.
 
+## Content modes: shapes vs real objects
+
+The second test question is whether sorting **recognisable everyday objects** is more fun than sorting shapes. The drag, bins, feedback and E1 variants are identical in every mode. Only what's on the table changes.
+
+| Mode | What spawns |
+|---|---|
+| **Shapes** | The original P1 content: tinted geometric shapes with colour-blind patterns |
+| **Real** (default) | Recognisable objects from the object library, e.g. a red apple, blue stapler, yellow banana, green plant, purple gift box |
+| **Mixed** | Half shapes, half real objects in every round |
+
+Switch modes in the panel (•••) under **Content**: tap **Shapes**, **Real** or **Mixed**. The fourth button cycles the **object pool**:
+
+| Pool | Objects | Colour-sortable |
+|---|---|---|
+| **Core 30** (default) | The first 30 (food, desk, everyday) | 29 (the orange isn't a bin colour) |
+| **Core + Extended** | Plus more food, office, home, toys, electronics, nature | 67 |
+| **Everything** | Plus animals and fantasy | 78 |
+
+Switching starts a new round at once, and the choice is saved between launches.
+
+In real-object rounds: no object appears twice in a round, objects from the last two rounds are avoided, categories are spread, and every round has at least one heavy object (mass 4–5) and two light ones (mass 1–2), so weight lag stays testable. With Core 30 alone, about 43% of a round's objects were also in one of the last two rounds, because the pool is small. Core + Extended brings that to ~0%.
+
+### The object library
+
+| File | Role |
+|---|---|
+| `Scripts/Content/ObjectDefs.cs` | `ObjectDef` plus enums: id, display name, category, sort colour, mass 1–5, size class, material, room, tier, tags, special (reserved) |
+| `Scripts/Content/ObjectLibrary.cs` | The database: 103 one-line definitions, with queries such as `ColorSortable(pool, colour)` |
+| `Scripts/Content/ObjectDrawings.cs` | One small procedural vector drawing per object id |
+| `Scripts/Content/VectorPainter.cs` | Signed-distance vector painter: shapes, sticker outlines, toy shading, convex-hull collider tracing |
+| `Scripts/Content/ObjectArt.cs` | Turns drawings into cached Unity sprites (160 px) and polygon colliders |
+| `Scripts/Content/RoundContent.cs` | Picks objects for a round's colour slots (no repeats, variety, mass spread) |
+| `Scripts/Content/ContentSettings.cs` | Current mode and pool (PlayerPrefs) |
+
+**To add an object:** add one `D(...)` line in `ObjectLibrary.cs` and one drawing function, registered in the dictionary in `ObjectDrawings.cs`. Nothing in the drag, bins or rounds changes. Objects with `SortColor.None` (brown cookie, black smartphone, …) never appear in colour rounds; their category, material and room metadata are there for later rule types.
+
+The library and drawings are plain C# with no UnityEngine dependency, so they can be rendered and tested outside Unity.
+
 ## Opening the project
 
 1. Install **Unity 6 LTS** (6000.0.x) through Unity Hub, with the **Android Build Support** and/or **iOS Build Support** modules. A newer Unity 6 patch is fine; accept the upgrade prompt.
@@ -76,7 +114,8 @@ Tap **•••** (top-right). Testers never see the variant name; only the pane
 - **E1 variants:** A (GDD spec), B (no lift), C (no weight lag), D (neither).
 - **Sliders:** lift offset, follow time for mass 1 and mass 5, sag, pickup scale, hit padding, drop assist, flick threshold, throw scale, aim assist, max tilt. Changing any slider marks the session "custom" in the logs.
 - **Toggles:** Weight lag, Juice (squash, particles, faces, melody, shake), Sound, Haptics, Debug.
-- **Debug** overlays the hit areas (cyan), drop-assist zones (yellow), bin mouths (green) and the container-zone line (pink), and shows the last release speed in dp/s. Use it to tune the flick threshold against real thumbs.
+- **Content:** Shapes / Real / Mixed and the object pool (see above).
+- **Debug** overlays the hit areas (cyan), drop-assist zones (yellow), bin mouths (green) and the container-zone line (pink), labels each object with its name, and shows the last release speed in dp/s. Use it to tune the flick threshold against real thumbs.
 - Settings persist between launches.
 
 ## Logs
@@ -86,7 +125,10 @@ Written to `Application.persistentDataPath`:
 | File | Contents |
 |---|---|
 | `dragfeel_<session>.csv` | One row per event: pickup, release (type, speed in dp/s, drag time and distance, outcome), round complete, next tapped, variant changes |
-| `dragfeel_sessions.jsonl` | One summary line per session, updated on every round and when the app is backgrounded or quit |
+| `dragfeel_sessions.jsonl` | One summary line per session, updated on every round and when the app is backgrounded or quit. Includes `contentMode` and `objectPool` |
+| `dragfeel_objects_<session>.csv` | Per object (`apple`, `stapler`, `shape_circle`, …): category, colour, pickups, releases, correct, wrong, missed, assisted, flicks |
+
+Every event row in the CSV also carries `objectKey`, `objectCategory`, `sortColor` and `contentMode`. That makes it possible to see which objects get picked up, missed or mis-sorted, and which categories do best.
 
 To get them off the device:
 - **Android:** `adb pull /sdcard/Android/data/com.sorteverything.dragfeel/files/`
@@ -112,6 +154,10 @@ To get them off the device:
 | `Hud.cs` | HUD, stamp, NEXT, tuning panel, debug overlay (IMGUI) |
 | `Editor/PrototypeSetup.cs` | First-open project setup |
 | `Editor/IosLogAccess.cs` | iOS Info.plist file-sharing flag |
+
+## Deliberately not in this iteration
+
+Sorting by anything other than colour. The category, size, material, room and tags metadata exists for later rules, but no rule uses it yet.
 
 ## Deliberately not in P1
 
