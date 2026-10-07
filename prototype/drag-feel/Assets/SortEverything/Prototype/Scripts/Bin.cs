@@ -1,0 +1,358 @@
+using System.Collections;
+using UnityEngine;
+
+namespace SortEverything.Prototype
+{
+    /// <summary>
+    /// A container with a face ("Binbuddy", GDD ch. 08). Counts an object the moment its centre is inside the
+    /// mouth (GDD ch. 02 §2.5 rule 2), gulps correct objects and spits wrong ones back onto the pile.
+    /// Colliders live on the root; everything that animates lives under visualRoot.
+    /// </summary>
+    public class Bin : MonoBehaviour
+    {
+        public int category;
+        public int capacity;
+        public int count;
+        public bool Closed;
+        public Color color;
+
+        float width, height, wall;
+        Vector2 bottomCenter;
+
+        Transform visualRoot;
+        Springy spring;
+        SpriteRenderer back;
+        Color backColor;
+        Transform eyeL, eyeR, pupilL, pupilR;
+        Vector3 pupilLBase, pupilRBase;
+        float eyeRadius;
+        TextMesh counter;
+        Transform lidHinge;
+        SpriteRenderer lidSprite;
+        BoxCollider2D lidCollider;
+
+        bool hover;
+        float nextBlink, blinkUntil;
+        float happyUntil, disgustUntil, flashUntil;
+        float wiggleStart = -10f;
+
+        public float Top { get { return bottomCenter.y + height; } }
+        public float Bottom { get { return bottomCenter.y; } }
+        public float CenterX { get { return bottomCenter.x; } }
+        public float InnerLeft { get { return bottomCenter.x - width / 2f + wall; } }
+        public float InnerRight { get { return bottomCenter.x + width / 2f - wall; } }
+        public Vector2 MouthCenter { get { return new Vector2(bottomCenter.x, Top); } }
+
+        public static Bin Create(int category, Color color, int pattern, int capacity, Vector2 bottomCenter,
+            float width, float height, PhysicsMaterial2D material, Transform parent)
+        {
+            var go = new GameObject("Bin" + category);
+            go.transform.SetParent(parent, false);
+            go.transform.position = bottomCenter;
+            var bin = go.AddComponent<Bin>();
+            bin.category = category;
+            bin.color = color;
+            bin.capacity = capacity;
+            bin.width = width;
+            bin.height = height;
+            bin.wall = Units.DpToWorld(8f);
+            bin.bottomCenter = bottomCenter;
+            bin.Build(pattern, material);
+            return bin;
+        }
+
+        void Build(int pattern, PhysicsMaterial2D material)
+        {
+            // Physics: two walls and a floor. A lid collider switches on when the bin is full.
+            AddBox("WallL", new Vector2(-width / 2f + wall / 2f, height / 2f), new Vector2(wall, height), material);
+            AddBox("WallR", new Vector2(width / 2f - wall / 2f, height / 2f), new Vector2(wall, height), material);
+            AddBox("Floor", new Vector2(0f, wall / 2f), new Vector2(width, wall), material);
+            lidCollider = AddBox("LidCollider", new Vector2(0f, height + wall / 2f), new Vector2(width, wall), material);
+            lidCollider.enabled = false;
+
+            var rr = ProcSprites.RoundedRect();
+            var vr = new GameObject("Visual");
+            vr.transform.SetParent(transform, false);
+            visualRoot = vr.transform;
+            spring = vr.AddComponent<Springy>();
+
+            backColor = Color.Lerp(color, new Color(0.25f, 0.22f, 0.3f), 0.45f);
+            back = Sliced("Back", rr, new Vector2(0f, height / 2f), new Vector2(width, height), backColor, 0);
+            Color side = Color.Lerp(color, Color.black, 0.25f);
+            Sliced("SideL", rr, new Vector2(-width / 2f + wall * 0.7f, height / 2f), new Vector2(wall * 1.4f, height), side, 300);
+            Sliced("SideR", rr, new Vector2(width / 2f - wall * 0.7f, height / 2f), new Vector2(wall * 1.4f, height), side, 300);
+            float frontH = height * 0.45f;
+            Sliced("Front", rr, new Vector2(0f, frontH / 2f), new Vector2(width, frontH), Color.Lerp(color, Color.white, 0.25f), 301);
+
+            // Face.
+            eyeRadius = Mathf.Min(width * 0.13f, height * 0.11f);
+            var circle = ProcSprites.Circle();
+            eyeL = Disc("EyeL", circle, new Vector2(-width * 0.2f, height * 0.31f), eyeRadius * 2f, Color.white, 302);
+            eyeR = Disc("EyeR", circle, new Vector2(width * 0.2f, height * 0.31f), eyeRadius * 2f, Color.white, 302);
+            pupilL = Disc("PupilL", circle, Vector2.zero, 0.5f, new Color(0.12f, 0.1f, 0.14f), 303, eyeL);
+            pupilR = Disc("PupilR", circle, Vector2.zero, 0.5f, new Color(0.12f, 0.1f, 0.14f), 303, eyeR);
+            pupilLBase = pupilL.localPosition;
+            pupilRBase = pupilR.localPosition;
+
+            // Rule chip (colour + pattern, never text) and capacity counter.
+            var chip = new GameObject("Chip");
+            chip.transform.SetParent(visualRoot, false);
+            chip.transform.localPosition = new Vector3(-width * 0.17f, height * 0.11f, 0f);
+            chip.transform.localScale = Vector3.one * height * 0.16f;
+            var chipSr = chip.AddComponent<SpriteRenderer>();
+            chipSr.sprite = ProcSprites.Shape(ShapeKind.Circle, pattern);
+            chipSr.color = color;
+            chipSr.sortingOrder = 302;
+
+            var txt = new GameObject("Counter");
+            txt.transform.SetParent(visualRoot, false);
+            txt.transform.localPosition = new Vector3(width * 0.14f, height * 0.11f, 0f);
+            counter = txt.AddComponent<TextMesh>();
+            counter.font = Hud.BuiltinFont;
+            counter.GetComponent<MeshRenderer>().sharedMaterial = counter.font.material;
+            counter.GetComponent<MeshRenderer>().sortingOrder = 304;
+            counter.fontSize = 64;
+            counter.characterSize = height * 0.13f * 10f / 64f * 1.4f;
+            counter.anchor = TextAnchor.MiddleCenter;
+            counter.alignment = TextAlignment.Center;
+            counter.fontStyle = FontStyle.Bold;
+            counter.color = new Color(0.15f, 0.12f, 0.18f);
+            UpdateCounter();
+
+            // Lid, hinged at the left rim; stands open (behind the pile) until the bin fills.
+            var hinge = new GameObject("LidHinge");
+            hinge.transform.SetParent(visualRoot, false);
+            hinge.transform.localPosition = new Vector3(-width / 2f, height, 0f);
+            hinge.transform.localRotation = Quaternion.Euler(0f, 0f, 100f);
+            lidHinge = hinge.transform;
+            var lid = new GameObject("Lid");
+            lid.transform.SetParent(lidHinge, false);
+            lid.transform.localPosition = new Vector3(width / 2f + wall * 0.3f, 0f, 0f);
+            lidSprite = lid.AddComponent<SpriteRenderer>();
+            lidSprite.sprite = rr;
+            lidSprite.drawMode = SpriteDrawMode.Sliced;
+            lidSprite.size = new Vector2(width + wall * 0.6f, wall * 1.6f);
+            lidSprite.color = side;
+            lidSprite.sortingOrder = 1;
+
+            nextBlink = Time.time + Random.Range(1.5f, 4f);
+        }
+
+        BoxCollider2D AddBox(string name, Vector2 local, Vector2 size, PhysicsMaterial2D material)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(transform, false);
+            go.transform.localPosition = local;
+            var box = go.AddComponent<BoxCollider2D>();
+            box.size = size;
+            box.sharedMaterial = material;
+            return box;
+        }
+
+        SpriteRenderer Sliced(string name, Sprite sprite, Vector2 local, Vector2 size, Color c, int order)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(visualRoot, false);
+            go.transform.localPosition = local;
+            var sr = go.AddComponent<SpriteRenderer>();
+            sr.sprite = sprite;
+            sr.drawMode = SpriteDrawMode.Sliced;
+            sr.size = size;
+            sr.color = c;
+            sr.sortingOrder = order;
+            return sr;
+        }
+
+        Transform Disc(string name, Sprite sprite, Vector2 local, float diameter, Color c, int order, Transform parent = null)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(parent != null ? parent : visualRoot, false);
+            go.transform.localPosition = local;
+            go.transform.localScale = Vector3.one * diameter;
+            var sr = go.AddComponent<SpriteRenderer>();
+            sr.sprite = sprite;
+            sr.color = c;
+            sr.sortingOrder = order;
+            return go.transform;
+        }
+
+        public void PopIn(float delay)
+        {
+            spring.SetInstant(new Vector2(0.01f, 0.01f));
+            spring.target = Vector2.zero;
+            StartCoroutine(Juice.Delay(delay, () =>
+            {
+                spring.target = Vector2.one;
+                if (!Proto.Config.juice) spring.SetInstant(Vector2.one);
+            }));
+        }
+
+        /// <summary>True if x is over the open mouth (between the inner walls).</summary>
+        public bool ColumnContains(float x) { return x > InnerLeft && x < InnerRight; }
+
+        /// <summary>Horizontal distance from x to the mouth opening (0 when over it).</summary>
+        public float MouthDistance(float x)
+        {
+            if (x < InnerLeft) return InnerLeft - x;
+            if (x > InnerRight) return x - InnerRight;
+            return 0f;
+        }
+
+        public void SetHover(bool on) { hover = on; }
+
+        void FixedUpdate()
+        {
+            if (Closed || Proto.Director == null) return;
+            var objects = Proto.Director.Objects;
+            for (int i = 0; i < objects.Count; i++)
+            {
+                var o = objects[i];
+                if (o.state != ObjState.Pile) continue;
+                Vector2 p = o.Position;
+                if (p.y >= Top || p.y <= Bottom || !ColumnContains(p.x)) continue;
+                if (o.category == category) Accept(o);
+                else Reject(o);
+            }
+        }
+
+        void Accept(SortObject o)
+        {
+            o.state = ObjState.Sorted;
+            o.SetOrder(50 + count);
+            count++;
+            UpdateCounter();
+            spring.Kick(new Vector2(1.12f, 0.88f));
+            happyUntil = Time.time + 0.3f;
+            Proto.Juice.Burst(MouthCenter, color, Random.Range(6, 11), 4f, o.size * 0.18f);
+            Proto.Audio.Gulp();
+            Haptics.Play(Haptics.Kind.Light);
+            Proto.Telemetry.OnSorted(o, true);
+            Proto.Director.OnCorrect(this, o);
+            if (count >= capacity) Close();
+        }
+
+        void Reject(SortObject o)
+        {
+            o.state = ObjState.Spitting;
+            o.SetSimulated(false);
+            disgustUntil = Time.time + 0.6f;
+            flashUntil = Time.time + 0.35f;
+            Haptics.Play(Haptics.Kind.Medium);
+            Proto.Telemetry.OnSorted(o, false);
+            Proto.Director.OnWrong(this, o);
+            StartCoroutine(Spit(o));
+        }
+
+        IEnumerator Spit(SortObject o)
+        {
+            yield return new WaitForSeconds(0.15f);
+            if (o == null) yield break;
+            Proto.Audio.Ptoo();
+            Proto.Audio.Bwomp();
+            spring.Kick(new Vector2(0.9f, 1.15f));
+            Vector2 from = o.Position;
+            Vector2 to = Proto.Director.RandomPileLandingPoint();
+            float arc = Mathf.Max(1.5f, (to.y - from.y) * 0.5f + 1.5f);
+            float spin = Random.Range(-540f, 540f);
+            float startAngle = o.transform.eulerAngles.z;
+            const float duration = 0.45f;
+            for (float t = 0f; t < duration; t += Time.deltaTime)
+            {
+                if (o == null) yield break;
+                float k = t / duration;
+                Vector2 p = Vector2.Lerp(from, to, k) + Vector2.up * arc * 4f * k * (1f - k);
+                o.transform.position = p;
+                o.transform.rotation = Quaternion.Euler(0f, 0f, startAngle + spin * k);
+                yield return null;
+            }
+            if (o == null) yield break;
+            o.transform.position = to;
+            o.SetSimulated(true);
+            o.rb.SetVelocity(new Vector2(0f, -2f));
+            o.state = ObjState.Pile;
+        }
+
+        void Close()
+        {
+            Closed = true;
+            lidCollider.enabled = true;
+            StartCoroutine(CloseLid());
+        }
+
+        IEnumerator CloseLid()
+        {
+            lidSprite.sortingOrder = 310;
+            const float duration = 0.12f;
+            for (float t = 0f; t < duration; t += Time.deltaTime)
+            {
+                lidHinge.localRotation = Quaternion.Euler(0f, 0f, Mathf.Lerp(100f, 0f, t / duration));
+                yield return null;
+            }
+            lidHinge.localRotation = Quaternion.identity;
+            Proto.Audio.Clack();
+            Haptics.Play(Haptics.Kind.Tick);
+            Hop();
+            Proto.Juice.Ring(MouthCenter, Color.Lerp(color, Color.white, 0.4f), 14, 3.5f, height * 0.06f);
+        }
+
+        /// <summary>Little happy hop + wiggle, used when full and in the completion cascade.</summary>
+        public void Hop()
+        {
+            if (!Proto.Config.juice) return;
+            wiggleStart = Time.time;
+            spring.Kick(new Vector2(0.92f, 1.1f));
+        }
+
+        void UpdateCounter()
+        {
+            counter.text = count + "/" + capacity;
+        }
+
+        void Update()
+        {
+            bool juice = Proto.Config.juice;
+            float now = Time.time;
+
+            // Blink.
+            if (now > nextBlink)
+            {
+                blinkUntil = now + 0.09f;
+                nextBlink = now + Random.Range(2f, 5f);
+            }
+
+            Vector2 left = Vector2.one, right = Vector2.one;
+            if (juice)
+            {
+                if (hover) left = right = new Vector2(1.18f, 1.18f);
+                if (now < happyUntil) left = right = new Vector2(1.1f, 0.28f);
+                if (now < disgustUntil) { left = new Vector2(1.05f, 0.35f); right = new Vector2(1f, 0.8f); }
+                if (now < blinkUntil) { left.y = 0.1f; right.y = 0.1f; }
+            }
+            float k = 1f - Mathf.Exp(-Time.deltaTime * 30f);
+            eyeL.localScale = Vector3.Lerp(eyeL.localScale, new Vector3(left.x, left.y, 1f) * eyeRadius * 2f, k);
+            eyeR.localScale = Vector3.Lerp(eyeR.localScale, new Vector3(right.x, right.y, 1f) * eyeRadius * 2f, k);
+
+            // Pupils track the object under the finger (or drift when idle).
+            Vector2 look;
+            Vector2 eyesWorld = (Vector2)visualRoot.position + new Vector2(0f, height * 0.31f);
+            Vector2 target;
+            if (juice && Proto.Drag != null && Proto.Drag.TryGetHeldPosition(out target))
+                look = Vector2.ClampMagnitude((target - eyesWorld) * 0.6f, 1f);
+            else
+                look = new Vector2(Mathf.Sin(now * 0.7f + category), Mathf.Cos(now * 0.5f + category * 2f) * 0.5f) * 0.4f;
+            if (juice && now < disgustUntil) look = new Vector2(0f, -0.8f);
+            pupilL.localPosition = Vector3.Lerp(pupilL.localPosition, pupilLBase + (Vector3)(look * 0.24f), k);
+            pupilR.localPosition = Vector3.Lerp(pupilR.localPosition, pupilRBase + (Vector3)(look * 0.24f), k);
+
+            // Red flash on reject.
+            back.color = now < flashUntil && juice
+                ? Color.Lerp(backColor, new Color(0.95f, 0.2f, 0.2f), (flashUntil - now) / 0.35f)
+                : backColor;
+
+            // Wiggle.
+            float w = now - wiggleStart;
+            float angle = w < 0.5f ? Mathf.Sin(w * 40f) * 6f * (1f - w / 0.5f) : 0f;
+            visualRoot.localRotation = Quaternion.Euler(0f, 0f, angle);
+        }
+    }
+}
