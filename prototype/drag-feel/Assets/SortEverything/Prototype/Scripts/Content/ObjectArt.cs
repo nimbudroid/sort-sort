@@ -14,7 +14,7 @@ namespace SortEverything.Prototype
         class Entry
         {
             public Sprite sprite;
-            public Sprite shadow; // soft baked contact shadow (Molded mode only); separate layer, never a collider input
+            public Sprite shadow; // soft baked contact shadow (Molded and Sculpted modes); separate layer, never a collider input
             public Vector2[] hull;
         }
 
@@ -39,7 +39,7 @@ namespace SortEverything.Prototype
             return true;
         }
 
-        /// <summary>The object's baked soft shadow sprite, or null (not Molded mode, or not built yet).</summary>
+        /// <summary>The object's baked soft shadow sprite, or null (Flat/Painted mode, or not built yet).</summary>
         public static Sprite Shadow(ObjectDef def)
         {
             Entry e;
@@ -71,7 +71,7 @@ namespace SortEverything.Prototype
 
             // Soft contact shadow: its own small texture made from a copy of the silhouette mask.
             Sprite shadow = null;
-            if (ToyShading.Mode == ToyRenderMode.Molded)
+            if (ToyShading.BakesShadow)
             {
                 int sres = ToyShading.ShadowRes;
                 var stex = new Texture2D(sres, sres, TextureFormat.RGBA32, false);

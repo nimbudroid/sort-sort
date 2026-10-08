@@ -261,6 +261,7 @@ namespace SortEverything.Prototype
         {
             switch (ToyShading.Mode)
             {
+                case ToyRenderMode.Sculpted: return RasterizeSculpted(res);
                 case ToyRenderMode.Molded: return RasterizeMolded(res);
                 case ToyRenderMode.Painted: return RasterizeToy(res);
                 default: return RasterizeFlat(res);

@@ -3,7 +3,11 @@ using System.Collections.Generic;
 namespace SortEverything.Prototype
 {
     /// <summary>Material family for the Molded renderer. See ToyShading.Soft / Plastic / Matte for the looks.</summary>
-    public enum ToyFamily { Soft, Plastic, Matte }
+    /// <remarks>
+    /// Paper: paper, card and leather goods. Sculpted renders it molded (face, bevel, side) with matte gloss;
+    /// Molded treats it exactly like Matte.
+    /// </remarks>
+    public enum ToyFamily { Soft, Plastic, Matte, Paper }
 
     /// <summary>
     /// Which material family each library object (and, where it matters, each part) is made of.
@@ -29,14 +33,14 @@ namespace SortEverything.Prototype
         {
             // Food that is a container or packaging, not an inflated food mass.
             { "ketchup", ToyFamily.Plastic }, { "milk_carton", ToyFamily.Plastic }, { "jam_jar", ToyFamily.Plastic },
-            { "cereal_box", ToyFamily.Matte },
+            { "cereal_box", ToyFamily.Paper },
             // Baked / dry food.
             { "pizza_slice", ToyFamily.Matte }, { "bread", ToyFamily.Matte }, { "cookie", ToyFamily.Matte },
             { "burger", ToyFamily.Matte }, { "fries", ToyFamily.Matte },
             // Paper and fabric.
-            { "paper_sheet", ToyFamily.Matte }, { "sticky_note", ToyFamily.Matte }, { "clipboard", ToyFamily.Matte },
+            { "paper_sheet", ToyFamily.Paper }, { "sticky_note", ToyFamily.Paper }, { "clipboard", ToyFamily.Paper },
             { "sock", ToyFamily.Matte }, { "towel", ToyFamily.Matte }, { "teddy_bear", ToyFamily.Matte },
-            { "wallet", ToyFamily.Matte }, { "wizard_hat", ToyFamily.Matte },
+            { "wallet", ToyFamily.Paper }, { "wizard_hat", ToyFamily.Matte },
             // Inflated / squishy.
             { "pillow", ToyFamily.Soft }, { "toy_ball", ToyFamily.Soft }, { "rubber_duck", ToyFamily.Soft },
             { "soap", ToyFamily.Soft }, { "dragon_egg", ToyFamily.Soft }, { "monster", ToyFamily.Soft },

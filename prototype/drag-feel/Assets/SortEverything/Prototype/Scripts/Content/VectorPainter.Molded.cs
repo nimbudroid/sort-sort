@@ -333,7 +333,7 @@ namespace SortEverything.Prototype
         /// thickness is still inside i. Children are later body parts lying at least 85% inside i.
         /// </summary>
         float WallClearance(float[][] D, int i, float t, float wallX, float wallY, float px, int res,
-            int[] bx0, int[] by0, int[] bx1, int[] by1)
+            int[] bx0, int[] by0, int[] bx1, int[] by1, float edgeChildMargin = -1f)
         {
             float[] di = D[i];
             for (int j = i + 1; j < shapes.Count && t >= px; j++)
@@ -352,6 +352,10 @@ namespace SortEverything.Prototype
                         if (di[k] < 0f) inside++;
                     }
                 if (all == 0 || inside < all * 0.85f) continue;
+                // Optionally (Sculpted) ignore flat decals and paint regions that reach i's edge (a shoe's toe
+                // cap): they follow the wall instead of holding it back.
+                if (edgeChildMargin >= 0f && !sj.shade) continue; // flat decals (pepperoni) follow the surface
+                if (edgeChildMargin >= 0f && ReachesEdge(di, dj, res, bx0[j], by0[j], bx1[j], by1[j], edgeChildMargin)) continue;
                 // Shrink the wall one pixel at a time until the whole child stays on the face.
                 while (t >= px)
                 {
@@ -369,6 +373,18 @@ namespace SortEverything.Prototype
                 }
             }
             return t;
+        }
+
+        /// <summary>True when part j comes within `margin` of part i's edge (it is a region of i, not an object on it).</summary>
+        static bool ReachesEdge(float[] di, float[] dj, int res, int x0, int y0, int x1, int y1, float margin)
+        {
+            for (int yi = y0; yi <= y1; yi++)
+                for (int xi = x0; xi <= x1; xi++)
+                {
+                    int k = yi * res + xi;
+                    if (dj[k] < 0f && di[k] > -margin) return true;
+                }
+            return false;
         }
 
         // Pixels outside the silhouette can still hold decorations (steam, sparkles) that must be drawn.

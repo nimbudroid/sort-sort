@@ -16,13 +16,17 @@ namespace SortEverything.Prototype
     {
         Flat,     // original flat sticker shading
         Painted,  // first ToyShading pass (dae71c2): lighting painted over inflated regions
-        Molded,   // per-part height maps with face + side wall, stacking occlusion, families (default)
+        Molded,   // per-part height maps with face + side wall, stacking occlusion, families (9a39506)
+        Sculpted, // modelled toy parts: inset face, wide lit/dark bevel ring, side plane, tubes (default)
     }
 
     public static class ToyShading
     {
         /// <summary>Renderer switch: Flat / Painted / Molded. Read once per object when its sprite is baked.</summary>
-        public static ToyRenderMode Mode = ToyRenderMode.Molded;
+        public static ToyRenderMode Mode = ToyRenderMode.Sculpted;
+
+        /// <summary>True for the renderers that bake a soft contact-shadow sprite (Molded, Sculpted).</summary>
+        public static bool BakesShadow { get { return Mode == ToyRenderMode.Molded || Mode == ToyRenderMode.Sculpted; } }
 
         /// <summary>Legacy switch from the Painted pass: true for any toy renderer, false = Flat.</summary>
         public static bool Enabled
@@ -39,17 +43,17 @@ namespace SortEverything.Prototype
         public static float InlayBevel = 0.07f;      // printed-on parts (labels, windows) only get a small bevel
         public static float WholeBodyWeight = 0.4f;  // how much every part also follows the whole object's dome
         public static float DetailRadius = 0.1f;     // shaded decorations (seeds, sprinkles) get a tiny dome
-        public static float MaxSlope = 2.4f;
+        public static float MaxSlope = 2.4f;         // steepest edge tilt; lower = softer, rounder edges
         public static float BoxBevelRadius = 0.22f;  // bevel radius for parts with corners (boxes, slices)
         public static float RoundRatio = 1.07f, BoxRatio = 1.22f; // corner test thresholds (see PartRadius)
-        public static float NormalSmoothing = 0.025f; // blur of the fields behind the normals (fraction of sprite)         // steepest edge tilt; lower = softer, rounder edges
+        public static float NormalSmoothing = 0.025f; // blur of the fields behind the normals (fraction of sprite)
 
         // Tone ramp: shadow -> base -> light. The front-facing middle stays at the base (bin) colour.
         public static float FrontLevel = 0.8f;       // diffuse level that maps exactly to the base colour
         public static float ShadowStart = 0.22f;     // diffuse level that maps to the full shadow tone
         public static float ShadowR = 0.6f, ShadowG = 0.5f, ShadowB = 0.7f;   // hue-shifted (cool, purple) shadow
-        public static float ShadowLift = 0.035f;
-        public static float ShadowSaturation = 1.3f; // shadows stay colourful (pale greens/yellows never go grey)     // keeps shadows from going muddy on dark colours
+        public static float ShadowLift = 0.035f;     // keeps shadows from going muddy on dark colours
+        public static float ShadowSaturation = 1.3f; // shadows stay colourful (pale greens/yellows never go grey)
         public static float LightAmount = 0.24f;     // how far the lit side goes toward warm white
 
         // Occlusion and bounce.
@@ -150,7 +154,7 @@ namespace SortEverything.Prototype
 
         public static FamilyLook Look(ToyFamily f)
         {
-            return f == ToyFamily.Soft ? Soft : f == ToyFamily.Matte ? Matte : Plastic;
+            return f == ToyFamily.Soft ? Soft : (f == ToyFamily.Matte || f == ToyFamily.Paper) ? Matte : Plastic;
         }
 
         // Lights: key from the upper-left front, soft fill from the lower-right, low ambient.
@@ -243,6 +247,55 @@ namespace SortEverything.Prototype
                     for (int t = -r; t <= r; t++) s += tmp[Math.Min(res - 1, Math.Max(0, y + t)) * res + x];
                     f[y * res + x] = s * inv;
                 }
+        }
+
+        // ======================================================================================
+        // Sculpted renderer (Mode = Sculpted). Used only by VectorPainter.Sculpted.cs. Families pick the geometry:
+        // Soft = inflated dome, Matte = gentle dome (baked food, fabric), Plastic and Paper = molded face + bevel +
+        // side plane. Gloss per family comes from the Soft / Plastic / Matte FamilyLook above (Paper uses Matte).
+        // Sizes are canvas units (the sprite spans 2.0; at phone size 0.1 is roughly 7-8 screen pixels).
+        // ======================================================================================
+        public static class Sculpt
+        {
+            // Contour. Full weight on normal parts; parts too thin to carry it get a proportionally thinner one,
+            // so the key shaft, pencil and stems keep visible form instead of turning solid ink.
+            public static float Outline = 0.08f;
+            public static float ThinOutline = 0.34f;      // contour <= this fraction of the part's half-thickness
+
+            // Molded (hard) parts: flat-ish face, rounded bevel ring, side plane below.
+            public static float Bevel = 0.17f;            // visible width of the rounded edge ring (plastic)
+            public static float MatteBevel = 0.18f;       // paper parts round over a wider, softer edge
+            public static float BevelTilt = 76f;          // edge tilt at the outside of the ring (degrees)
+            public static float MatteBevelTilt = 58f;
+            public static float Wall = 0.6f;              // side plane height as a fraction of the part's depth...
+            public static float WallMax = 0.28f;          // ...capped (canvas units)
+            public static float EdgeRegion = 0.03f;       // a child within contour + this of the edge is a painted region
+            public static float SoftWall = 0.26f, SoftWallMax = 0.12f; // inflated parts show a smaller underside
+
+            // Soft (inflated) parts: dome over the whole face, steepest at the edge. Matte food domes more gently.
+            public static float DomeTilt = 70f;
+            public static float MatteDomeTilt = 56f;
+            public static float BevelHold = 0.55f;        // 0 = ring eases to flat quickly, 1 = keeps its tilt longer
+            public static float HotWidth = 0.045f;        // width of the gloss line along bevels (N.H band)
+
+            // Side plane.
+            public static float SideNormalZ = 0.2f;       // lower = faces further down, darker
+            public static float SideDarken = 0.25f;       // extra darkening toward its bottom edge
+            public static float BevelLine = 0.45f;        // dark seam where the face's bevel meets the side plane
+            public static float BevelLineWidth = 0.014f;
+
+            // Tones: lit side, base, and a deeper hue-shifted shadow, in two soft cartoon bands.
+            public static float LightAmount = 0.42f;
+            public static float ShadowR = 0.5f, ShadowG = 0.42f, ShadowB = 0.62f;
+            public static float ShadowLift = 0.03f;
+            public static float ShadowSaturation = 1.3f;
+            public static int Bands = 2;
+            public static float BandSoftness = 0.3f;
+
+            // Occlusion: localized contact between attached parts matters more than gloss.
+            public static float CastOffset = 0.05f, CastSoftness = 0.06f, CastStrength = 0.4f;
+            public static float ContactWidth = 0.05f, ContactStrength = 0.32f;
+            public static float GroundAO = 0.25f;
         }
 
         internal static void Light(out float lx, out float ly, out float lz)

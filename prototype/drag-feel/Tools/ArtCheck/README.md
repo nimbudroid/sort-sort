@@ -4,7 +4,7 @@ Plain-C# checks for the library object art. Run outside Unity with mono (`mcs` /
 `Assets/SortEverything/Prototype/Scripts/Content`.
 
 ```
-SRC="ObjectDefs.cs VectorPainter.cs VectorPainter.Molded.cs ToyShading.cs ObjectMaterials.cs ObjectLibrary.cs ObjectDrawings.cs"
+SRC="ObjectDefs.cs VectorPainter.cs VectorPainter.Molded.cs VectorPainter.Sculpted.cs ToyShading.cs ObjectMaterials.cs ObjectLibrary.cs ObjectDrawings.cs"
 T=../../../../../Tools/ArtCheck
 ```
 
@@ -20,13 +20,23 @@ mcs -out:/tmp/sil.exe $SRC $T/SilhouetteHashes.cs && mono /tmp/sil.exe verify $T
 
 ## Preview sheet
 
-Bake the library in two modes, then build a before/after sheet. Use about 150 px per object for on-phone size, or a
-larger `--size` to enlarge. Each run also prints bake timing and texture memory.
+Bake the library in two modes (`Flat`, `Painted`, `Molded` or `Sculpted`), then build a before/after sheet. Use
+about 150 px per object for on-phone size, or a larger `--size` to enlarge. Each run also prints bake timing and
+texture memory.
 
 ```
 mcs -langversion:7.2 -out:/tmp/ap.exe $SRC $T/ArtPreview.cs
-mono /tmp/ap.exe /tmp/painted Painted && mono /tmp/ap.exe /tmp/molded Molded
-python3 $T/preview_sheet.py /tmp/painted /tmp/molded /tmp/sheet.png --size 150 --labels
-python3 $T/preview_sheet.py /tmp/painted /tmp/molded /tmp/hero.png --size 260 --cols 4 \
+mono /tmp/ap.exe /tmp/molded Molded && mono /tmp/ap.exe /tmp/sculpted Sculpted
+python3 $T/preview_sheet.py /tmp/molded /tmp/sculpted /tmp/sheet.png --size 150 --labels
+python3 $T/preview_sheet.py /tmp/molded /tmp/sculpted /tmp/hero.png --size 260 --cols 4 \
   --ids apple,strawberry,orange,watermelon_slice,cupcake,donut,pizza_slice,popsicle,calculator,notebook,stapler,ketchup,pencil,shoe
+```
+
+## Squint test
+
+Each folder gets a row at phone size, then the same row downscaled, blurred and scaled back up. Form that survives
+the blurred row survives on a phone.
+
+```
+python3 $T/squint_sheet.py /tmp/molded,/tmp/sculpted /tmp/squint.png apple,calculator,notebook,stapler,pencil,shoe 120
 ```

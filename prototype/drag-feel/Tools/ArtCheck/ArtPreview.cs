@@ -37,7 +37,7 @@ static class ArtPreview
                 byte[] rgba = p.Rasterize(res);
                 byte[] shadow = null;
                 byte[] silhouette = p.RasterizeSilhouette(res); // ObjectArt computes this anyway for the hull
-                if (ToyShading.Mode == ToyRenderMode.Molded) shadow = ToyShading.SoftShadow(silhouette, res);
+                if (ToyShading.BakesShadow) shadow = ToyShading.SoftShadow(silhouette, res);
                 sw.Stop();
                 double ms = sw.Elapsed.TotalMilliseconds;
                 times.Add(ms); total += ms;
