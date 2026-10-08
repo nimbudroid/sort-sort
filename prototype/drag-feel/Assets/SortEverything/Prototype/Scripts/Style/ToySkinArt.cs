@@ -114,6 +114,101 @@ namespace SortEverything.Prototype
             return Panel(spec);
         }
 
+        // ---- environment recipes (white shapes; tinted by SpriteRenderer.color) ------------------
+
+        /// <summary>Soft-edged cloud made of overlapping discs. No outline (outlines mean "interactive").</summary>
+        public static byte[] Cloud(int w, int h)
+        {
+            // Disc centres/radii in 0..1 canvas space (y up), forming a puffy cloud with a flat-ish base.
+            float[] discs = { 0.24f, 0.36f, 0.2f, 0.45f, 0.52f, 0.28f, 0.7f, 0.42f, 0.22f, 0.86f, 0.32f, 0.12f, 0.5f, 0.3f, 0.26f };
+            var bytes = new byte[w * h * 4];
+            float soft = 0.035f;
+            for (int y = 0; y < h; y++)
+                for (int x = 0; x < w; x++)
+                {
+                    float px = (x + 0.5f) / w, py = (y + 0.5f) / h;
+                    float aspect = (float)w / h;
+                    float d = 9f;
+                    for (int i = 0; i < discs.Length; i += 3)
+                    {
+                        float dx = (px - discs[i]) * aspect, dy = py - discs[i + 1];
+                        d = Math.Min(d, (float)Math.Sqrt(dx * dx + dy * dy) - discs[i + 2]);
+                    }
+                    d = Math.Max(d, 0.14f - py); // flatten the base
+                    int o = (y * w + x) * 4;
+                    bytes[o] = bytes[o + 1] = bytes[o + 2] = 255;
+                    bytes[o + 3] = B(1f - Smooth(-soft, soft, d));
+                }
+            return bytes;
+        }
+
+        /// <summary>Four-point star / sparkle with a soft core glow.</summary>
+        public static byte[] Sparkle(int size)
+        {
+            var bytes = new byte[size * size * 4];
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    float dx = Math.Abs((x + 0.5f) / size * 2f - 1f), dy = Math.Abs((y + 0.5f) / size * 2f - 1f);
+                    // Concave four-point star: |x|^0.5 + |y|^0.5 < 1, sharpened.
+                    float star = (float)(Math.Sqrt(dx) + Math.Sqrt(dy));
+                    float a = 1f - Smooth(0.82f, 0.98f, star);
+                    float glow = 0.35f * (1f - Smooth(0f, 0.5f, (float)Math.Sqrt(dx * dx + dy * dy)));
+                    int o = (y * size + x) * 4;
+                    bytes[o] = bytes[o + 1] = bytes[o + 2] = 255;
+                    bytes[o + 3] = B(Math.Max(a, glow));
+                }
+            return bytes;
+        }
+
+        /// <summary>Soft ring (thickness as a fraction of the radius).</summary>
+        public static byte[] SoftRing(int size, float thickness)
+        {
+            var bytes = new byte[size * size * 4];
+            float px = 2f / size;
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    float dx = (x + 0.5f) / size * 2f - 1f, dy = (y + 0.5f) / size * 2f - 1f;
+                    float d = Math.Abs((float)Math.Sqrt(dx * dx + dy * dy) - (1f - thickness)) - thickness * 0.9f;
+                    int o = (y * size + x) * 4;
+                    bytes[o] = bytes[o + 1] = bytes[o + 2] = 255;
+                    bytes[o + 3] = B(Clamp01(0.5f - d / px));
+                }
+            return bytes;
+        }
+
+        /// <summary>Vignette: transparent centre, alpha rising towards the edges/corners.</summary>
+        public static byte[] Vignette(int size)
+        {
+            var bytes = new byte[size * size * 4];
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    float dx = (x + 0.5f) / size * 2f - 1f, dy = (y + 0.5f) / size * 2f - 1f;
+                    float r = (float)Math.Sqrt(dx * dx * 0.9f + dy * dy * 1.1f);
+                    int o = (y * size + x) * 4;
+                    bytes[o] = bytes[o + 1] = bytes[o + 2] = 255;
+                    bytes[o + 3] = B(Smooth(0.55f, 1.35f, r));
+                }
+            return bytes;
+        }
+
+        /// <summary>Rounded rectangle with a wide feathered edge (play-zone backplate).</summary>
+        public static byte[] SoftPanel(int w, int h, float radius, float feather)
+        {
+            var bytes = new byte[w * h * 4];
+            for (int y = 0; y < h; y++)
+                for (int x = 0; x < w; x++)
+                {
+                    float d = RoundRect(x + 0.5f, y + 0.5f, feather, feather, w - feather, h - feather, radius);
+                    int o = (y * w + x) * 4;
+                    bytes[o] = bytes[o + 1] = bytes[o + 2] = 255;
+                    bytes[o + 3] = B(1f - Smooth(-feather * 0.6f, feather, d));
+                }
+            return bytes;
+        }
+
         /// <summary>White light burst: alternating soft rays fading out from the centre.</summary>
         public static byte[] Sunburst(int size, int rays)
         {

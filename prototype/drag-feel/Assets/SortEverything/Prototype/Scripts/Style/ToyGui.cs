@@ -48,7 +48,7 @@ namespace SortEverything.Prototype
             {
                 case ToyTone.Primary: return T("3FD436", "FFC414", "2654E8");
                 case ToyTone.Secondary: return T("1E96FF", "9FF0FF", "1C3FC4");
-                case ToyTone.Purple: return T("9447FF", "FF9CF0", "4A1FB8");
+                case ToyTone.Purple: return T("9447FF", "FFC414", "3B22A8"); // purple body, warm yellow rim
                 case ToyTone.Reward: return T("FFC800", "FFF09A", "EB6A00");
                 case ToyTone.Warning: return T("FF8A00", "FFE07A", "C23A08");
                 case ToyTone.Danger: return T("FF3D3D", "FFC0A8", "A01434");

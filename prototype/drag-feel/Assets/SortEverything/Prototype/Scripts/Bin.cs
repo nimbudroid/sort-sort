@@ -85,6 +85,9 @@ namespace SortEverything.Prototype
             Sliced("SideR", ToyStyle.Strip(side), new Vector2(width / 2f - wall * 0.7f, height / 2f), new Vector2(wall * 1.4f, height), Color.white, 300);
             float frontH = height * 0.45f;
             Sliced("Front", ToyStyle.Panel(Color.Lerp(color, Color.white, 0.18f), true), new Vector2(0f, frontH / 2f), new Vector2(width, frontH), Color.white, 301);
+            // Lighter top rim across the mouth: reads as the container's molded lip.
+            Sliced("Rim", ToyStyle.Strip(Color.Lerp(color, Color.white, 0.45f)), new Vector2(0f, height - wall * 0.8f),
+                new Vector2(width + wall * 0.4f, wall * 2f), Color.white, 300);
 
             // Face.
             eyeRadius = Mathf.Min(width * 0.13f, height * 0.11f);
@@ -117,7 +120,7 @@ namespace SortEverything.Prototype
             var badgeSr = badge.AddComponent<SpriteRenderer>();
             badgeSr.sprite = ToyStyle.Badge(ToyStyle.Hex("3B2F7A"));
             badgeSr.drawMode = SpriteDrawMode.Sliced;
-            badgeSr.size = new Vector2(width * 0.42f, height * 0.18f);
+            badgeSr.size = new Vector2(width * 0.46f, height * 0.21f);
             badgeSr.sortingOrder = 303;
 
             counter = MakeCounterText(txt, Color.white, 305);

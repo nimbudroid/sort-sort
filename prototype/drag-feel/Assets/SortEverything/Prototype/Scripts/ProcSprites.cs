@@ -74,6 +74,20 @@ namespace SortEverything.Prototype
                     float shade = (0.8f + 0.18f * Mathf.Clamp01(0.5f + 0.5f * (-p.x * 0.4f + p.y * 0.7f))) * (0.8f + 0.2f * bevel);
                     float spec = Mathf.Clamp01(1f - (p - new Vector2(-0.32f, 0.38f)).magnitude / 0.2f);
                     float v = Mathf.Lerp(shade, 1f, spec * spec);
+                    // Specular crescent just inside the upper-left edge (same toy-plastic look as library objects).
+                    if (d > -0.2f && d < -0.03f)
+                    {
+                        const float e = 0.01f;
+                        float gx = ShapeSdf(shape, p + new Vector2(e, 0f)) - ShapeSdf(shape, p - new Vector2(e, 0f));
+                        float gy = ShapeSdf(shape, p + new Vector2(0f, e)) - ShapeSdf(shape, p - new Vector2(0f, e));
+                        float gl = Mathf.Sqrt(gx * gx + gy * gy);
+                        if (gl > 1e-5f)
+                        {
+                            float facing = (gx * -0.55f + gy * 0.83f) / gl;
+                            float band = Mathf.Clamp01(1f - Mathf.Abs(d + 0.1f) / 0.065f);
+                            v = Mathf.Lerp(v, 1f, VectorPainter.SpecularStrength * band * Mathf.Clamp01((facing - 0.35f) / 0.5f));
+                        }
+                    }
                     if (PatternMask(pattern, p)) v *= 0.74f;
 
                     // Outline band just inside the edge, anti-aliased.

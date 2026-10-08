@@ -183,6 +183,7 @@ namespace SortEverything.Prototype
         public Rgba Ink = Rgba.Hex("2E2433");
         public float OutlineWidth = 0.09f;   // outer silhouette outline (normalised units); heavier for the toy style
         public float LineWidth = 0.035f;     // inner part outlines
+        public static float SpecularStrength = 0.42f; // edge highlight on body shapes (visual style)
 
         readonly List<VShape> shapes = new List<VShape>();
 
@@ -273,10 +274,24 @@ namespace SortEverything.Prototype
                             if (s.silhouette) // body shapes only; small decorations stay flat and clean
                             {
                                 bevel = Clamp01(-d / 0.22f);
-                                bevel = 0.82f + 0.2f * bevel * bevel * (3f - 2f * bevel);
+                                bevel = 0.79f + 0.24f * bevel * bevel * (3f - 2f * bevel);
                             }
                             float k = (0.84f + 0.2f * h) * bevel;
                             cr = Math.Min(1f, cr * k); cg = Math.Min(1f, cg * k); cb = Math.Min(1f, cb * k);
+                            // Specular: a soft crescent just inside the upper-left edge of body shapes (molded plastic).
+                            if (s.silhouette && d > -0.2f && d < -0.03f)
+                            {
+                                const float e = 0.01f;
+                                float gx = s.sdf(x + e, y) - s.sdf(x - e, y), gy = s.sdf(x, y + e) - s.sdf(x, y - e);
+                                float gl = (float)Math.Sqrt(gx * gx + gy * gy);
+                                if (gl > 1e-5f)
+                                {
+                                    float facing = (gx * -0.55f + gy * 0.83f) / gl;
+                                    float band = Clamp01(1f - Math.Abs(d + 0.1f) / 0.065f);
+                                    float spec = SpecularStrength * band * Clamp01((facing - 0.35f) / 0.5f);
+                                    cr += (1f - cr) * spec; cg += (1f - cg) * spec; cb += (1f - cb) * spec;
+                                }
+                            }
                         }
                         if (s.outline)
                         {
