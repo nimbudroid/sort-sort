@@ -37,6 +37,7 @@ namespace SortEverything.Prototype
         public bool outline = true;     // thin ink line just inside this shape's edge
         public bool silhouette = true;  // contributes to the thick outer outline and the collider hull
         public bool shade = true;       // toy-style top-left lighting
+        public float feather;           // > 0: soft-edged (gloss shines); canvas units
 
         /// <summary>Carve another shape out of this one.</summary>
         public VShape Minus(Sdf cut)
@@ -184,6 +185,9 @@ namespace SortEverything.Prototype
         public float OutlineWidth = 0.09f;   // outer silhouette outline (normalised units); heavier for the toy style
         public float LineWidth = 0.035f;     // inner part outlines
         public static float SpecularStrength = 0.42f; // edge highlight on body shapes (visual style)
+        public float Gloss = 1f;    // per-object material (ToyShading.PerObject), set by ObjectArt before Rasterize
+        public float Volume = 1f;
+        public bool Dome;           // per-object: skip the corner test and always dome parts
 
         readonly List<VShape> shapes = new List<VShape>();
 
@@ -239,11 +243,24 @@ namespace SortEverything.Prototype
         /// <summary>Soft white highlight.</summary>
         public VShape Shine(float x, float y, float rx, float ry, float rotDeg = 0f, float alpha = 0.55f)
         {
-            return Ellipse(x, y, rx, ry, new Rgba(1f, 1f, 1f, alpha), rotDeg).Detail().Flat();
+            var s = Ellipse(x, y, rx, ry, new Rgba(1f, 1f, 1f, alpha), rotDeg).Detail().Flat();
+            if (ToyShading.Enabled)
+            {
+                // Toy look: the lighting already places a gloss hotspot, so hand-placed shines become soft sheen.
+                s.fill.a = alpha * ToyShading.ShineAlphaScale;
+                s.feather = Math.Min(rx, ry) * ToyShading.ShineFeather;
+            }
+            return s;
         }
 
         /// <summary>Rasterise to straight-alpha RGBA bytes, row 0 = bottom (Unity texture order).</summary>
         public byte[] Rasterize(int res)
+        {
+            return ToyShading.Enabled ? RasterizeToy(res) : RasterizeFlat(res);
+        }
+
+        /// <summary>The previous flat "sticker" shading, kept as the ToyShading.Enabled = false fallback.</summary>
+        byte[] RasterizeFlat(int res)
         {
             var outBytes = new byte[res * res * 4];
             float px = 2f / res;
@@ -317,6 +334,318 @@ namespace SortEverything.Prototype
                 }
             }
             return outBytes;
+        }
+
+        /// <summary>
+        /// Toy rendering (ToyShading): every part is treated as an inflated, molded piece. The signed distance to a
+        /// part's edge becomes a rounded height profile, giving a surface normal per pixel; the whole object also
+        /// domes as one piece, and parts printed onto a body (labels, windows) follow that body's curve with only a
+        /// small bevel. The normal is lit by one rig for the whole library: hue-shifted shadow side, warm lit side,
+        /// underside and contact occlusion, a cool bounce rim and a cartoon gloss hotspot. Coverage and the
+        /// silhouette are computed exactly as before, so sprite alpha and colliders do not change.
+        /// </summary>
+        byte[] RasterizeToy(int res)
+        {
+            int n = shapes.Count, count = res * res;
+            float px = 2f / res;
+
+            // Pass 1: every shape's distance field on the pixel grid (normals come from grid differences).
+            var D = new float[n][];
+            for (int i = 0; i < n; i++) D[i] = new float[count];
+            var U = new float[count];
+            for (int yi = 0; yi < res; yi++)
+            {
+                float y = (yi + 0.5f) / res * 2f - 1f;
+                for (int xi = 0; xi < res; xi++)
+                {
+                    float x = (xi + 0.5f) / res * 2f - 1f;
+                    int k = yi * res + xi;
+                    float u = 1e9f;
+                    for (int i = 0; i < n; i++)
+                    {
+                        float d = shapes[i].sdf(x, y);
+                        D[i][k] = d;
+                        if (shapes[i].silhouette && d < u) u = d;
+                    }
+                    U[k] = u;
+                }
+            }
+
+            // Smoothed copies of the fields drive the normals (never coverage), so boxy parts dome as soft pillows
+            // instead of showing hard diagonal creases along their medial axis.
+            int blur = Math.Max(1, (int)(res * ToyShading.NormalSmoothing + 0.5f));
+            var N = new float[n][];
+            var tmp = new float[count];
+            for (int i = 0; i < n; i++)
+            {
+                if (!shapes[i].shade || shapes[i].feather > 0f || !HasDepth(D[i], px)) continue;
+                // Parts thinner than the blur would only be distorted by it (and it is the costly step on
+                // many-part objects such as keyboards), so they use their exact field.
+                if (!HasDepth(D[i], blur * px * 2f)) { N[i] = D[i]; continue; }
+                N[i] = (float[])D[i].Clone();
+                BoxBlur(N[i], tmp, res, blur);
+                BoxBlur(N[i], tmp, res, blur);
+            }
+            var NU = (float[])U.Clone();
+            BoxBlur(NU, tmp, res, blur);
+            BoxBlur(NU, tmp, res, blur);
+
+            // Pass 2: each part's role and inflation radius.
+            float depthU = 0f;
+            for (int k = 0; k < count; k++) depthU = Math.Max(depthU, -U[k]);
+            float radiusU = Math.Max(px, PartRadius(U, res, depthU, ToyShading.MaxPartRadius * 1.4f, Dome) * Volume);
+            var volume = new bool[n];
+            var inlay = new bool[n];
+            var radius = new float[n];
+            var partW = new float[n];
+            var bodyW = new float[n];
+            for (int i = 0; i < n; i++)
+            {
+                var s = shapes[i];
+                if (N[i] == null) continue;
+                float[] di = D[i];
+                float depth = 0f;
+                for (int k = 0; k < count; k++) depth = Math.Max(depth, -di[k]);
+                if (depth <= px) continue; // too small to read as volume
+                volume[i] = true;
+                if (!s.silhouette)
+                {
+                    radius[i] = Math.Min(depth, ToyShading.DetailRadius);
+                    partW[i] = 1f;
+                    bodyW[i] = ToyShading.WholeBodyWeight;
+                    continue;
+                }
+                // Printed-on part: its whole edge lies inside the parts drawn beneath it.
+                int edge = 0, covered = 0;
+                for (int k = 0; k < count; k++)
+                {
+                    if (Math.Abs(di[k]) >= px) continue;
+                    edge++;
+                    for (int j = 0; j < i; j++)
+                        if (shapes[j].silhouette && D[j][k] < -0.02f) { covered++; break; }
+                }
+                inlay[i] = edge > 0 && covered >= edge * 0.85f;
+                if (inlay[i])
+                {
+                    radius[i] = Math.Min(depth, ToyShading.InlayBevel);
+                    partW[i] = 0.6f;
+                    bodyW[i] = 1f;
+                }
+                else
+                {
+                    radius[i] = PartRadius(di, res, depth, ToyShading.MaxPartRadius, Dome) * Volume;
+                    partW[i] = 1f;
+                    bodyW[i] = ToyShading.WholeBodyWeight * Math.Min(1f, depth / Math.Max(depthU, 1e-4f));
+                }
+            }
+
+            float lx, ly, lz;
+            ToyShading.Light(out lx, out ly, out lz);
+            float hx = lx, hy = ly, hz = lz + 1f, hl = (float)Math.Sqrt(hx * hx + hy * hy + hz * hz);
+            hx /= hl; hy /= hl; hz /= hl;
+            float front = ToyShading.FrontLevel;
+
+            var outBytes = new byte[count * 4];
+            var above = new float[n];
+            for (int yi = 0; yi < res; yi++)
+            {
+                for (int xi = 0; xi < res; xi++)
+                {
+                    int k = yi * res + xi;
+                    float ar = 0f, ag = 0f, ab = 0f, aa = 0f; // premultiplied accumulator
+                    float union = U[k];
+                    float ugx = 0f, ugy = 0f, us = 0f;
+                    if (union < 0.5f * px + ToyShading.MaxPartRadius)
+                    {
+                        Grad(NU, xi, yi, res, out ugx, out ugy);
+                        us = Slope(-NU[k] / radiusU);
+                    }
+                    // above[i] = distance to the nearest raised part drawn on top of part i (contact shadow source).
+                    float nearest = 1e9f;
+                    for (int i = n - 1; i >= 0; i--)
+                    {
+                        above[i] = nearest;
+                        if (shapes[i].silhouette && !inlay[i] && D[i][k] < nearest) nearest = D[i][k];
+                    }
+                    for (int i = 0; i < n; i++)
+                    {
+                        var s = shapes[i];
+                        float d = D[i][k];
+                        float cov = (s.feather > 0f ? Clamp01(-d / s.feather) : Clamp01(0.5f - d / px)) * s.fill.a;
+                        if (cov <= 0f) continue;
+                        Rgba f = s.fill;
+                        float cr = f.r, cg = f.g, cb = f.b;
+                        // Hue-shifted shadow tone of this part (also used for its internal seam lines).
+                        float sr = f.r * ToyShading.ShadowR + ToyShading.ShadowLift;
+                        float sg = f.g * ToyShading.ShadowG + ToyShading.ShadowLift;
+                        float sb = f.b * ToyShading.ShadowB + ToyShading.ShadowLift * 1.6f;
+                        float sl = (sr + sg + sb) / 3f, sat = ToyShading.ShadowSaturation;
+                        sr = Clamp01(sl + (sr - sl) * sat); sg = Clamp01(sl + (sg - sl) * sat); sb = Clamp01(sl + (sb - sl) * sat);
+                        if (volume[i])
+                        {
+                            float gx, gy;
+                            Grad(N[i], xi, yi, res, out gx, out gy);
+                            float ps = Slope(-N[i][k] / radius[i]) * partW[i], bs = us * bodyW[i];
+                            float nx = ps * gx + bs * ugx, ny = ps * gy + bs * ugy;
+                            float il = 1f / (float)Math.Sqrt(nx * nx + ny * ny + 1f);
+                            nx *= il; ny *= il;
+                            float nz = il;
+
+                            // Soft three-tone ramp: shadow -> base (front-facing) -> warm light.
+                            float dif = 0.5f + 0.5f * (nx * lx + ny * ly + nz * lz);
+                            if (dif >= front)
+                            {
+                                float t = Math.Min(1f, (dif - front) / (1f - front)) * ToyShading.LightAmount;
+                                cr += (1f - cr) * t; cg += (0.98f - cg) * t; cb += (0.92f - cb) * t;
+                            }
+                            else
+                            {
+                                float t = Smooth(ToyShading.ShadowStart, front, dif);
+                                cr = sr + (cr - sr) * t; cg = sg + (cg - sg) * t; cb = sb + (cb - sb) * t;
+                            }
+
+                            if (s.silhouette)
+                            {
+                                float occ = 1f;
+                                // Underside of the whole object: grounded, sitting on something.
+                                if (ugy < 0f) occ -= ToyShading.UndersideAO * (1f - Smooth(0f, 0.16f, -union)) * -ugy;
+                                // Parts resting on top of this one cast a soft contact shadow onto it.
+                                float dj = above[i];
+                                if (dj > 0f && dj < ToyShading.ContactAOWidth)
+                                {
+                                    float w = 1f - dj / ToyShading.ContactAOWidth;
+                                    occ -= ToyShading.ContactAO * w * w;
+                                }
+                                occ = Math.Max(0.45f, occ);
+                                cr *= occ; cg *= occ; cb *= occ;
+                            }
+
+                            // Cool bounce light along the lower-right rim.
+                            float rl = (float)Math.Sqrt(nx * nx + ny * ny);
+                            if (rl > 1e-4f)
+                            {
+                                // Bounce lifts the part's own colour (slightly cooled) so yellows and greens never go muddy.
+                                float b = ToyShading.BounceLight * (1f - nz) * Clamp01((nx * 0.55f - ny * 0.83f) / rl);
+                                float br = f.r + (1f - f.r) * 0.35f, bg = f.g + (1f - f.g) * 0.35f, bb = f.b + (1f - f.b) * 0.45f;
+                                cr += (br - cr) * b; cg += (bg - cg) * b; cb += (bb - cb) * b;
+                            }
+
+                            // Gloss: crisp cartoon hotspot + broad sheen, both following the surface.
+                            float nh = Math.Max(0f, nx * hx + ny * hy + nz * hz);
+                            float nh2 = nh * nh, nh4 = nh2 * nh2, nh8 = nh4 * nh4;
+                            float spec = Gloss * (ToyShading.SpecularHotspot * Smooth(ToyShading.SpecularSize - 0.02f, ToyShading.SpecularSize, nh)
+                                                  + ToyShading.SpecularSheen * nh8 * nh4);
+                            spec = Clamp01(spec);
+                            cr += (1f - cr) * spec; cg += (1f - cg) * spec; cb += (1f - cb) * spec;
+                        }
+                        if (s.outline)
+                        {
+                            // Internal seams: medium weight, tinted by the part's own shadow colour.
+                            float t = Clamp01((d + LineWidth) / px + 0.5f);
+                            float m = ToyShading.InnerLineInk;
+                            float lr = sr + (Ink.r - sr) * m, lg = sg + (Ink.g - sg) * m, lb = sb + (Ink.b - sb) * m;
+                            cr += (lr - cr) * t; cg += (lg - cg) * t; cb += (lb - cb) * t;
+                        }
+                        ar = cr * cov + ar * (1f - cov);
+                        ag = cg * cov + ag * (1f - cov);
+                        ab = cb * cov + ab * (1f - cov);
+                        aa = cov + aa * (1f - cov);
+                    }
+                    if (aa > 0f && union < 1e8f)
+                    {
+                        float t = Clamp01((union + OutlineWidth) / px + 0.5f);
+                        ar += (Ink.r * aa - ar) * t; ag += (Ink.g * aa - ag) * t; ab += (Ink.b * aa - ab) * t;
+                    }
+                    int o = k * 4;
+                    if (aa <= 0.001f) { outBytes[o] = outBytes[o + 1] = outBytes[o + 2] = 255; outBytes[o + 3] = 0; continue; }
+                    outBytes[o] = ToByte(ar / aa);
+                    outBytes[o + 1] = ToByte(ag / aa);
+                    outBytes[o + 2] = ToByte(ab / aa);
+                    outBytes[o + 3] = ToByte(aa);
+                }
+            }
+            return outBytes;
+        }
+
+        /// <summary>
+        /// Inflation radius for a part. Smooth parts (circles, ellipses, blobs) dome fully; parts with corners (boxes,
+        /// slices, stars) get flat faces and a rounded bevel, like molded plastic, instead of a creased pillow.
+        /// Corner detection: area relative to an ellipse with the same depth and proportions (1.0 for an ellipse,
+        /// 1.27 for any rectangle, higher for triangles and stars), proportions from the part's second moments.
+        /// </summary>
+        static float PartRadius(float[] d, int res, float depth, float maxRadius, bool forceDome)
+        {
+            float dome = Math.Min(depth, maxRadius);
+            double m = 0, sx = 0, sy = 0, sxx = 0, syy = 0, sxy = 0;
+            for (int yi = 0; yi < res; yi++)
+                for (int xi = 0; xi < res; xi++)
+                {
+                    if (d[yi * res + xi] >= 0f) continue;
+                    double x = xi, y = yi;
+                    m++; sx += x; sy += y; sxx += x * x; syy += y * y; sxy += x * y;
+                }
+            if (m < 4 || depth <= 0f || forceDome) return dome;
+            double cx = sx / m, cy = sy / m;
+            double vxx = sxx / m - cx * cx, vyy = syy / m - cy * cy, vxy = sxy / m - cx * cy;
+            double tr = (vxx + vyy) * 0.5, disc = Math.Sqrt(Math.Max(0.0, (vxx - vyy) * (vxx - vyy) * 0.25 + vxy * vxy));
+            double aspect = Math.Sqrt((tr + disc) / Math.Max(tr - disc, 1e-6));
+            double area = m * (2.0 / res) * (2.0 / res);
+            float ratio = (float)(area / (Math.PI * depth * depth * aspect));
+            float bevel = Math.Min(depth, ToyShading.BoxBevelRadius);
+            float t = Smooth(ToyShading.RoundRatio, ToyShading.BoxRatio, ratio);
+            return dome + (bevel - dome) * t;
+        }
+
+        static bool HasDepth(float[] d, float px)
+        {
+            for (int k = 0; k < d.Length; k++) if (d[k] < -px) return true;
+            return false;
+        }
+
+        // Separable box blur in place (sliding window, clamped edges).
+        static void BoxBlur(float[] f, float[] tmp, int res, int r)
+        {
+            float inv = 1f / (2 * r + 1);
+            for (int pass = 0; pass < 2; pass++)
+            {
+                for (int line = 0; line < res; line++)
+                {
+                    float sum = 0f;
+                    for (int t = -r; t <= r; t++) sum += At(f, pass, line, Math.Min(res - 1, Math.Max(0, t)), res);
+                    for (int t = 0; t < res; t++)
+                    {
+                        tmp[pass == 0 ? line * res + t : t * res + line] = sum * inv;
+                        sum += At(f, pass, line, Math.Min(res - 1, t + r + 1), res) - At(f, pass, line, Math.Max(0, t - r), res);
+                    }
+                }
+                Array.Copy(tmp, f, f.Length);
+            }
+        }
+
+        static float At(float[] f, int pass, int line, int t, int res) { return pass == 0 ? f[line * res + t] : f[t * res + line]; }
+
+        // Unit direction of a distance field's gradient on the pixel grid (points out of the shape).
+        static void Grad(float[] f, int xi, int yi, int res, out float gx, out float gy)
+        {
+            int k = yi * res + xi;
+            gx = f[xi < res - 1 ? k + 1 : k] - f[xi > 0 ? k - 1 : k];
+            gy = f[yi < res - 1 ? k + res : k] - f[yi > 0 ? k - res : k];
+            float l = (float)Math.Sqrt(gx * gx + gy * gy);
+            if (l > 1e-6f) { gx /= l; gy /= l; } else { gx = 0f; gy = 0f; }
+        }
+
+        // Edge tilt of a rounded (quarter-circle) profile at normalised depth t (0 = edge, 1 = top).
+        static float Slope(float t)
+        {
+            t = Clamp01(t);
+            float q = 1f - t;
+            return Math.Min(ToyShading.MaxSlope, q / (float)Math.Sqrt(Math.Max(1f - q * q, 1e-4f)));
+        }
+
+        static float Smooth(float a, float b, float v)
+        {
+            float t = Clamp01((v - a) / (b - a));
+            return t * t * (3f - 2f * t);
         }
 
         /// <summary>

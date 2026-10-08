@@ -42,6 +42,11 @@ namespace SortEverything.Prototype
         {
             var painter = ObjectDrawings.Paint(id);
             if (painter == null) return null;
+            // Per-object toy material (rendering only; the silhouette and collider hull are unaffected).
+            var material = ToyShading.For(id);
+            painter.Gloss = material.gloss;
+            painter.Volume = material.volume;
+            painter.Dome = material.dome;
 
             byte[] rgba = painter.Rasterize(Res);
             var tex = new Texture2D(Res, Res, TextureFormat.RGBA32, false);
