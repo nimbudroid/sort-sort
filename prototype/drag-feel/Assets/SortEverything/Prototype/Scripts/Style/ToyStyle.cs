@@ -10,7 +10,7 @@ namespace SortEverything.Prototype
     public static class ToyStyle
     {
         // ---- UI palette -------------------------------------------------------------------------
-        public static readonly Color Ink = Hex("2E2433");
+        public static readonly Color Ink = Hex("2A2347");        // dark navy outline / depth
         public static readonly Color Primary = Hex("58CC6A");    // friendly green: primary actions
         public static readonly Color Secondary = Hex("4C8DF6");  // blue: secondary actions
         public static readonly Color Purple = Hex("8E63F0");     // purple: secondary actions
@@ -88,8 +88,16 @@ namespace SortEverything.Prototype
                 width = size, height = size, radius = 14f, outline = 4f, extrude = extrude ? 6f : 0f, shadow = 0f,
                 shadowSoftness = 1f, highlight = 0.22f, face = ToRgba(face), ink = ToRgba(Ink),
             };
+            if (extrude)
+            {
+                // Layered molded construction: lighter rim, darker coloured extrusion, dark depth band.
+                spec.rim = 4f;
+                spec.rimColor = ToRgba(Color.Lerp(face, Color.white, 0.55f));
+                spec.extrusionColor = ToRgba(Color.Lerp(face, Ink, 0.45f));
+                spec.depth = 3f;
+            }
             var tex = ToTexture(ToySkinArt.Panel(spec), size, size, key);
-            float bottom = extrude ? 26f : 20f;
+            float bottom = extrude ? 29f : 20f;
             s = Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 1f / WorldPerPx, 0,
                 SpriteMeshType.FullRect, new Vector4(20f, bottom, 20f, 20f));
             sprites[key] = s;

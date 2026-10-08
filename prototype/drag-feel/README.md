@@ -85,6 +85,8 @@ A visual-only pass on top of the prototype: no gameplay, flow or content changes
 
 All new code is in `Scripts/Style/`. Existing files only switch sprites, colours and fonts at their drawing sites.
 
+**v2 (layered construction):** every UI element is built as molded plastic layers: bright face → contrasting rim → dark navy outline → coloured extrusion → dark depth band → soft shadow (e.g. NEXT = green face, yellow rim, blue extrusion). Headlines (SORTED!, ROUND, combo, panel title, toast) use sticker text: cream face → thick navy outline → orange depth → soft shadow. Buttons come in Small / Medium / Large depth presets sized to their existing rects. Bin fronts use the same rim + extrusion construction.
+
 ## Opening the project
 
 1. Install **Unity 6 LTS** (6000.0.x) through Unity Hub, with the **Android Build Support** and/or **iOS Build Support** modules. A newer Unity 6 patch is fine; accept the upgrade prompt.

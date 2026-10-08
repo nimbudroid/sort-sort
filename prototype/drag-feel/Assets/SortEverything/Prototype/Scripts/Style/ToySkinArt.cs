@@ -19,6 +19,11 @@ namespace SortEverything.Prototype
         public float highlight = 0.28f;  // glossy band strength
         public Rgba face = Rgba.Hex("6BD36A");
         public Rgba? extrusionColor;     // default: face darkened
+        // Layered "molded plastic" construction (all optional; 0 / null = off):
+        public Rgba? rimColor;           // contrasting outer border between the face and the dark outline
+        public float rim = 0f;           // rim width
+        public float depth = 0f;         // dark depth band under the coloured extrusion
+        public Rgba? depthColor;         // default: ink
         public Rgba ink = Rgba.Hex("2E2433");
         public Rgba shadowColor = new Rgba(0.12f, 0.08f, 0.22f, 0.28f);
     }
@@ -33,10 +38,12 @@ namespace SortEverything.Prototype
             var bytes = new byte[w * h * 4];
             float m = s.outline * 0.5f + 1f;
             // Layout in "top-down" pixel space.
-            float faceH = h - 2 * m - s.extrude - s.shadow;
+            float faceH = h - 2 * m - s.extrude - s.depth - s.shadow;
             float faceTop = m + s.pressed;
             float extTop = m + s.extrude;
+            float depthTop = extTop + s.depth;
             Rgba ext = s.extrusionColor ?? s.face.Dark(0.32f);
+            Rgba depthColor = s.depthColor ?? s.ink;
             Rgba faceTopColor = s.face.Light(0.14f);
 
             for (int row = 0; row < h; row++)
@@ -47,12 +54,20 @@ namespace SortEverything.Prototype
                     float px = x + 0.5f;
                     float ar = 0, ag = 0, ab = 0, aa = 0;
 
-                    // 1. soft shadow under the extrusion
-                    float ds = RoundRect(px, y, m, extTop + s.shadow, w - m, extTop + s.shadow + faceH, s.radius);
+                    // 1. soft shadow under everything
+                    float ds = RoundRect(px, y, m, depthTop + s.shadow, w - m, depthTop + s.shadow + faceH, s.radius);
                     float sa = s.shadowColor.a * (1f - Smooth(-s.shadowSoftness, s.shadowSoftness, ds));
                     Over(ref ar, ref ag, ref ab, ref aa, s.shadowColor, sa);
 
-                    // 2. extrusion (darker base) with outline
+                    // 2a. dark depth layer
+                    if (s.depth > 0f)
+                    {
+                        float dd = RoundRect(px, y, m, depthTop, w - m, depthTop + faceH, s.radius);
+                        float cd = Cov(dd);
+                        if (cd > 0f) Over(ref ar, ref ag, ref ab, ref aa, Rgba.Lerp(depthColor, s.ink, Cov(-(dd + s.outline))), cd);
+                    }
+
+                    // 2b. coloured extrusion with outline
                     float de = RoundRect(px, y, m, extTop, w - m, extTop + faceH, s.radius);
                     float ce = Cov(de);
                     if (ce > 0f) Over(ref ar, ref ag, ref ab, ref aa, Rgba.Lerp(ext, s.ink, Cov(-(de + s.outline))), ce);
@@ -64,9 +79,17 @@ namespace SortEverything.Prototype
                     {
                         float t = Clamp01((y - faceTop) / Math.Max(1f, faceH));
                         Rgba c = Rgba.Lerp(faceTopColor, s.face, t);
-                        float inset = s.outline + Math.Max(2f, s.radius * 0.25f);
+                        float inset = s.outline + s.rim + Math.Max(2f, s.radius * 0.25f);
                         float hl = RoundRect(px, y, m + inset, faceTop + inset * 0.7f, w - m - inset, faceTop + faceH * 0.42f, s.radius * 0.6f);
                         c = Rgba.Lerp(c, new Rgba(1f, 1f, 1f, 1f), s.highlight * Cov(hl));
+                        if (s.rim > 0f && s.rimColor.HasValue)
+                        {
+                            // Rim band just inside the outline, with a thin ink line separating it from the face.
+                            Rgba rimC = s.rimColor.Value;
+                            float inner = -(df + s.outline + s.rim);
+                            c = Rgba.Lerp(c, rimC, Cov(inner));
+                            c = Rgba.Lerp(c, s.ink, Cov(inner) * Cov(-inner - Math.Max(1f, s.outline * 0.35f)));
+                        }
                         c = Rgba.Lerp(c, s.ink, Cov(-(df + s.outline)));
                         Over(ref ar, ref ag, ref ab, ref aa, c, cf);
                     }

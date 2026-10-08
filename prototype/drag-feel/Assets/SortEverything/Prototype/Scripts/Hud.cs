@@ -115,13 +115,13 @@ namespace SortEverything.Prototype
             value = new GUIStyle(label) { alignment = TextAnchor.MiddleRight };
             value.normal.textColor = ToyStyle.Reward;
             title = new GUIStyle(label) { font = display, fontSize = Px(18), alignment = TextAnchor.MiddleLeft };
-            stamp = new GUIStyle(GUI.skin.label) { font = display, fontSize = Px(56), alignment = TextAnchor.MiddleCenter, clipping = TextClipping.Overflow };
+            stamp = new GUIStyle(GUI.skin.label) { font = display, fontSize = Px(62), alignment = TextAnchor.MiddleCenter, clipping = TextClipping.Overflow };
             stamp.normal.textColor = ToyStyle.Reward;
-            combo = new GUIStyle(stamp) { fontSize = Px(30) };
+            combo = new GUIStyle(stamp) { fontSize = Px(34) };
             combo.normal.textColor = ToyStyle.Reward;
             button = new GUIStyle(GUI.skin.label) { font = display, fontSize = Px(14), alignment = TextAnchor.MiddleCenter, clipping = TextClipping.Overflow };
-            bigButton = new GUIStyle(button) { fontSize = Px(28) };
-            hudLabel = new GUIStyle(button) { fontSize = Px(15) };
+            bigButton = new GUIStyle(button) { fontSize = Px(32) };
+            hudLabel = new GUIStyle(button) { fontSize = Px(17) };
             stats = new GUIStyle(GUI.skin.label) { font = f, fontSize = Px(12), wordWrap = true };
             stats.normal.textColor = new Color(0.9f, 0.88f, 1f);
             panelBg = new GUIStyle();
@@ -150,13 +150,13 @@ namespace SortEverything.Prototype
             {
                 string roundText = "ROUND " + d.Round;
                 float pw = hudLabel.CalcSize(new GUIContent(roundText)).x + 30 * u;
-                var pill = new Rect(safe.x + 10 * u, safe.y + 10 * u, pw, 36 * u);
+                var pill = new Rect(safe.x + 10 * u, safe.y + 10 * u, pw, 40 * u);
                 float pop = Pop(roundPopAt, 0.35f, 1.18f);
                 Matrix4x4 pm = GUI.matrix;
                 GUIUtility.ScaleAroundPivot(new Vector2(pop, pop), pill.center);
-                ToyGui.Pill(pill, ToyTone.Paper);
-                ToyGui.Text(new Rect(pill.x, pill.y - ToyGui.ButtonDepth * 0.5f, pill.width, pill.height), roundText, hudLabel,
-                    ToyStyle.Purple, 1.6f, 0f);
+                ToyGui.Pill(pill, ToyTone.Purple, ToySize.Medium);
+                ToyGui.Logo(new Rect(pill.x, pill.y - ToyGui.Depth(ToySize.Medium) * 0.5f, pill.width, pill.height), roundText, hudLabel,
+                    ToyGui.TextCream, ToyGui.TextDepthWarm, 2.2f, 2f, false);
                 GUI.matrix = pm;
             }
 
@@ -174,7 +174,7 @@ namespace SortEverything.Prototype
                 float pop = Mathf.Lerp(1.7f, 1f, Juice.EaseOutBack(Mathf.Clamp01(since / 0.16f)));
                 Matrix4x4 cm = GUI.matrix;
                 GUIUtility.ScaleAroundPivot(new Vector2(pop, pop), r.center);
-                ToyGui.Text(r, "x" + d.Combo, combo, new Color(c.r, c.g, c.b, 1f - since / 0.6f), 2.6f, 2.6f);
+                ToyGui.Logo(r, "x" + d.Combo, combo, new Color(c.r, c.g, c.b, 1f - since / 0.6f), ToyStyle.Hex("C8601A"), 3.2f, 3.6f);
                 GUI.matrix = cm;
             }
 
@@ -197,18 +197,19 @@ namespace SortEverything.Prototype
             {
                 var ts = new GUIStyle(hudLabel) { fontSize = Px(16) };
                 float tw = ts.CalcSize(new GUIContent(toast)).x + 36 * u;
-                var tr = new Rect((Screen.width - tw) / 2f, safe.yMax - 86 * u, tw, 42 * u);
+                var tr = new Rect((Screen.width - tw) / 2f, safe.yMax - 86 * u, tw, 44 * u);
                 float pop = Pop(toastPopAt, 0.3f, 0.7f);
                 Matrix4x4 tm = GUI.matrix;
                 GUIUtility.ScaleAroundPivot(new Vector2(pop, pop), tr.center);
-                ToyGui.Pill(tr, ToyTone.Purple);
-                ToyGui.Text(new Rect(tr.x, tr.y - ToyGui.ButtonDepth * 0.5f, tr.width, tr.height), toast, ts, Color.white, 1.8f, 1.2f);
+                ToyGui.Pill(tr, ToyTone.Purple, ToySize.Medium);
+                ToyGui.Logo(new Rect(tr.x, tr.y - ToyGui.Depth(ToySize.Medium) * 0.5f, tr.width, tr.height), toast, ts,
+                    ToyGui.TextCream, ToyGui.TextDepthWarm, 2.2f, 2f, false);
                 GUI.matrix = tm;
             }
 
             if (!PanelOpen)
             {
-                if (ToyGui.Button(GearRect, "•••", ToyTone.Purple, button)) { PanelOpen = true; scroll = Vector2.zero; }
+                if (ToyGui.Button(GearRect, "•••", ToyTone.Purple, button, null, ToySize.Medium)) { PanelOpen = true; scroll = Vector2.zero; }
             }
             else
             {
@@ -225,7 +226,7 @@ namespace SortEverything.Prototype
             Matrix4x4 m = GUI.matrix;
             GUIUtility.RotateAroundPivot(-8f, centre);
             GUIUtility.ScaleAroundPivot(new Vector2(scale, scale), centre);
-            ToyGui.Text(rect, "SORTED!", stamp, stamp.normal.textColor, 3.6f, 5f);
+            ToyGui.Logo(rect, "SORTED!", stamp, ToyGui.TextCream, ToyGui.TextDepthWarm, 4.4f, 7f);
             GUI.matrix = m;
         }
 
@@ -237,7 +238,7 @@ namespace SortEverything.Prototype
             float pop = Pop(nextPopAt, 0.35f, 0.6f);
             Matrix4x4 m = GUI.matrix;
             GUIUtility.ScaleAroundPivot(new Vector2(pop, pop), r.center);
-            bool next = ToyGui.Button(r, "NEXT  >", ToyTone.Primary, bigButton);
+            bool next = ToyGui.Button(r, "NEXT  >", ToyTone.Primary, bigButton, null, ToySize.Large);
             GUI.matrix = m;
             if (next) d.Next();
         }
@@ -283,7 +284,7 @@ namespace SortEverything.Prototype
 
             float y = 0f;
             float w = area.width;
-            ToyGui.Text(new Rect(0, y, w, row), "DRAG-FEEL TUNING  (observer only)", title, Color.white, 2f, 1.5f);
+            ToyGui.Logo(new Rect(0, y, w, row), "DRAG-FEEL TUNING  (observer only)", title, ToyGui.TextCream, ToyGui.TextDepthWarm, 2.4f, 2.6f, false);
             y += row;
 
             // E1 variants.

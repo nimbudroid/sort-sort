@@ -5,17 +5,69 @@ namespace SortEverything.Prototype
 {
     public enum ToyTone { Primary, Secondary, Purple, Reward, Warning, Danger, Inactive, Paper }
 
+    /// <summary>Button depth/size presets. Each fits its existing rect height (Small 34 dp, Medium 36–44 dp, Large 70 dp).</summary>
+    public enum ToySize { Small, Medium, Large }
+
     /// <summary>
-    /// IMGUI toy kit for the visual style prototype: chunky outlined text, physical-feeling buttons that squash when
-    /// pressed and bounce when released, rounded cards and a toy slider skin. Purely presentational: a ToyGui.Button
-    /// returns true exactly when GUI.Button would (released inside the rect).
+    /// IMGUI toy kit for the visual style prototype. Everything is built as layered molded plastic:
+    /// bright face → contrasting rim → dark outline → coloured extrusion → dark depth band → soft shadow.
+    /// Text uses the same idea: light face → thick dark outline → warm depth → dark shadow.
+    /// Purely presentational: ToyGui.Button returns true exactly when GUI.Button would (released inside the rect).
     /// </summary>
     public static class ToyGui
     {
-        static float u = -1f;   // pixels per dp the textures were built for
+        static float u = -1f; // pixels per dp the textures were built for
 
-        // Button geometry in dp (kept small enough that 34 dp tall panel buttons still 9-slice cleanly).
-        const float BtnRadius = 10f, BtnOutline = 2.6f, BtnExtrude = 4.5f, BtnShadow = 2.5f, BtnPressed = 3.5f;
+        struct Geo
+        {
+            public float radius, outline, rim, extrude, depth, shadow, pressed, textOutline, textDepth;
+        }
+
+        static Geo GeoFor(ToySize size)
+        {
+            switch (size)
+            {
+                case ToySize.Large:
+                    return new Geo { radius = 13f, outline = 3.2f, rim = 3.6f, extrude = 9f, depth = 3.5f, shadow = 4f, pressed = 7.5f, textOutline = 3.2f, textDepth = 3.4f };
+                case ToySize.Medium:
+                    return new Geo { radius = 11f, outline = 2.8f, rim = 2.8f, extrude = 5f, depth = 2.4f, shadow = 3f, pressed = 4f, textOutline = 2.4f, textDepth = 2.2f };
+                default:
+                    return new Geo { radius = 9f, outline = 2.4f, rim = 2f, extrude = 3.6f, depth = 1.8f, shadow = 2.2f, pressed = 3f, textOutline = 2f, textDepth = 1.6f };
+            }
+        }
+
+        struct ToneColors
+        {
+            public Color face, rim, extrusion;
+        }
+
+        /// <summary>Face / contrasting rim / coloured extrusion for each tone (e.g. green face, yellow rim, blue base).</summary>
+        static ToneColors Tone(ToyTone tone)
+        {
+            switch (tone)
+            {
+                case ToyTone.Primary: return T("5CCF4F", "FFD23F", "3C64D8");
+                case ToyTone.Secondary: return T("47A2FF", "D4F0FF", "2E4BB5");
+                case ToyTone.Purple: return T("A06BFF", "F2C6FF", "5B3AB8");
+                case ToyTone.Reward: return T("FFD23F", "FFF4B8", "E07A1F");
+                case ToyTone.Warning: return T("FF9A2E", "FFE1A8", "C24E1C");
+                case ToyTone.Danger: return T("F2564A", "FFC2B8", "9E2A3A");
+                case ToyTone.Inactive: return T("B3A9CC", "ECE7F5", "6E6488");
+                default: return T("FFFFFF", "FFE38A", "8E63F0");
+            }
+        }
+
+        static ToneColors T(string face, string rim, string ext)
+        {
+            return new ToneColors { face = ToyStyle.Hex(face), rim = ToyStyle.Hex(rim), extrusion = ToyStyle.Hex(ext) };
+        }
+
+        /// <summary>Warm depth colour for headline text (orange/gold extrusion).</summary>
+        public static readonly Color TextDepthWarm = ToyStyle.Hex("F08C1E");
+        /// <summary>Cream face for headline text.</summary>
+        public static readonly Color TextCream = ToyStyle.Hex("FFF9E8");
+
+        public static Color ToneColor(ToyTone tone) { return Tone(tone).face; }
 
         static readonly Dictionary<string, GUIStyle> skins = new Dictionary<string, GUIStyle>();
         static readonly List<Texture2D> textures = new List<Texture2D>();
@@ -39,21 +91,6 @@ namespace SortEverything.Prototype
             textures.Clear();
         }
 
-        public static Color ToneColor(ToyTone tone)
-        {
-            switch (tone)
-            {
-                case ToyTone.Primary: return ToyStyle.Primary;
-                case ToyTone.Secondary: return ToyStyle.Secondary;
-                case ToyTone.Purple: return ToyStyle.Purple;
-                case ToyTone.Reward: return ToyStyle.Reward;
-                case ToyTone.Warning: return ToyStyle.Warning;
-                case ToyTone.Danger: return ToyStyle.Danger;
-                case ToyTone.Inactive: return ToyStyle.Inactive;
-                default: return ToyStyle.Paper;
-            }
-        }
-
         static Rgba R(Color c) { return new Rgba(c.r, c.g, c.b, c.a); }
 
         static GUIStyle MakeSkin(string key, ToyPanelSpec spec, RectOffset border)
@@ -68,87 +105,118 @@ namespace SortEverything.Prototype
             return s;
         }
 
-        static GUIStyle ButtonSkin(ToyTone tone, bool down)
-        {
-            string key = "btn_" + tone + (down ? "_down" : "");
-            if (skins.ContainsKey(key)) return skins[key];
-            int size = Mathf.CeilToInt(48f * u);
-            var spec = new ToyPanelSpec
-            {
-                width = size, height = size, radius = BtnRadius * u, outline = BtnOutline * u, extrude = BtnExtrude * u,
-                pressed = down ? BtnPressed * u : 0f, shadow = BtnShadow * u, shadowSoftness = 2.5f * u,
-                highlight = 0.3f, face = R(ToneColor(tone)), ink = R(ToyStyle.Ink),
-            };
-            int side = Mathf.CeilToInt((BtnRadius + BtnOutline + 1f) * u);
-            int bottom = Mathf.CeilToInt((BtnRadius + BtnOutline + BtnExtrude + BtnShadow + 1f) * u);
-            return MakeSkin(key, spec, new RectOffset(side, side, side, bottom));
-        }
-
-        static GUIStyle CardSkin(Color face, string key)
+        static GUIStyle LayeredSkin(string key, ToneColors c, Geo g, bool down)
         {
             if (skins.ContainsKey(key)) return skins[key];
-            int size = Mathf.CeilToInt(72f * u);
-            const float radius = 20f, outline = 3f, extrude = 5f, shadow = 5f;
+            int top = Mathf.CeilToInt((g.radius + g.outline + 1f) * u);
+            int bottom = Mathf.CeilToInt((g.radius + g.outline + g.extrude + g.depth + g.shadow + 1f) * u);
+            int size = top + bottom + Mathf.CeilToInt(10f * u);
             var spec = new ToyPanelSpec
             {
-                width = size, height = size, radius = radius * u, outline = outline * u, extrude = extrude * u,
-                shadow = shadow * u, shadowSoftness = 5f * u, highlight = 0.08f, face = R(face), ink = R(ToyStyle.Ink),
+                width = size, height = size, radius = g.radius * u, outline = g.outline * u, rim = g.rim * u,
+                extrude = g.extrude * u, depth = g.depth * u, shadow = g.shadow * u, shadowSoftness = g.shadow * u,
+                pressed = down ? g.pressed * u : 0f, highlight = 0.32f, face = R(c.face), rimColor = R(c.rim),
+                extrusionColor = R(c.extrusion), depthColor = R(ToyStyle.Ink), ink = R(ToyStyle.Ink),
+                shadowColor = new Rgba(0.1f, 0.06f, 0.22f, 0.32f),
             };
-            int side = Mathf.CeilToInt((radius + outline + 1f) * u);
-            int bottom = Mathf.CeilToInt((radius + outline + extrude + shadow + 1f) * u);
-            return MakeSkin(key, spec, new RectOffset(side, side, side, bottom));
+            return MakeSkin(key, spec, new RectOffset(top, top, top, bottom));
         }
 
-        /// <summary>Dark rounded card (the tuning panel).</summary>
+        static GUIStyle ButtonSkin(ToyTone tone, ToySize size, bool down)
+        {
+            return LayeredSkin("btn_" + tone + "_" + size + (down ? "_down" : ""), Tone(tone), GeoFor(size), down);
+        }
+
+        /// <summary>Vertical pixels of a size's depth (extrusion + depth + shadow); text sits above it.</summary>
+        public static float Depth(ToySize size)
+        {
+            var g = GeoFor(size);
+            return (g.extrude + g.depth + g.shadow) * u;
+        }
+
+        /// <summary>Kept for existing call sites: depth of a Small element.</summary>
+        public static float ButtonDepth { get { return Depth(ToySize.Small); } }
+
+        /// <summary>Big layered card (the tuning panel): purple face, lighter rim, dark extrusion.</summary>
         public static void Card(Rect r)
         {
             if (Event.current.type != EventType.Repaint) return;
-            CardSkin(ToyStyle.Card, "card").Draw(r, false, false, false, false);
+            var g = new Geo { radius = 22f, outline = 3.2f, rim = 3.2f, extrude = 6f, depth = 3f, shadow = 6f };
+            var c = new ToneColors { face = ToyStyle.Card, rim = ToyStyle.Hex("7B5CC9"), extrusion = ToyStyle.Hex("2B1F54") };
+            LayeredSkin("card", c, g, false).Draw(r, false, false, false, false);
         }
 
-        /// <summary>Rounded pill/panel in a tone, no interaction (HUD round label, toast).</summary>
-        public static void Pill(Rect r, ToyTone tone)
+        /// <summary>Layered pill/panel in a tone, no interaction (HUD round label, toast).</summary>
+        public static void Pill(Rect r, ToyTone tone, ToySize size = ToySize.Small)
         {
             if (Event.current.type != EventType.Repaint) return;
-            ButtonSkin(tone, false).Draw(r, false, false, false, false);
+            ButtonSkin(tone, size, false).Draw(r, false, false, false, false);
         }
 
-        /// <summary>Vertical pixels of a button's depth (extrusion + shadow); text sits above it.</summary>
-        public static float ButtonDepth { get { return (BtnExtrude + BtnShadow) * u; } }
-
         /// <summary>
-        /// Chunky cartoon text: dark outline ring, a dark extrusion below it, then the fill.
+        /// Chunky cartoon text: dark outline ring, a dark extrusion below it, then the fill (single-depth variant).
         /// </summary>
         public static void Text(Rect r, string text, GUIStyle style, Color fill, float outlineDp = 2.2f, float extrudeDp = 2f)
         {
+            Logo(r, text, style, fill, ToyStyle.Ink, outlineDp, extrudeDp, false);
+        }
+
+        /// <summary>
+        /// Headline "sticker" text: light face → thick dark outline → coloured depth → dark soft shadow.
+        /// </summary>
+        public static void Logo(Rect r, string text, GUIStyle style, Color face, Color depth, float outlineDp, float depthDp,
+            bool shadow = true)
+        {
             if (Event.current.type != EventType.Repaint || string.IsNullOrEmpty(text)) return;
             Color old = style.normal.textColor;
+            float alpha = face.a;
+            float o = outlineDp * u, e = depthDp * u;
             Color ink = ToyStyle.Ink;
-            ink.a = fill.a;
-            float o = outlineDp * u, e = extrudeDp * u;
+            ink.a = alpha;
+
+            if (shadow)
+            {
+                style.normal.textColor = new Color(ink.r, ink.g, ink.b, 0.35f * alpha);
+                DrawRing(style, r, text, o, o * 0.35f, e + o * 0.9f);
+            }
+
+            // Dark silhouette of the whole extruded block.
             style.normal.textColor = ink;
-            const int ring = 12;
+            float step = Mathf.Max(1f, 1.6f * u);
+            for (float k = e; k > 0f; k -= step) DrawRing(style, r, text, o, 0f, k);
+            DrawRing(style, r, text, o, 0f, 0f);
+
+            // Coloured depth inside the silhouette.
             if (e > 0f)
-                for (int i = 0; i < ring; i++)
-                {
-                    float a = i * Mathf.PI * 2f / ring;
-                    style.Draw(new Rect(r.x + Mathf.Cos(a) * o, r.y + Mathf.Sin(a) * o + e, r.width, r.height), text, false, false, false, false);
-                }
-            if (o > 0f)
-                for (int i = 0; i < ring; i++)
-                {
-                    float a = i * Mathf.PI * 2f / ring;
-                    style.Draw(new Rect(r.x + Mathf.Cos(a) * o, r.y + Mathf.Sin(a) * o, r.width, r.height), text, false, false, false, false);
-                }
-            style.normal.textColor = fill;
+            {
+                style.normal.textColor = new Color(depth.r, depth.g, depth.b, alpha);
+                for (float k = e; k > 0.5f * step; k -= step)
+                    style.Draw(new Rect(r.x, r.y + k, r.width, r.height), text, false, false, false, false);
+                // Thin dark line separating the face from its depth.
+                style.normal.textColor = ink;
+                DrawRing(style, r, text, Mathf.Max(1f, o * 0.4f), 0f, 0f, 8);
+            }
+
+            style.normal.textColor = face;
             style.Draw(r, text, false, false, false, false);
             style.normal.textColor = old;
         }
 
+        static void DrawRing(GUIStyle style, Rect r, string text, float radius, float dx, float dy, int ring = 16)
+        {
+            for (int i = 0; i < ring; i++)
+            {
+                float a = i * Mathf.PI * 2f / ring;
+                style.Draw(new Rect(r.x + Mathf.Cos(a) * radius + dx, r.y + Mathf.Sin(a) * radius + dy, r.width, r.height),
+                    text, false, false, false, false);
+            }
+        }
+
         /// <summary>
-        /// Physical toy button. Squashes while held, bounces on release; returns true on release inside (like GUI.Button).
+        /// Molded plastic toy button. Squashes while held, bounces on release; returns true on release inside (like GUI.Button).
         /// </summary>
-        public static bool Button(Rect r, string text, ToyTone tone, GUIStyle textStyle, Color? textColor = null)
+        public static bool Button(Rect r, string text, ToyTone tone, GUIStyle textStyle, Color? textColor = null,
+            ToySize size = ToySize.Small)
         {
             int id = GUIUtility.GetControlID(FocusType.Passive, r);
             Press p;
@@ -180,14 +248,15 @@ namespace SortEverything.Prototype
                     break;
                 case EventType.Repaint:
                     StepSpring(p);
+                    var g = GeoFor(size);
                     float sy = p.scaleY;
                     float sx = 1f + (1f - sy) * 0.6f;
                     Matrix4x4 m = GUI.matrix;
                     GUIUtility.ScaleAroundPivot(new Vector2(sx, sy), new Vector2(r.center.x, r.yMax));
-                    ButtonSkin(tone, p.down).Draw(r, false, false, false, false);
-                    float push = p.down ? BtnPressed * u : 0f;
-                    var textRect = new Rect(r.x, r.y - ButtonDepth * 0.5f + push, r.width, r.height);
-                    Text(textRect, text, textStyle, textColor ?? Color.white, 1.8f, 1.2f);
+                    ButtonSkin(tone, size, p.down).Draw(r, false, false, false, false);
+                    float push = p.down ? g.pressed * u : 0f;
+                    var textRect = new Rect(r.x, r.y - Depth(size) * 0.5f + push, r.width, r.height);
+                    Logo(textRect, text, textStyle, textColor ?? TextCream, ToyStyle.Ink, g.textOutline, g.textDepth, false);
                     GUI.matrix = m;
                     break;
             }
@@ -210,7 +279,7 @@ namespace SortEverything.Prototype
             }
         }
 
-        /// <summary>Toy slider: chunky inset track and a round white knob that presses in.</summary>
+        /// <summary>Toy slider: chunky inset track and a layered knob (white face, gold rim, purple base) that presses in.</summary>
         public static void SkinSliders(GUISkin skin)
         {
             const string trackKey = "slider_track";
@@ -229,8 +298,15 @@ namespace SortEverything.Prototype
                 foreach (bool down in new[] { false, true })
                 {
                     string key = down ? "slider_knob_down" : "slider_knob";
-                    var tex = ToyStyle.ToTexture(ToySkinArt.Knob(k, 2.6f * u, down ? 1.2f * u : 3.5f * u,
-                        R(down ? ToyStyle.Reward : ToyStyle.Paper), R(ToyStyle.Ink)), k, k, key);
+                    var knob = new ToyPanelSpec
+                    {
+                        width = k, height = k, outline = 2.4f * u, rim = 2.6f * u, extrude = (down ? 1.2f : 3.2f) * u,
+                        depth = 1.4f * u, shadow = 0f, shadowSoftness = 1f, highlight = 0.3f,
+                        face = R(Color.white), rimColor = R(ToyStyle.Reward), extrusionColor = R(ToyStyle.Purple),
+                        depthColor = R(ToyStyle.Ink), ink = R(ToyStyle.Ink),
+                    };
+                    knob.radius = (k - (2.4f * u + 2f) - knob.extrude - knob.depth) * 0.5f;
+                    var tex = ToyStyle.ToTexture(ToySkinArt.Panel(knob), k, k, key);
                     textures.Add(tex);
                     var st = new GUIStyle();
                     st.normal.background = tex;
