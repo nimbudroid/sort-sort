@@ -38,6 +38,7 @@ namespace SortEverything.Prototype
         public bool silhouette = true;  // contributes to the thick outer outline and the collider hull
         public bool shade = true;       // toy-style top-left lighting
         public float feather;           // > 0: soft-edged (gloss shines); canvas units
+        public bool shine;              // hand-placed highlight; the Molded renderer drops these (gloss is computed)
 
         /// <summary>Carve another shape out of this one.</summary>
         public VShape Minus(Sdf cut)
@@ -179,7 +180,7 @@ namespace SortEverything.Prototype
     }
 
     /// <summary>Collects shapes (back to front) and rasterises them with anti-aliased sticker outlines.</summary>
-    public sealed class VectorPainter
+    public sealed partial class VectorPainter
     {
         public Rgba Ink = Rgba.Hex("2E2433");
         public float OutlineWidth = 0.09f;   // outer silhouette outline (normalised units); heavier for the toy style
@@ -196,6 +197,7 @@ namespace SortEverything.Prototype
         bool transformed;
 
         public int ShapeCount { get { return shapes.Count; } }
+        public IReadOnlyList<VShape> Parts { get { return shapes; } }
 
         public void Push(float rotDeg, float pivotX = 0f, float pivotY = 0f, float offsetX = 0f, float offsetY = 0f)
         {
@@ -244,6 +246,7 @@ namespace SortEverything.Prototype
         public VShape Shine(float x, float y, float rx, float ry, float rotDeg = 0f, float alpha = 0.55f)
         {
             var s = Ellipse(x, y, rx, ry, new Rgba(1f, 1f, 1f, alpha), rotDeg).Detail().Flat();
+            s.shine = true;
             if (ToyShading.Enabled)
             {
                 // Toy look: the lighting already places a gloss hotspot, so hand-placed shines become soft sheen.
@@ -256,7 +259,12 @@ namespace SortEverything.Prototype
         /// <summary>Rasterise to straight-alpha RGBA bytes, row 0 = bottom (Unity texture order).</summary>
         public byte[] Rasterize(int res)
         {
-            return ToyShading.Enabled ? RasterizeToy(res) : RasterizeFlat(res);
+            switch (ToyShading.Mode)
+            {
+                case ToyRenderMode.Molded: return RasterizeMolded(res);
+                case ToyRenderMode.Painted: return RasterizeToy(res);
+                default: return RasterizeFlat(res);
+            }
         }
 
         /// <summary>The previous flat "sticker" shading, kept as the ToyShading.Enabled = false fallback.</summary>
@@ -576,6 +584,17 @@ namespace SortEverything.Prototype
         static float PartRadius(float[] d, int res, float depth, float maxRadius, bool forceDome)
         {
             float dome = Math.Min(depth, maxRadius);
+            if (depth <= 0f || forceDome) return dome;
+            float ratio = CornerRatio(d, res, depth);
+            if (ratio <= 0f) return dome;
+            float bevel = Math.Min(depth, ToyShading.BoxBevelRadius);
+            float t = Smooth(ToyShading.RoundRatio, ToyShading.BoxRatio, ratio);
+            return dome + (bevel - dome) * t;
+        }
+
+        /// <summary>Part area relative to an ellipse of the same depth and proportions; 0 if too small to measure.</summary>
+        static float CornerRatio(float[] d, int res, float depth)
+        {
             double m = 0, sx = 0, sy = 0, sxx = 0, syy = 0, sxy = 0;
             for (int yi = 0; yi < res; yi++)
                 for (int xi = 0; xi < res; xi++)
@@ -584,16 +603,13 @@ namespace SortEverything.Prototype
                     double x = xi, y = yi;
                     m++; sx += x; sy += y; sxx += x * x; syy += y * y; sxy += x * y;
                 }
-            if (m < 4 || depth <= 0f || forceDome) return dome;
+            if (m < 4) return 0f;
             double cx = sx / m, cy = sy / m;
             double vxx = sxx / m - cx * cx, vyy = syy / m - cy * cy, vxy = sxy / m - cx * cy;
             double tr = (vxx + vyy) * 0.5, disc = Math.Sqrt(Math.Max(0.0, (vxx - vyy) * (vxx - vyy) * 0.25 + vxy * vxy));
             double aspect = Math.Sqrt((tr + disc) / Math.Max(tr - disc, 1e-6));
             double area = m * (2.0 / res) * (2.0 / res);
-            float ratio = (float)(area / (Math.PI * depth * depth * aspect));
-            float bevel = Math.Min(depth, ToyShading.BoxBevelRadius);
-            float t = Smooth(ToyShading.RoundRatio, ToyShading.BoxRatio, ratio);
-            return dome + (bevel - dome) * t;
+            return (float)(area / (Math.PI * depth * depth * aspect));
         }
 
         static bool HasDepth(float[] d, float px)

@@ -14,6 +14,7 @@ namespace SortEverything.Prototype
         class Entry
         {
             public Sprite sprite;
+            public Sprite shadow; // soft baked contact shadow (Molded mode only); separate layer, never a collider input
             public Vector2[] hull;
         }
 
@@ -29,7 +30,7 @@ namespace SortEverything.Prototype
             Entry e;
             if (!cache.TryGetValue(def.id, out e))
             {
-                e = Build(def.id);
+                e = Build(def);
                 if (e == null) return false;
                 cache[def.id] = e;
             }
@@ -38,15 +39,20 @@ namespace SortEverything.Prototype
             return true;
         }
 
-        static Entry Build(string id)
+        /// <summary>The object's baked soft shadow sprite, or null (not Molded mode, or not built yet).</summary>
+        public static Sprite Shadow(ObjectDef def)
         {
+            Entry e;
+            return def != null && cache.TryGetValue(def.id, out e) ? e.shadow : null;
+        }
+
+        static Entry Build(ObjectDef def)
+        {
+            string id = def.id;
             var painter = ObjectDrawings.Paint(id);
             if (painter == null) return null;
-            // Per-object toy material (rendering only; the silhouette and collider hull are unaffected).
-            var material = ToyShading.For(id);
-            painter.Gloss = material.gloss;
-            painter.Volume = material.volume;
-            painter.Dome = material.dome;
+            // Per-object material and family (rendering only; the silhouette and collider hull are unaffected).
+            ObjectMaterials.Configure(painter, def);
 
             byte[] rgba = painter.Rasterize(Res);
             var tex = new Texture2D(Res, Res, TextureFormat.RGBA32, false);
@@ -58,10 +64,28 @@ namespace SortEverything.Prototype
             var sprite = Sprite.Create(tex, new Rect(0, 0, Res, Res), new Vector2(0.5f, 0.5f), Res, 0, SpriteMeshType.FullRect);
             sprite.name = id;
 
-            float[] h = VectorPainter.ConvexHull(painter.RasterizeSilhouette(Res), Res);
+            byte[] silhouette = painter.RasterizeSilhouette(Res);
+            float[] h = VectorPainter.ConvexHull(silhouette, Res);
             var hull = new Vector2[h.Length / 2];
             for (int i = 0; i < hull.Length; i++) hull[i] = new Vector2(h[i * 2], h[i * 2 + 1]);
-            return new Entry { sprite = sprite, hull = hull };
+
+            // Soft contact shadow: its own small texture made from a copy of the silhouette mask.
+            Sprite shadow = null;
+            if (ToyShading.Mode == ToyRenderMode.Molded)
+            {
+                int sres = ToyShading.ShadowRes;
+                var stex = new Texture2D(sres, sres, TextureFormat.RGBA32, false);
+                stex.name = "shadow_" + id;
+                stex.wrapMode = TextureWrapMode.Clamp;
+                stex.filterMode = FilterMode.Bilinear;
+                stex.LoadRawTextureData(ToyShading.SoftShadow(silhouette, Res));
+                stex.Apply(false, true);
+                // Same world size per texel span as the object: the texture covers (1 + 2 * padding) units.
+                shadow = Sprite.Create(stex, new Rect(0, 0, sres, sres), new Vector2(0.5f, 0.5f),
+                    sres / (1f + 2f * ToyShading.ShadowPadding), 0, SpriteMeshType.FullRect);
+                shadow.name = id + "_shadow";
+            }
+            return new Entry { sprite = sprite, shadow = shadow, hull = hull };
         }
     }
 }

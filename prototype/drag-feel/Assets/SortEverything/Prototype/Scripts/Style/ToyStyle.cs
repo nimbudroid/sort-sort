@@ -404,8 +404,10 @@ namespace SortEverything.Prototype
             var go = new GameObject("ToyShadow");
             go.transform.SetParent(o.transform, false);
             var sr = go.AddComponent<SpriteRenderer>();
-            sr.sprite = o.sr.sprite;
-            sr.color = new Color(0.16f, 0.1f, 0.3f, DropShadowAlpha);
+            // Molded objects have a baked soft shadow (blurred silhouette, own texture); others reuse their sprite.
+            Sprite soft = o.def != null ? ObjectArt.Shadow(o.def) : null;
+            sr.sprite = soft != null ? soft : o.sr.sprite;
+            sr.color = new Color(0.16f, 0.1f, 0.3f, soft != null ? ToyShading.ShadowAlpha : DropShadowAlpha);
             sr.sortingOrder = 6;
 
             // Soft contact shadow on the platform surface (sibling, so it doesn't inherit rotation/scale).
