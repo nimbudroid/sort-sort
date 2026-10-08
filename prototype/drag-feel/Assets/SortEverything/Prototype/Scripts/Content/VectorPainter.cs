@@ -181,7 +181,7 @@ namespace SortEverything.Prototype
     public sealed class VectorPainter
     {
         public Rgba Ink = Rgba.Hex("2E2433");
-        public float OutlineWidth = 0.075f;  // outer silhouette outline (normalised units)
+        public float OutlineWidth = 0.09f;   // outer silhouette outline (normalised units); heavier for the toy style
         public float LineWidth = 0.035f;     // inner part outlines
 
         readonly List<VShape> shapes = new List<VShape>();

@@ -110,10 +110,20 @@ namespace SortEverything.Prototype
             var txt = new GameObject("Counter");
             txt.transform.SetParent(visualRoot, false);
             txt.transform.localPosition = new Vector3(width * 0.14f, height * 0.11f, 0f);
+            // Visual style: the counter sits on a small layered game-piece badge.
+            var badge = new GameObject("CounterBadge");
+            badge.transform.SetParent(visualRoot, false);
+            badge.transform.localPosition = new Vector3(width * 0.14f, height * 0.105f, 0f);
+            var badgeSr = badge.AddComponent<SpriteRenderer>();
+            badgeSr.sprite = ToyStyle.Badge(ToyStyle.Hex("3B2F7A"));
+            badgeSr.drawMode = SpriteDrawMode.Sliced;
+            badgeSr.size = new Vector2(width * 0.42f, height * 0.18f);
+            badgeSr.sortingOrder = 303;
+
             counter = MakeCounterText(txt, Color.white, 305);
             // Chunky outline: eight ink copies around the white counter.
             counterOutline = new TextMesh[8];
-            float ow = height * 0.014f;
+            float ow = height * 0.018f;
             for (int i = 0; i < counterOutline.Length; i++)
             {
                 var o = new GameObject("CounterOutline");

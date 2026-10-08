@@ -28,11 +28,11 @@ namespace SortEverything.Prototype
             switch (size)
             {
                 case ToySize.Large:
-                    return new Geo { radius = 13f, outline = 3.2f, rim = 3.6f, extrude = 9f, depth = 3.5f, shadow = 4f, pressed = 7.5f, textOutline = 3.2f, textDepth = 3.4f };
+                    return new Geo { radius = 14f, outline = 4.2f, rim = 4.6f, extrude = 9.5f, depth = 4f, shadow = 4.5f, pressed = 8f, textOutline = 4.4f, textDepth = 4.6f };
                 case ToySize.Medium:
-                    return new Geo { radius = 11f, outline = 2.8f, rim = 2.8f, extrude = 5f, depth = 2.4f, shadow = 3f, pressed = 4f, textOutline = 2.4f, textDepth = 2.2f };
+                    return new Geo { radius = 11f, outline = 3.4f, rim = 3.2f, extrude = 4.4f, depth = 2f, shadow = 2.4f, pressed = 3.6f, textOutline = 3f, textDepth = 2.8f };
                 default:
-                    return new Geo { radius = 9f, outline = 2.4f, rim = 2f, extrude = 3.6f, depth = 1.8f, shadow = 2.2f, pressed = 3f, textOutline = 2f, textDepth = 1.6f };
+                    return new Geo { radius = 8.5f, outline = 2.9f, rim = 2.4f, extrude = 3.4f, depth = 1.6f, shadow = 2f, pressed = 2.8f, textOutline = 2.4f, textDepth = 2.1f };
             }
         }
 
@@ -46,14 +46,14 @@ namespace SortEverything.Prototype
         {
             switch (tone)
             {
-                case ToyTone.Primary: return T("5CCF4F", "FFD23F", "3C64D8");
-                case ToyTone.Secondary: return T("47A2FF", "D4F0FF", "2E4BB5");
-                case ToyTone.Purple: return T("A06BFF", "F2C6FF", "5B3AB8");
-                case ToyTone.Reward: return T("FFD23F", "FFF4B8", "E07A1F");
-                case ToyTone.Warning: return T("FF9A2E", "FFE1A8", "C24E1C");
-                case ToyTone.Danger: return T("F2564A", "FFC2B8", "9E2A3A");
-                case ToyTone.Inactive: return T("B3A9CC", "ECE7F5", "6E6488");
-                default: return T("FFFFFF", "FFE38A", "8E63F0");
+                case ToyTone.Primary: return T("3FD436", "FFC414", "2654E8");
+                case ToyTone.Secondary: return T("1E96FF", "9FF0FF", "1C3FC4");
+                case ToyTone.Purple: return T("9447FF", "FF9CF0", "4A1FB8");
+                case ToyTone.Reward: return T("FFC800", "FFF09A", "EB6A00");
+                case ToyTone.Warning: return T("FF8A00", "FFE07A", "C23A08");
+                case ToyTone.Danger: return T("FF3D3D", "FFC0A8", "A01434");
+                case ToyTone.Inactive: return T("ABA2C8", "E8E3F4", "625A82");
+                default: return T("FFFFFF", "FFD84A", "8447FF");
             }
         }
 
@@ -63,7 +63,7 @@ namespace SortEverything.Prototype
         }
 
         /// <summary>Warm depth colour for headline text (orange/gold extrusion).</summary>
-        public static readonly Color TextDepthWarm = ToyStyle.Hex("F08C1E");
+        public static readonly Color TextDepthWarm = ToyStyle.Hex("FF8A00");
         /// <summary>Cream face for headline text.</summary>
         public static readonly Color TextCream = ToyStyle.Hex("FFF9E8");
 
@@ -134,6 +134,36 @@ namespace SortEverything.Prototype
             return (g.extrude + g.depth + g.shadow) * u;
         }
 
+        static Texture2D burst;
+
+        /// <summary>Full-screen translucent dim (completion state backdrop).</summary>
+        public static void Dim(float alpha)
+        {
+            if (Event.current.type != EventType.Repaint || alpha <= 0f) return;
+            var old = GUI.color;
+            GUI.color = new Color(ToyStyle.Ink.r, ToyStyle.Ink.g, ToyStyle.Ink.b, alpha);
+            GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), Texture2D.whiteTexture);
+            GUI.color = old;
+        }
+
+        /// <summary>Soft rotating light burst behind a headline (decoration only).</summary>
+        public static void Burst(Vector2 centre, float radius, float angle, Color tint)
+        {
+            if (Event.current.type != EventType.Repaint || radius <= 0f) return;
+            if (burst == null)
+            {
+                const int res = 256;
+                burst = ToyStyle.ToTexture(ToySkinArt.Sunburst(res, 14), res, res, "burst");
+            }
+            var old = GUI.color;
+            Matrix4x4 m = GUI.matrix;
+            GUI.color = tint;
+            GUIUtility.RotateAroundPivot(angle, centre);
+            GUI.DrawTexture(new Rect(centre.x - radius, centre.y - radius, radius * 2f, radius * 2f), burst);
+            GUI.matrix = m;
+            GUI.color = old;
+        }
+
         /// <summary>Kept for existing call sites: depth of a Small element.</summary>
         public static float ButtonDepth { get { return Depth(ToySize.Small); } }
 
@@ -141,7 +171,7 @@ namespace SortEverything.Prototype
         public static void Card(Rect r)
         {
             if (Event.current.type != EventType.Repaint) return;
-            var g = new Geo { radius = 22f, outline = 3.2f, rim = 3.2f, extrude = 6f, depth = 3f, shadow = 6f };
+            var g = new Geo { radius = 22f, outline = 4.2f, rim = 4f, extrude = 6f, depth = 3f, shadow = 6f };
             var c = new ToneColors { face = ToyStyle.Card, rim = ToyStyle.Hex("7B5CC9"), extrusion = ToyStyle.Hex("2B1F54") };
             LayeredSkin("card", c, g, false).Draw(r, false, false, false, false);
         }
@@ -256,7 +286,7 @@ namespace SortEverything.Prototype
                     ButtonSkin(tone, size, p.down).Draw(r, false, false, false, false);
                     float push = p.down ? g.pressed * u : 0f;
                     var textRect = new Rect(r.x, r.y - Depth(size) * 0.5f + push, r.width, r.height);
-                    Logo(textRect, text, textStyle, textColor ?? TextCream, ToyStyle.Ink, g.textOutline, g.textDepth, false);
+                    Logo(textRect, text, textStyle, textColor ?? TextCream, Tone(tone).extrusion, g.textOutline, g.textDepth, false);
                     GUI.matrix = m;
                     break;
             }
@@ -300,12 +330,12 @@ namespace SortEverything.Prototype
                     string key = down ? "slider_knob_down" : "slider_knob";
                     var knob = new ToyPanelSpec
                     {
-                        width = k, height = k, outline = 2.4f * u, rim = 2.6f * u, extrude = (down ? 1.2f : 3.2f) * u,
+                        width = k, height = k, outline = 3f * u, rim = 2.8f * u, extrude = (down ? 1.2f : 3.2f) * u,
                         depth = 1.4f * u, shadow = 0f, shadowSoftness = 1f, highlight = 0.3f,
                         face = R(Color.white), rimColor = R(ToyStyle.Reward), extrusionColor = R(ToyStyle.Purple),
                         depthColor = R(ToyStyle.Ink), ink = R(ToyStyle.Ink),
                     };
-                    knob.radius = (k - (2.4f * u + 2f) - knob.extrude - knob.depth) * 0.5f;
+                    knob.radius = (k - (3f * u + 2f) - knob.extrude - knob.depth) * 0.5f;
                     var tex = ToyStyle.ToTexture(ToySkinArt.Panel(knob), k, k, key);
                     textures.Add(tex);
                     var st = new GUIStyle();

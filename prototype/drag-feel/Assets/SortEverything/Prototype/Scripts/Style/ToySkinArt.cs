@@ -114,6 +114,28 @@ namespace SortEverything.Prototype
             return Panel(spec);
         }
 
+        /// <summary>White light burst: alternating soft rays fading out from the centre.</summary>
+        public static byte[] Sunburst(int size, int rays)
+        {
+            var bytes = new byte[size * size * 4];
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    float dx = (x + 0.5f) / size * 2f - 1f, dy = (y + 0.5f) / size * 2f - 1f;
+                    float r = (float)Math.Sqrt(dx * dx + dy * dy);
+                    double a = Math.Atan2(dy, dx);
+                    float ray = (float)(0.5 + 0.5 * Math.Cos(a * rays));
+                    ray = Smooth(0.35f, 0.65f, ray);
+                    float fade = 1f - Smooth(0.15f, 1f, r);
+                    float glow = 1f - Smooth(0f, 0.45f, r);
+                    float alpha = Clamp01(fade * (0.55f * ray + 0.25f) + 0.5f * glow);
+                    int o = (y * size + x) * 4;
+                    bytes[o] = bytes[o + 1] = bytes[o + 2] = 255;
+                    bytes[o + 3] = B(alpha);
+                }
+            return bytes;
+        }
+
         /// <summary>Vertical gradient (row 0 = bottom colour).</summary>
         public static byte[] Gradient(int height, Rgba bottom, Rgba top)
         {

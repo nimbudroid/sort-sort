@@ -57,7 +57,7 @@ namespace SortEverything.Prototype
             var tex = NewTexture(ShapeRes, ShapeRes, key);
             var px = new Color32[ShapeRes * ShapeRes];
             float pixel = 2f / ShapeRes;
-            const float outline = 0.11f;
+            const float outline = 0.13f; // visual style: heavier sticker outline
 
             for (int y = 0; y < ShapeRes; y++)
             {

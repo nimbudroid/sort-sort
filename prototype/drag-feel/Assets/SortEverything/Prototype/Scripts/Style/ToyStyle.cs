@@ -11,13 +11,13 @@ namespace SortEverything.Prototype
     {
         // ---- UI palette -------------------------------------------------------------------------
         public static readonly Color Ink = Hex("2A2347");        // dark navy outline / depth
-        public static readonly Color Primary = Hex("58CC6A");    // friendly green: primary actions
-        public static readonly Color Secondary = Hex("4C8DF6");  // blue: secondary actions
-        public static readonly Color Purple = Hex("8E63F0");     // purple: secondary actions
-        public static readonly Color Reward = Hex("FFCD3C");     // yellow/gold: rewards
-        public static readonly Color Warning = Hex("FF9A2E");    // orange: warnings
-        public static readonly Color Danger = Hex("F2564A");     // red: failure/danger
-        public static readonly Color Inactive = Hex("A79CC0");   // muted grey-purple: inactive
+        public static readonly Color Primary = Hex("3FD436");    // vivid green: primary actions
+        public static readonly Color Secondary = Hex("1E96FF");  // saturated blue: secondary actions
+        public static readonly Color Purple = Hex("9447FF");     // purple: secondary actions
+        public static readonly Color Reward = Hex("FFC800");     // yellow/gold: rewards
+        public static readonly Color Warning = Hex("FF8A00");    // orange: warnings
+        public static readonly Color Danger = Hex("FF3D3D");     // red: failure/danger
+        public static readonly Color Inactive = Hex("ABA2C8");   // muted grey-purple: inactive
         public static readonly Color Card = Hex("4A3880");       // panel card
         public static readonly Color Paper = Hex("FFFFFF");
 
@@ -85,7 +85,7 @@ namespace SortEverything.Prototype
             const int size = 64;
             var spec = new ToyPanelSpec
             {
-                width = size, height = size, radius = 14f, outline = 4f, extrude = extrude ? 6f : 0f, shadow = 0f,
+                width = size, height = size, radius = 14f, outline = 5f, extrude = extrude ? 6f : 0f, shadow = 0f,
                 shadowSoftness = 1f, highlight = 0.22f, face = ToRgba(face), ink = ToRgba(Ink),
             };
             if (extrude)
@@ -113,12 +113,36 @@ namespace SortEverything.Prototype
             const int size = 24;
             var spec = new ToyPanelSpec
             {
-                width = size, height = size, radius = 7f, outline = 3f, extrude = 0f, shadow = 0f, shadowSoftness = 1f,
+                width = size, height = size, radius = 7f, outline = 4f, extrude = 0f, shadow = 0f, shadowSoftness = 1f,
                 highlight = 0.15f, face = ToRgba(face), ink = ToRgba(Ink),
             };
             var tex = ToTexture(ToySkinArt.Panel(spec), size, size, key);
             s = Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 1f / WorldPerPx, 0,
-                SpriteMeshType.FullRect, new Vector4(9f, 9f, 9f, 9f));
+                SpriteMeshType.FullRect, new Vector4(11f, 11f, 11f, 11f));
+            sprites[key] = s;
+            return s;
+        }
+
+        /// <summary>
+        /// Small layered game-piece badge (bin counters): saturated face, light rim, thick outline, coloured base.
+        /// 9-sliced, minimum height ≈ 0.4 world units.
+        /// </summary>
+        public static Sprite Badge(Color face)
+        {
+            string key = "badge_" + ColorUtility.ToHtmlStringRGB(face);
+            Sprite s;
+            if (sprites.TryGetValue(key, out s)) return s;
+            const int size = 40;
+            var spec = new ToyPanelSpec
+            {
+                width = size, height = size, radius = 10f, outline = 4f, rim = 2.5f, extrude = 4f, depth = 2f, shadow = 0f,
+                shadowSoftness = 1f, highlight = 0.25f, face = ToRgba(face),
+                rimColor = ToRgba(Color.Lerp(face, Color.white, 0.5f)), extrusionColor = ToRgba(Color.Lerp(face, Ink, 0.5f)),
+                depthColor = ToRgba(Ink), ink = ToRgba(Ink),
+            };
+            var tex = ToTexture(ToySkinArt.Panel(spec), size, size, key);
+            s = Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 1f / WorldPerPx, 0,
+                SpriteMeshType.FullRect, new Vector4(15f, 21f, 15f, 15f));
             sprites[key] = s;
             return s;
         }
