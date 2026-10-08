@@ -76,7 +76,7 @@ namespace SortEverything.Prototype
             cam.transform.position = new Vector3(0f, 0f, -10f);
             cam.transform.rotation = Quaternion.identity;
             cam.clearFlags = CameraClearFlags.SolidColor;
-            cam.backgroundColor = new Color32(0xCD, 0xEB, 0xDD, 0xFF); // kitchen mint stage
+            cam.backgroundColor = ToyStyle.SkyBottom; // behind the toy-style gradient background
             cam.nearClipPlane = 0.1f;
             cam.farClipPlane = 50f;
             return cam;

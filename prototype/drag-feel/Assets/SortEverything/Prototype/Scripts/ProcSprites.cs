@@ -68,8 +68,10 @@ namespace SortEverything.Prototype
                     float coverage = Mathf.Clamp01(0.5f - d / pixel);
                     if (coverage <= 0f) { px[y * ShapeRes + x] = new Color32(255, 255, 255, 0); continue; }
 
-                    // Fill: soft toy shading, lighter towards the top-left, plus a specular spot.
-                    float shade = 0.82f + 0.13f * Mathf.Clamp01(0.5f + 0.5f * (-p.x * 0.4f + p.y * 0.7f));
+                    // Fill: toy shading, lighter towards the top-left, a soft bevel so the shape looks
+                    // puffed up like a vinyl toy, plus a specular spot.
+                    float bevel = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(-d / 0.3f));
+                    float shade = (0.8f + 0.18f * Mathf.Clamp01(0.5f + 0.5f * (-p.x * 0.4f + p.y * 0.7f))) * (0.8f + 0.2f * bevel);
                     float spec = Mathf.Clamp01(1f - (p - new Vector2(-0.32f, 0.38f)).magnitude / 0.2f);
                     float v = Mathf.Lerp(shade, 1f, spec * spec);
                     if (PatternMask(pattern, p)) v *= 0.74f;

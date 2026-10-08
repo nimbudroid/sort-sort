@@ -27,6 +27,7 @@ namespace SortEverything.Prototype
         Vector3 pupilLBase, pupilRBase;
         float eyeRadius;
         TextMesh counter;
+        TextMesh[] counterOutline; // visual style: ink copies around the counter for a chunky outline
         Transform lidHinge;
         SpriteRenderer lidSprite;
         BoxCollider2D lidCollider;
@@ -70,25 +71,27 @@ namespace SortEverything.Prototype
             lidCollider = AddBox("LidCollider", new Vector2(0f, height + wall / 2f), new Vector2(width, wall), material);
             lidCollider.enabled = false;
 
-            var rr = ProcSprites.RoundedRect();
             var vr = new GameObject("Visual");
             vr.transform.SetParent(transform, false);
             visualRoot = vr.transform;
             spring = vr.AddComponent<Springy>();
 
-            backColor = Color.Lerp(color, new Color(0.25f, 0.22f, 0.3f), 0.45f);
-            back = Sliced("Back", rr, new Vector2(0f, height / 2f), new Vector2(width, height), backColor, 0);
+            // Visual style: chunky outlined toy panels (the back is tinted so the reject flash still works).
+            ToyStyle.GroundShadow(transform, bottomCenter + new Vector2(0f, wall * 0.5f), width * 1.2f, height * 0.24f, -20);
+            backColor = Color.Lerp(color, new Color(0.25f, 0.22f, 0.3f), 0.32f);
+            back = Sliced("Back", ToyStyle.Panel(Color.white, false), new Vector2(0f, height / 2f), new Vector2(width, height), backColor, 0);
             Color side = Color.Lerp(color, Color.black, 0.25f);
-            Sliced("SideL", rr, new Vector2(-width / 2f + wall * 0.7f, height / 2f), new Vector2(wall * 1.4f, height), side, 300);
-            Sliced("SideR", rr, new Vector2(width / 2f - wall * 0.7f, height / 2f), new Vector2(wall * 1.4f, height), side, 300);
+            Sliced("SideL", ToyStyle.Strip(side), new Vector2(-width / 2f + wall * 0.7f, height / 2f), new Vector2(wall * 1.4f, height), Color.white, 300);
+            Sliced("SideR", ToyStyle.Strip(side), new Vector2(width / 2f - wall * 0.7f, height / 2f), new Vector2(wall * 1.4f, height), Color.white, 300);
             float frontH = height * 0.45f;
-            Sliced("Front", rr, new Vector2(0f, frontH / 2f), new Vector2(width, frontH), Color.Lerp(color, Color.white, 0.25f), 301);
+            Sliced("Front", ToyStyle.Panel(Color.Lerp(color, Color.white, 0.18f), true), new Vector2(0f, frontH / 2f), new Vector2(width, frontH), Color.white, 301);
 
             // Face.
             eyeRadius = Mathf.Min(width * 0.13f, height * 0.11f);
             var circle = ProcSprites.Circle();
-            eyeL = Disc("EyeL", circle, new Vector2(-width * 0.2f, height * 0.31f), eyeRadius * 2f, Color.white, 302);
-            eyeR = Disc("EyeR", circle, new Vector2(width * 0.2f, height * 0.31f), eyeRadius * 2f, Color.white, 302);
+            var eye = ToyStyle.Eye();
+            eyeL = Disc("EyeL", eye, new Vector2(-width * 0.2f, height * 0.31f), eyeRadius * 2f, Color.white, 302);
+            eyeR = Disc("EyeR", eye, new Vector2(width * 0.2f, height * 0.31f), eyeRadius * 2f, Color.white, 302);
             pupilL = Disc("PupilL", circle, Vector2.zero, 0.5f, new Color(0.12f, 0.1f, 0.14f), 303, eyeL);
             pupilR = Disc("PupilR", circle, Vector2.zero, 0.5f, new Color(0.12f, 0.1f, 0.14f), 303, eyeR);
             pupilLBase = pupilL.localPosition;
@@ -107,16 +110,18 @@ namespace SortEverything.Prototype
             var txt = new GameObject("Counter");
             txt.transform.SetParent(visualRoot, false);
             txt.transform.localPosition = new Vector3(width * 0.14f, height * 0.11f, 0f);
-            counter = txt.AddComponent<TextMesh>();
-            counter.font = Hud.BuiltinFont;
-            counter.GetComponent<MeshRenderer>().sharedMaterial = counter.font.material;
-            counter.GetComponent<MeshRenderer>().sortingOrder = 304;
-            counter.fontSize = 64;
-            counter.characterSize = height * 0.13f * 10f / 64f * 1.4f;
-            counter.anchor = TextAnchor.MiddleCenter;
-            counter.alignment = TextAlignment.Center;
-            counter.fontStyle = FontStyle.Bold;
-            counter.color = new Color(0.15f, 0.12f, 0.18f);
+            counter = MakeCounterText(txt, Color.white, 305);
+            // Chunky outline: eight ink copies around the white counter.
+            counterOutline = new TextMesh[8];
+            float ow = height * 0.014f;
+            for (int i = 0; i < counterOutline.Length; i++)
+            {
+                var o = new GameObject("CounterOutline");
+                o.transform.SetParent(txt.transform, false);
+                float a = i * Mathf.PI / 4f;
+                o.transform.localPosition = new Vector3(Mathf.Cos(a) * ow, Mathf.Sin(a) * ow - ow * 0.4f, 0f);
+                counterOutline[i] = MakeCounterText(o, ToyStyle.Ink, 304);
+            }
             UpdateCounter();
 
             // Lid, hinged at the left rim; stands open (behind the pile) until the bin fills.
@@ -129,10 +134,10 @@ namespace SortEverything.Prototype
             lid.transform.SetParent(lidHinge, false);
             lid.transform.localPosition = new Vector3(width / 2f + wall * 0.3f, 0f, 0f);
             lidSprite = lid.AddComponent<SpriteRenderer>();
-            lidSprite.sprite = rr;
+            lidSprite.sprite = ToyStyle.Strip(side);
             lidSprite.drawMode = SpriteDrawMode.Sliced;
             lidSprite.size = new Vector2(width + wall * 0.6f, wall * 1.6f);
-            lidSprite.color = side;
+            lidSprite.color = Color.white;
             lidSprite.sortingOrder = 1;
 
             nextBlink = Time.time + Random.Range(1.5f, 4f);
@@ -306,6 +311,23 @@ namespace SortEverything.Prototype
         void UpdateCounter()
         {
             counter.text = count + "/" + capacity;
+            if (counterOutline != null)
+                for (int i = 0; i < counterOutline.Length; i++) counterOutline[i].text = counter.text;
+        }
+
+        TextMesh MakeCounterText(GameObject go, Color c, int order)
+        {
+            var t = go.AddComponent<TextMesh>();
+            t.font = ToyStyle.Display;
+            var mr = go.GetComponent<MeshRenderer>();
+            mr.sharedMaterial = t.font.material;
+            mr.sortingOrder = order;
+            t.fontSize = 64;
+            t.characterSize = height * 0.13f * 10f / 64f * 1.4f * 0.85f; // Titan One is wider than the old font
+            t.anchor = TextAnchor.MiddleCenter;
+            t.alignment = TextAlignment.Center;
+            t.color = c;
+            return t;
         }
 
         void Update()

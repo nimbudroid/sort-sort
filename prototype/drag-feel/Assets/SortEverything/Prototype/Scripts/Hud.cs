@@ -29,7 +29,11 @@ namespace SortEverything.Prototype
         public bool PanelOpen { get; private set; }
 
         float u; // pixels per dp
-        GUIStyle small, label, title, stamp, stampShadow, combo, button, bigButton, panelBg, value;
+        GUIStyle small, label, title, stamp, combo, button, bigButton, panelBg, value, hudLabel, stats;
+        // Visual-style animation clocks (pop-ins); presentation only.
+        int lastRound = -1;
+        float roundPopAt = -10f, nextPopAt = -10f, toastPopAt = -10f;
+        bool nextWasShown;
         Texture2D white, glowV, glowH;
         Vector2 scroll;
         float viewHeight;
@@ -102,26 +106,28 @@ namespace SortEverything.Prototype
             if (small != null && Mathf.Approximately(nu, u)) return;
             u = nu;
             var f = BuiltinFont;
-            small = new GUIStyle(GUI.skin.label) { font = f, fontSize = Px(12), wordWrap = true };
-            small.normal.textColor = new Color(0.2f, 0.18f, 0.25f, 0.8f);
-            label = new GUIStyle(GUI.skin.label) { font = f, fontSize = Px(15), alignment = TextAnchor.MiddleLeft };
+            var display = ToyStyle.Display;
+            var body = ToyStyle.Body;
+            small = new GUIStyle(GUI.skin.label) { font = body, fontSize = Px(12), wordWrap = true };
+            small.normal.textColor = new Color(0.18f, 0.14f, 0.2f, 0.9f);
+            label = new GUIStyle(GUI.skin.label) { font = body, fontSize = Px(13), alignment = TextAnchor.MiddleLeft };
             label.normal.textColor = Color.white;
             value = new GUIStyle(label) { alignment = TextAnchor.MiddleRight };
-            title = new GUIStyle(label) { fontSize = Px(18), fontStyle = FontStyle.Bold };
-            stamp = new GUIStyle(GUI.skin.label) { font = f, fontSize = Px(54), fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
-            stamp.normal.textColor = new Color32(0xE8, 0x3B, 0x2E, 0xFF);
-            stampShadow = new GUIStyle(stamp);
-            stampShadow.normal.textColor = new Color(0.2f, 0.05f, 0.05f, 0.35f);
-            combo = new GUIStyle(stamp) { fontSize = Px(28) };
-            combo.normal.textColor = new Color32(0xFF, 0x8A, 0x1F, 0xFF);
-            button = new GUIStyle(GUI.skin.button) { font = f, fontSize = Px(14), fontStyle = FontStyle.Bold };
-            bigButton = new GUIStyle(GUI.skin.button) { font = f, fontSize = Px(26), fontStyle = FontStyle.Bold };
+            value.normal.textColor = ToyStyle.Reward;
+            title = new GUIStyle(label) { font = display, fontSize = Px(18), alignment = TextAnchor.MiddleLeft };
+            stamp = new GUIStyle(GUI.skin.label) { font = display, fontSize = Px(56), alignment = TextAnchor.MiddleCenter, clipping = TextClipping.Overflow };
+            stamp.normal.textColor = ToyStyle.Reward;
+            combo = new GUIStyle(stamp) { fontSize = Px(30) };
+            combo.normal.textColor = ToyStyle.Reward;
+            button = new GUIStyle(GUI.skin.label) { font = display, fontSize = Px(14), alignment = TextAnchor.MiddleCenter, clipping = TextClipping.Overflow };
+            bigButton = new GUIStyle(button) { fontSize = Px(28) };
+            hudLabel = new GUIStyle(button) { fontSize = Px(15) };
+            stats = new GUIStyle(GUI.skin.label) { font = f, fontSize = Px(12), wordWrap = true };
+            stats.normal.textColor = new Color(0.9f, 0.88f, 1f);
             panelBg = new GUIStyle();
             panelBg.normal.background = white;
 
-            GUI.skin.horizontalSlider.fixedHeight = 26f * u;
-            GUI.skin.horizontalSliderThumb.fixedHeight = 26f * u;
-            GUI.skin.horizontalSliderThumb.fixedWidth = 26f * u;
+            ToyGui.SkinSliders(GUI.skin);
         }
 
         int Px(float dp) { return Mathf.RoundToInt(dp * u); }
@@ -129,19 +135,33 @@ namespace SortEverything.Prototype
         void OnGUI()
         {
             if (Proto.Director == null) return;
+            ToyGui.Begin(Units.DpToPx(1f));
             EnsureStyles();
             var d = Proto.Director;
             Rect safe = SafeGui;
+            if (d.Round != lastRound) { lastRound = d.Round; roundPopAt = Time.unscaledTime; }
+            if (d.ShowNext && !nextWasShown) nextPopAt = Time.unscaledTime;
+            nextWasShown = d.ShowNext;
 
             // Combo edge glow at x5 (GDD ch. 01 §1.5).
             if (Proto.Config.juice && d.Combo >= 5 && Time.unscaledTime - d.ComboTime < 1.2f)
                 DrawEdgeGlow(new Color(1f, 0.6f, 0.15f, 0.35f + 0.15f * Mathf.Sin(Time.unscaledTime * 10f)));
 
-            GUI.Label(new Rect(safe.x + 12 * u, safe.y + 12 * u, 200 * u, 24 * u), "ROUND " + d.Round,
-                new GUIStyle(small) { fontSize = Px(14), fontStyle = FontStyle.Bold });
+            {
+                string roundText = "ROUND " + d.Round;
+                float pw = hudLabel.CalcSize(new GUIContent(roundText)).x + 30 * u;
+                var pill = new Rect(safe.x + 10 * u, safe.y + 10 * u, pw, 36 * u);
+                float pop = Pop(roundPopAt, 0.35f, 1.18f);
+                Matrix4x4 pm = GUI.matrix;
+                GUIUtility.ScaleAroundPivot(new Vector2(pop, pop), pill.center);
+                ToyGui.Pill(pill, ToyTone.Paper);
+                ToyGui.Text(new Rect(pill.x, pill.y - ToyGui.ButtonDepth * 0.5f, pill.width, pill.height), roundText, hudLabel,
+                    ToyStyle.Purple, 1.6f, 0f);
+                GUI.matrix = pm;
+            }
 
             if (Proto.Config.debugOverlay && Proto.Drag != null && Proto.Drag.LastReleaseType != null)
-                GUI.Label(new Rect(safe.x + 12 * u, safe.y + 34 * u, 320 * u, 24 * u),
+                GUI.Label(new Rect(safe.x + 12 * u, safe.y + 50 * u, 320 * u, 24 * u),
                     "last release: " + Proto.Drag.LastReleaseType + " @ " + Proto.Drag.LastReleaseSpeedDp.ToString("F0") + " dp/s", small);
 
             // Combo pop-up above the bin.
@@ -150,9 +170,12 @@ namespace SortEverything.Prototype
             {
                 Vector2 p = Units.WorldToGui(d.ComboWorldPos);
                 var c = combo.normal.textColor;
-                var style = new GUIStyle(combo);
-                style.normal.textColor = new Color(c.r, c.g, c.b, 1f - since / 0.6f);
-                GUI.Label(new Rect(p.x - 60 * u, p.y - 50 * u - since * 60 * u, 120 * u, 40 * u), "x" + d.Combo, style);
+                var r = new Rect(p.x - 60 * u, p.y - 50 * u - since * 60 * u, 120 * u, 40 * u);
+                float pop = Mathf.Lerp(1.7f, 1f, Juice.EaseOutBack(Mathf.Clamp01(since / 0.16f)));
+                Matrix4x4 cm = GUI.matrix;
+                GUIUtility.ScaleAroundPivot(new Vector2(pop, pop), r.center);
+                ToyGui.Text(r, "x" + d.Combo, combo, new Color(c.r, c.g, c.b, 1f - since / 0.6f), 2.6f, 2.6f);
+                GUI.matrix = cm;
             }
 
             if (d.RoundComplete && d.StampTime > d.CompleteTime) DrawStamp(d);
@@ -165,17 +188,27 @@ namespace SortEverything.Prototype
                     var o = d.Objects[i];
                     if (!o.gameObject.activeInHierarchy || o.state == ObjState.Sorted) continue;
                     Vector2 g = Units.WorldToGui(o.Position + Vector2.down * o.HalfExtent);
-                    GUI.Label(new Rect(g.x - 60 * u, g.y, 120 * u, 18 * u), o.displayName,
-                        new GUIStyle(small) { alignment = TextAnchor.UpperCenter, fontSize = Px(10) });
+                    ToyGui.Text(new Rect(g.x - 60 * u, g.y, 120 * u, 18 * u), o.displayName,
+                        new GUIStyle(small) { alignment = TextAnchor.UpperCenter, fontSize = Px(10) }, Color.white, 1.2f, 0f);
                 }
             }
 
             if (toast != null && Time.unscaledTime < toastUntil)
-                GUI.Label(new Rect(0, safe.yMax - 80 * u, Screen.width, 30 * u), toast, new GUIStyle(title) { alignment = TextAnchor.MiddleCenter });
+            {
+                var ts = new GUIStyle(hudLabel) { fontSize = Px(16) };
+                float tw = ts.CalcSize(new GUIContent(toast)).x + 36 * u;
+                var tr = new Rect((Screen.width - tw) / 2f, safe.yMax - 86 * u, tw, 42 * u);
+                float pop = Pop(toastPopAt, 0.3f, 0.7f);
+                Matrix4x4 tm = GUI.matrix;
+                GUIUtility.ScaleAroundPivot(new Vector2(pop, pop), tr.center);
+                ToyGui.Pill(tr, ToyTone.Purple);
+                ToyGui.Text(new Rect(tr.x, tr.y - ToyGui.ButtonDepth * 0.5f, tr.width, tr.height), toast, ts, Color.white, 1.8f, 1.2f);
+                GUI.matrix = tm;
+            }
 
             if (!PanelOpen)
             {
-                if (GUI.Button(GearRect, "•••", button)) { PanelOpen = true; scroll = Vector2.zero; }
+                if (ToyGui.Button(GearRect, "•••", ToyTone.Purple, button)) { PanelOpen = true; scroll = Vector2.zero; }
             }
             else
             {
@@ -192,16 +225,21 @@ namespace SortEverything.Prototype
             Matrix4x4 m = GUI.matrix;
             GUIUtility.RotateAroundPivot(-8f, centre);
             GUIUtility.ScaleAroundPivot(new Vector2(scale, scale), centre);
-            GUI.Label(new Rect(rect.x + 3 * u, rect.y + 4 * u, rect.width, rect.height), "SORTED!", stampShadow);
-            GUI.Label(rect, "SORTED!", stamp);
+            ToyGui.Text(rect, "SORTED!", stamp, stamp.normal.textColor, 3.6f, 5f);
             GUI.matrix = m;
         }
 
         void DrawNext(RoundDirector d)
         {
             float y = Units.WorldToGui(new Vector2(0f, (d.TableTop + d.BinsTop) / 2f)).y;
-            float w = Screen.width * 0.62f, h = 64f * u;
-            if (GUI.Button(new Rect((Screen.width - w) / 2f, y - h / 2f, w, h), "NEXT  >", bigButton)) d.Next();
+            float w = Screen.width * 0.62f, h = 70f * u;
+            var r = new Rect((Screen.width - w) / 2f, y - h / 2f, w, h);
+            float pop = Pop(nextPopAt, 0.35f, 0.6f);
+            Matrix4x4 m = GUI.matrix;
+            GUIUtility.ScaleAroundPivot(new Vector2(pop, pop), r.center);
+            bool next = ToyGui.Button(r, "NEXT  >", ToyTone.Primary, bigButton);
+            GUI.matrix = m;
+            if (next) d.Next();
         }
 
         void DrawEdgeGlow(Color c)
@@ -217,25 +255,35 @@ namespace SortEverything.Prototype
             GUI.color = old;
         }
 
+        /// <summary>UI pop-in: scale from `from` to 1 with a little overshoot over `seconds` after `start`.</summary>
+        float Pop(float start, float seconds, float from)
+        {
+            if (!Proto.Config.juice) return 1f;
+            float t = Mathf.Clamp01((Time.unscaledTime - start) / seconds);
+            return Mathf.LerpUnclamped(from, 1f, Juice.EaseOutBack(t));
+        }
+
         // ---- tuning panel --------------------------------------------------------------------
 
         void DrawPanel()
         {
             Rect safe = SafeGui;
             var old = GUI.color;
-            GUI.color = new Color(0.08f, 0.07f, 0.12f, 0.93f);
+            GUI.color = new Color(0.12f, 0.08f, 0.2f, 0.55f);
             GUI.Box(new Rect(0, 0, Screen.width, Screen.height), GUIContent.none, panelBg);
             GUI.color = old;
 
             float pad = 14f * u;
             float row = 38f * u;
-            var area = new Rect(safe.x + pad, safe.y + pad, safe.width - 2 * pad, safe.height - 2 * pad);
+            float cardInset = 6f * u;
+            ToyGui.Card(new Rect(safe.x + cardInset, safe.y + cardInset, safe.width - 2 * cardInset, safe.height - 2 * cardInset));
+            var area = new Rect(safe.x + pad + 6 * u, safe.y + pad + 4 * u, safe.width - 2 * pad - 12 * u, safe.height - 2 * pad - 18 * u);
             var view = new Rect(0, 0, area.width, Mathf.Max(viewHeight, area.height));
             scroll = GUI.BeginScrollView(area, scroll, view, false, false, GUIStyle.none, GUIStyle.none);
 
             float y = 0f;
             float w = area.width;
-            GUI.Label(new Rect(0, y, w, row), "DRAG-FEEL TUNING  (observer only)", title);
+            ToyGui.Text(new Rect(0, y, w, row), "DRAG-FEEL TUNING  (observer only)", title, Color.white, 2f, 1.5f);
             y += row;
 
             // E1 variants.
@@ -246,9 +294,8 @@ namespace SortEverything.Prototype
             for (int i = 0; i < 4; i++)
             {
                 bool selected = (int)Proto.Variant == i && !Proto.CustomTuning;
-                var s = new GUIStyle(button);
-                if (selected) s.normal.textColor = new Color(1f, 0.75f, 0.2f);
-                if (GUI.Button(new Rect(i * bw + 2, y, bw - 4, row - 4), names[i], s)) SelectVariant((FeelVariant)i);
+                if (ToyGui.Button(new Rect(i * bw + 2, y, bw - 4, row - 4), names[i], selected ? ToyTone.Secondary : ToyTone.Inactive, button))
+                    SelectVariant((FeelVariant)i);
             }
             y += row + 6 * u;
 
@@ -259,11 +306,11 @@ namespace SortEverything.Prototype
             for (int i = 0; i < 3; i++)
             {
                 var m = (ContentMode)i;
-                var s = new GUIStyle(button);
-                if (ContentSettings.Mode == m) s.normal.textColor = new Color(1f, 0.75f, 0.2f);
-                if (GUI.Button(new Rect(i * cw + 2, y, cw - 4, row - 4), ContentSettings.ModeLabel(m), s)) SelectContent(m, ContentSettings.Pool);
+                if (ToyGui.Button(new Rect(i * cw + 2, y, cw - 4, row - 4), ContentSettings.ModeLabel(m),
+                        ContentSettings.Mode == m ? ToyTone.Purple : ToyTone.Inactive, button))
+                    SelectContent(m, ContentSettings.Pool);
             }
-            if (GUI.Button(new Rect(3 * cw + 2, y, cw - 4, row - 4), ContentSettings.PoolLabel(ContentSettings.Pool), button))
+            if (ToyGui.Button(new Rect(3 * cw + 2, y, cw - 4, row - 4), ContentSettings.PoolLabel(ContentSettings.Pool), ToyTone.Secondary, button))
                 SelectContent(ContentSettings.Mode, (ObjectPool)(((int)ContentSettings.Pool + 1) % 3));
             y += row + 6 * u;
 
@@ -299,26 +346,25 @@ namespace SortEverything.Prototype
 
             // Session stats.
             string stats = Proto.Telemetry.SummaryText();
-            float statsH = small.CalcHeight(new GUIContent(stats), w) + 8 * u;
-            var statStyle = new GUIStyle(small);
-            statStyle.normal.textColor = new Color(0.85f, 0.85f, 0.9f);
+            float statsH = this.stats.CalcHeight(new GUIContent(stats), w) + 8 * u;
+            var statStyle = this.stats;
             GUI.Label(new Rect(0, y, w, statsH), stats, statStyle);
             y += statsH;
             string path = "Logs: " + Proto.Telemetry.FolderPath;
-            float pathH = small.CalcHeight(new GUIContent(path), w) + 6 * u;
+            float pathH = this.stats.CalcHeight(new GUIContent(path), w) + 6 * u;
             GUI.Label(new Rect(0, y, w, pathH), path, statStyle);
             y += pathH + 4 * u;
 
             float aw = w / 2f;
-            if (GUI.Button(new Rect(0, y, aw - 4, row - 4), "New round", button)) { Close(); Proto.Director.StartRound(); }
-            if (GUI.Button(new Rect(aw, y, aw - 4, row - 4), "Reset stats", button)) { Proto.Telemetry.ResetStats(); Toast("Stats reset"); }
+            if (ToyGui.Button(new Rect(0, y, aw - 4, row - 4), "New round", ToyTone.Primary, button)) { Close(); Proto.Director.StartRound(); }
+            if (ToyGui.Button(new Rect(aw, y, aw - 4, row - 4), "Reset stats", ToyTone.Warning, button)) { Proto.Telemetry.ResetStats(); Toast("Stats reset"); }
             y += row;
-            if (GUI.Button(new Rect(0, y, aw - 4, row - 4), "Copy summary", button))
+            if (ToyGui.Button(new Rect(0, y, aw - 4, row - 4), "Copy summary", ToyTone.Secondary, button))
             {
                 GUIUtility.systemCopyBuffer = Proto.Telemetry.SummaryJson();
                 Toast("Summary copied");
             }
-            if (GUI.Button(new Rect(aw, y, aw - 4, row - 4), "Close", button)) Close();
+            if (ToyGui.Button(new Rect(aw, y, aw - 4, row - 4), "Close", ToyTone.Purple, button)) Close();
             y += row;
 
             viewHeight = y + pad;
@@ -330,7 +376,7 @@ namespace SortEverything.Prototype
             float labelW = w * 0.42f;
             GUI.Label(new Rect(0, y, labelW * 0.62f, row), name, label);
             GUI.Label(new Rect(labelW * 0.55f, y, labelW * 0.45f, row), v.ToString(fmt) + unit, value);
-            float nv = GUI.HorizontalSlider(new Rect(labelW + 8 * u, y + (row - 26 * u) / 2f, w - labelW - 12 * u, 26 * u), v, min, max);
+            float nv = GUI.HorizontalSlider(new Rect(labelW + 8 * u, y + (row - 16 * u) / 2f, w - labelW - 22 * u, 16 * u), v, min, max);
             y += row;
             if (Mathf.Approximately(nv, v)) return false;
             v = nv;
@@ -339,9 +385,7 @@ namespace SortEverything.Prototype
 
         bool Toggle(Rect r, string name, ref bool v)
         {
-            var s = new GUIStyle(button);
-            if (v) s.normal.textColor = new Color(0.5f, 1f, 0.6f);
-            if (!GUI.Button(r, name + (v ? ": ON" : ": off"), s)) return false;
+            if (!ToyGui.Button(r, name + (v ? ": ON" : ": off"), v ? ToyTone.Primary : ToyTone.Inactive, button)) return false;
             v = !v;
             return true;
         }
@@ -382,6 +426,7 @@ namespace SortEverything.Prototype
         {
             toast = text;
             toastUntil = Time.unscaledTime + 1.5f;
+            toastPopAt = Time.unscaledTime;
         }
 
         // ---- debug overlay (world space) -----------------------------------------------------

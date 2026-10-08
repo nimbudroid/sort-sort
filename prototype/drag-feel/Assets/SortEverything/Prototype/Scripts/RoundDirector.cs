@@ -121,9 +121,13 @@ namespace SortEverything.Prototype
             StaticBox("Ceiling", new Vector2(0f, top + 0.5f), new Vector2(60f, 1f));
             StaticBox("Floor", new Vector2(0f, floorY - 0.5f), new Vector2(60f, 1f));
 
+            // Visual style: soft sky gradient behind everything.
+            float halfH = Proto.Cam.orthographicSize;
+            ToyStyle.BuildBackground(worldRoot, left, right, -halfH, halfH);
+
             // Floor band (the spill area in front of the containers).
-            Visual("FloorBand", rr, new Vector2(0f, floorY - 5f + 0.02f), new Vector2((right - left) + 1f, 10f),
-                new Color32(0xB4, 0xDB, 0xC9, 0xFF), -50);
+            Visual("FloorBand", ToyStyle.Panel(ToyStyle.FloorColor, false), new Vector2(0f, floorY - 5f + 0.02f),
+                new Vector2((right - left) + 1f, 10f), Color.white, -50);
 
             // The table the pile sits on, with small lips so objects stay put.
             float thick = Units.DpToWorld(14f);
@@ -133,14 +137,14 @@ namespace SortEverything.Prototype
             StaticBox("Table", new Vector2(cx, TableTop - thick / 2f), new Vector2(width, thick));
             StaticBox("LipL", new Vector2(tableLeft + thick / 2f, TableTop + lip / 2f), new Vector2(thick, lip));
             StaticBox("LipR", new Vector2(tableRight - thick / 2f, TableTop + lip / 2f), new Vector2(thick, lip));
-            var wood = new Color32(0xC9, 0x8B, 0x5A, 0xFF);
-            Visual("TableTop", rr, new Vector2(cx, TableTop - thick / 2f), new Vector2(width, thick), wood, -10);
-            Visual("TableLipL", rr, new Vector2(tableLeft + thick / 2f, TableTop + lip / 2f - thick * 0.25f),
-                new Vector2(thick, lip + thick * 0.5f), wood, -10);
-            Visual("TableLipR", rr, new Vector2(tableRight - thick / 2f, TableTop + lip / 2f - thick * 0.25f),
-                new Vector2(thick, lip + thick * 0.5f), wood, -10);
-            Visual("TableShadow", rr, new Vector2(cx, TableTop - thick - thick * 0.3f), new Vector2(width * 0.96f, thick * 0.6f),
-                new Color(0f, 0f, 0f, 0.08f), -11);
+            var wood = ToyStyle.Strip(ToyStyle.Wood);
+            Visual("TableTop", wood, new Vector2(cx, TableTop - thick / 2f), new Vector2(width, thick), Color.white, -10);
+            Visual("TableLipL", wood, new Vector2(tableLeft + thick / 2f, TableTop + lip / 2f - thick * 0.25f),
+                new Vector2(thick, lip + thick * 0.5f), Color.white, -9);
+            Visual("TableLipR", wood, new Vector2(tableRight - thick / 2f, TableTop + lip / 2f - thick * 0.25f),
+                new Vector2(thick, lip + thick * 0.5f), Color.white, -9);
+            Visual("TableShadow", rr, new Vector2(cx, TableTop - thick - thick * 0.35f), new Vector2(width * 0.96f, thick * 0.7f),
+                new Color(ToyStyle.Ink.r, ToyStyle.Ink.g, ToyStyle.Ink.b, 0.14f), -11);
         }
 
         void BuildBinsAndObjects()
@@ -229,6 +233,7 @@ namespace SortEverything.Prototype
                     o = SortObject.Create(i, categories[i], categories[i], Palette[categories[i]], shape, m, size,
                         new Vector2(-1000f, -1000f), objectMaterial, NextPileOrder(), worldRoot);
                 }
+                ToyStyle.AddObjectShadow(o); // visual style: stylised drop shadow
                 o.gameObject.SetActive(false);
                 Objects.Add(o);
             }

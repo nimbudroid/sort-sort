@@ -267,9 +267,16 @@ namespace SortEverything.Prototype
                         float cr = s.fill.r, cg = s.fill.g, cb = s.fill.b;
                         if (s.shade)
                         {
+                            // Toy shading: top-left key light plus a soft bevel (edges darker, middle "puffed up").
                             float h = Clamp01(0.5f + 0.5f * (-x * 0.4f + y * 0.7f));
-                            float k = 0.86f + 0.16f * h;
-                            cr *= k; cg *= k; cb *= k;
+                            float bevel = 1f;
+                            if (s.silhouette) // body shapes only; small decorations stay flat and clean
+                            {
+                                bevel = Clamp01(-d / 0.22f);
+                                bevel = 0.82f + 0.2f * bevel * bevel * (3f - 2f * bevel);
+                            }
+                            float k = (0.84f + 0.2f * h) * bevel;
+                            cr = Math.Min(1f, cr * k); cg = Math.Min(1f, cg * k); cb = Math.Min(1f, cb * k);
                         }
                         if (s.outline)
                         {

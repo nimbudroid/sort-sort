@@ -68,6 +68,23 @@ In real-object rounds: no object appears twice in a round, objects from the last
 
 The library and drawings are plain C# with no UnityEngine dependency, so they can be rendered and tested outside Unity.
 
+## Visual style prototype ("colourful digital toy box")
+
+A visual-only pass on top of the prototype: no gameplay, flow or content changes.
+
+| Element | Treatment |
+|---|---|
+| Typography | **Titan One** for game text and buttons, **Nunito Black** for small text. Chosen from Baloo 2, Nunito, Fredoka, Lilita One, Titan One, Coiny and Luckiest Guy. The panel's stats block keeps the built-in font because it uses ✓/✗, which neither font has. Fonts and OFL licences are in `Resources/Fonts/` |
+| Text | Fill + dark outline + small extrusion (`ToyGui.Text`) |
+| Buttons | Physical toy buttons: rounded, thick outline, bright face, darker extrusion, soft shadow; squash while pressed, bounce on release (`ToyGui.Button`) |
+| Palette | Green primary · blue/purple secondary · gold rewards · orange warning · red danger · grey-purple inactive |
+| HUD | ROUND pill, purple ••• button, gold combo pop, gold SORTED! stamp, green NEXT that pops in |
+| Panel | Rounded dark card, toy buttons (selected = coloured, unselected = grey-purple), toy slider track and knob |
+| World | Soft sky gradient, outlined toy panels for bins, floor and table, outlined eyes, Titan One bin counters with outline, soft ground shadows under bins, stylised drop shadows under objects |
+| Objects | Same shapes and art, with toy shading (soft bevel plus key light) on body shapes |
+
+All new code is in `Scripts/Style/`. Existing files only switch sprites, colours and fonts at their drawing sites.
+
 ## Opening the project
 
 1. Install **Unity 6 LTS** (6000.0.x) through Unity Hub, with the **Android Build Support** and/or **iOS Build Support** modules. A newer Unity 6 patch is fine; accept the upgrade prompt.
