@@ -39,7 +39,7 @@ namespace SortEverything.Tests
                     Assert.IsNotNull(BoardSolver.Solve(b), l.id);
         }
 
-        const string MiniCampaign = @"{
+        internal const string MiniCampaign = @"{
           // comments are allowed
           ""schemaVersion"": 1,
           ""categoryColors"": { ""FRUIT"": ""F28C28"" },
@@ -56,7 +56,7 @@ namespace SortEverything.Tests
           ""levelFiles"": [""levels""]
         }";
 
-        const string MiniLevels = @"{ ""levels"": [
+        internal const string MiniLevels = @"{ ""levels"": [
           { ""id"": ""l2"", ""title"": ""Two"", ""boards"": [ { ""objects"": ""orange* apple carrot"", ""targets"": ""T"" } ] },
           { ""id"": ""l1"", ""title"": ""One"", ""version"": 3, ""coins"": 75,
             ""boards"": [ { ""objects"": ""apple apple carrot"", ""targets"": ""FRUIT VEGETABLES"" } ] },
@@ -64,7 +64,7 @@ namespace SortEverything.Tests
             ""targets"": [ { ""accepts"": [""FRUIT""], ""color"": ""RED"" }, { ""accepts"": [""KITCHENWARE""], ""label"": ""SPOONS"" } ] } ] }
         ] }";
 
-        static Campaign Mini()
+        internal static Campaign Mini()
         {
             return CatalogLoader.Load(n => n == "campaign" ? MiniCampaign : n == "levels" ? MiniLevels : null);
         }

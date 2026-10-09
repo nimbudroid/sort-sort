@@ -294,12 +294,48 @@ namespace SortEverything.Prototype
             ToyGui.Logo(rect, "SORTED!", stamp, ToyGui.TextCream, ToyGui.TextDepthWarm, 5.6f, 9f);
             GUI.matrix = m;
 
-            // Mastery only: the active time for this clear (never affects rewards or unlocks).
+            // What this completion changed: coins (first time only), restoration milestones, and in Mastery the time.
             float a = Mathf.Clamp01((t - 0.2f) / 0.2f);
-            if (a > 0f && PlayerSettings.Mastery && d.Level.recordsEnabled)
+            if (a <= 0f) return;
+            var result = Proto.Flow != null ? Proto.Flow.LastResult : null;
+            if (result != resultFor) BuildResultLines(result, d);
+            float y = centre.y + 54 * u;
+            for (int i = 0; i < resultLines.Count; i++)
             {
-                var tr = new Rect(centre.x - 160 * u, centre.y + 54 * u, 320 * u, 30 * u);
-                ToyGui.Logo(tr, d.TimerText.For(d.Attempt.Clock.DisplayTenths), resultBest, new Color(1f, 0.98f, 0.91f, a), ToyStyle.Ink, 2.6f, 2.4f);
+                var tr = new Rect(centre.x - 180 * u, y, 360 * u, 30 * u);
+                Color face = resultGold[i] ? new Color(1f, 0.85f, 0.2f, a) : new Color(1f, 0.98f, 0.91f, a);
+                ToyGui.Logo(tr, resultLines[i], resultBest, face, ToyStyle.Ink, 2.6f, 2.4f);
+                y += 32 * u;
+            }
+        }
+
+        // Result lines, built once per completion.
+        CompletionResult resultFor;
+        readonly System.Collections.Generic.List<string> resultLines = new System.Collections.Generic.List<string>();
+        readonly System.Collections.Generic.List<bool> resultGold = new System.Collections.Generic.List<bool>();
+
+        void BuildResultLines(CompletionResult r, RoundDirector d)
+        {
+            resultFor = r;
+            resultLines.Clear();
+            resultGold.Clear();
+            if (r == null) return;
+            if (r.coinsEarned > 0) { resultLines.Add("+" + r.coinsEarned + " COINS"); resultGold.Add(true); }
+            if (r.houseCompleted) { resultLines.Add("THE WHOLE HOUSE IS ORGANIZED!"); resultGold.Add(true); }
+            else if (r.roomCompleted != null)
+            {
+                resultLines.Add((r.roomCompleted.masterName ?? r.roomCompleted.name + " done").ToUpperInvariant() + "!");
+                resultGold.Add(true);
+            }
+            else if (r.areaRestored != null)
+            {
+                resultLines.Add((r.areaRestored.restoredText ?? r.areaRestored.name + " restored").ToUpperInvariant() + "!");
+                resultGold.Add(true);
+            }
+            if (r.recordEligible)
+            {
+                resultLines.Add(d.TimerText.For((int)System.Math.Floor(r.time * 10f + 1e-3f)) + (r.newBest ? "  NEW BEST" : ""));
+                resultGold.Add(r.newBest);
             }
         }
 
@@ -504,6 +540,23 @@ namespace SortEverything.Prototype
             {
                 y = LevelButtons(y, w, row, "Campaign  (" + campaign.Levels.Count + " levels)", campaign.Levels, dir.Level, "");
                 y = LevelButtons(y, w, row, "Lab  (debug levels, not part of progress)", campaign.Lab, dir.Level, "L");
+            }
+
+            // Progress (save file).
+            var prog = Proto.Flow != null ? Proto.Flow.Progress : null;
+            if (prog != null)
+            {
+                int restored, planned;
+                prog.HouseProgress(out restored, out planned);
+                GUI.Label(new Rect(0, y, w, row * 0.7f), "Progress: " + prog.Save.completed.Count + " / " + prog.Campaign.Levels.Count
+                    + " levels, " + restored + " / " + planned + " areas, " + prog.Save.coins + " coins", label);
+                y += row * 0.75f;
+                if (ToyGui.Button(new Rect(0, y, w / 2f - 4, row - 4), "Reset progress", ToyTone.Danger, button))
+                {
+                    Proto.Flow.ResetProgress();
+                    Toast("Progress reset");
+                }
+                y += row + 6 * u;
             }
 
             // Player preferences that apply immediately.
