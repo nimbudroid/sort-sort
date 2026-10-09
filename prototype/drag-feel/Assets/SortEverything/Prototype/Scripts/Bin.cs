@@ -18,6 +18,7 @@ namespace SortEverything.Prototype
         public int category;    // legacy: colour index for pattern/animation seeding
         public bool Closed;
         public Color color;
+        Sprite[] icons;         // category icons: art of a representative object per accepted category
 
         float width, height, wall;
         Vector2 bottomCenter;
@@ -49,7 +50,7 @@ namespace SortEverything.Prototype
         public Vector2 MouthCenter { get { return new Vector2(bottomCenter.x, Top); } }
 
         public static Bin Create(int index, TargetDef def, Vector2 bottomCenter,
-            float width, float height, PhysicsMaterial2D material, Transform parent)
+            float width, float height, PhysicsMaterial2D material, Transform parent, Sprite[] icons = null)
         {
             var go = new GameObject("Bin" + index + "_" + def.id);
             go.transform.SetParent(parent, false);
@@ -64,6 +65,7 @@ namespace SortEverything.Prototype
             bin.height = height;
             bin.wall = Units.DpToWorld(8f);
             bin.bottomCenter = bottomCenter;
+            bin.icons = icons;
             bin.Build(pattern, material);
             return bin;
         }
@@ -119,6 +121,26 @@ namespace SortEverything.Prototype
                 chipSr.sprite = ProcSprites.Shape(ShapeKind.Circle, pattern);
                 chipSr.color = color;
                 chipSr.sortingOrder = 302;
+            }
+
+            else if (icons != null && icons.Length > 0)
+            {
+                // Category targets: small object icons beside the counter (the label text stays the rule).
+                float s = Mathf.Min(height * 0.2f, width * 0.24f) * (icons.Length > 1 ? 0.8f : 1f);
+                for (int i = 0; i < icons.Length; i++)
+                {
+                    if (icons[i] == null) continue;
+                    var ic = new GameObject("Icon" + i);
+                    ic.transform.SetParent(visualRoot, false);
+                    float x = -width * 0.17f + (icons.Length > 1 ? (i - (icons.Length - 1) / 2f) * s * 0.55f : 0f);
+                    ic.transform.localPosition = new Vector3(x, height * 0.11f, 0f);
+                    var isr = ic.AddComponent<SpriteRenderer>();
+                    isr.sprite = icons[i];
+                    float ext = Mathf.Max(icons[i].bounds.size.x, icons[i].bounds.size.y);
+                    ic.transform.localScale = Vector3.one * (s / Mathf.Max(0.001f, ext));
+                    isr.sortingOrder = 302 + i;
+                }
+                chipShown = true;
             }
 
             float counterX = chipShown ? width * 0.14f : 0f;

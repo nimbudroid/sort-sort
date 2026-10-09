@@ -104,6 +104,7 @@ namespace SortEverything.Prototype
             { "apple", new Material(1.15f, 1.5f, true) }, { "sunglasses", new Material(1.3f, 1f) },
             // Organic shapes whose outline has points, so the corner test would bevel them.
             { "strawberry", Dome() }, { "lemon", Dome() }, { "avocado", Dome() }, { "dragon_egg", Dome() },
+            { "pepper", Dome(1.15f) }, { "corn", Dome() },
             { "carrot", Dome() }, { "pine_cone", Dome() }, { "fish", Dome() }, { "rubber_duck", Dome(1.2f) },
         };
 

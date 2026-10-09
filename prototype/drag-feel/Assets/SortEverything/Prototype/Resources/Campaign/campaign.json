@@ -3,7 +3,7 @@
   // Whole-house campaign: House -> Room -> Area -> Section (one level). Rooms with "available": false are shown
   // locked in the house overview until their levels are authored.
   "house": { "id": "house", "finalMilestoneId": "house_complete" },
-  "levelFiles": [],
+  "levelFiles": ["kitchen", "pantry"],
   "labFile": "lab",
 
   // Body colours for one-category targets. Category targets avoid the five rule colours where possible.
@@ -40,10 +40,24 @@
   },
 
   "rooms": [
-    { "id": "kitchen", "name": "Kitchen", "available": false, "plannedAreas": 4, "icons": ["apple", "milk_carton", "spoon"],
-      "theme": { "wall": "FCE7C8", "wallAccent": "F6D3A4", "surface": "C98B4E", "pattern": "tiles", "accent": "F28C28" }, "areas": [] },
-    { "id": "pantry", "name": "Pantry", "available": false, "plannedAreas": 2, "icons": ["jam_jar", "cereal_box"],
-      "theme": { "wall": "EFE3CF", "wallAccent": "E0CCAA", "surface": "B07A4A", "pattern": "planks", "accent": "E9A03B" }, "areas": [] },
+    { "id": "kitchen", "name": "Kitchen", "available": true, "masterName": "Kitchen Master", "plannedAreas": 4, "icons": ["apple", "milk_carton", "spoon"],
+      "theme": { "wall": "FCE7C8", "wallAccent": "F6D3A4", "surface": "C98B4E", "pattern": "tiles", "accent": "F28C28" },
+      "areas": [
+        { "id": "breakfast_counter", "name": "Breakfast counter", "restored": "Breakfast corner restored", "variant": "Sunny tiles", "price": 100,
+          "sections": ["kitchen_01", "kitchen_02", "kitchen_03", "kitchen_04", "kitchen_05"] },
+        { "id": "kitchenware_area", "name": "Kitchenware area", "restored": "Open shelves stocked", "variant": "Mint shelves", "price": 150,
+          "sections": ["kitchen_06", "kitchen_07", "kitchen_08", "kitchen_09", "kitchen_10"] },
+        { "id": "cooking_area", "name": "Cooking area", "restored": "Cooking area restored", "variant": "Copper rail", "price": 200,
+          "sections": ["kitchen_11", "kitchen_12", "kitchen_13", "kitchen_14", "kitchen_15"] },
+        { "id": "sink_drinks", "name": "Sink & drinks", "restored": "Kitchen finished", "variant": "Garden window", "price": 250,
+          "sections": ["kitchen_16", "kitchen_17", "kitchen_18", "kitchen_19", "kitchen_20"] }
+      ] },
+    { "id": "pantry", "name": "Pantry", "available": true, "masterName": "Pantry Keeper", "plannedAreas": 2, "icons": ["jam_jar", "cereal_box"],
+      "theme": { "wall": "EFE3CF", "wallAccent": "E0CCAA", "surface": "B07A4A", "pattern": "planks", "accent": "E9A03B" },
+      "areas": [
+        { "id": "jar_shelf", "name": "Jar shelf", "restored": "Jar shelf lined up", "sections": ["pantry_01", "pantry_02", "pantry_03"] },
+        { "id": "storage_shelves", "name": "Storage shelves", "restored": "Pantry finished", "sections": ["pantry_04", "pantry_05", "pantry_06"] }
+      ] },
     { "id": "kids_room", "name": "Kids' Room", "available": false, "plannedAreas": 4, "icons": ["teddy_bear", "toy_ball", "book"],
       "theme": { "wall": "DDEBFF", "wallAccent": "C6DCFA", "surface": "E8B86A", "pattern": "dots", "accent": "FF6FAE" }, "areas": [] },
     { "id": "bathroom", "name": "Bathroom", "available": false, "plannedAreas": 3, "icons": ["soap", "towel", "toothbrush"],

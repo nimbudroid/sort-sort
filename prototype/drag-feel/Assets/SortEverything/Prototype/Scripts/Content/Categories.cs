@@ -52,6 +52,7 @@ namespace SortEverything.Prototype
                 "BREAKFAST", "LUNCH", "DINNER", "DRINKS", "GROCERIES", "PICNIC");
             Group("Kitchen & cooking", "KITCHEN", "KITCHENWARE", "COOKING", "TABLEWARE", "CUTLERY", "PLATES", "CUPS",
                 "COOKING TOOLS", "BAKING");
+            Group("Pantry & storage", "JARS", "CANS", "PACKAGES");
             Group("Toys & play", "TOYS", "BALLS", "BOARD GAMES", "PUZZLES", "DOLLS", "PLUSH TOYS", "ACTION FIGURES",
                 "BUILDING TOYS", "OUTDOOR TOYS", "PLAYGROUND");
             Group("School & office", "SCHOOL", "OFFICE", "STATIONERY", "WRITING", "PAPER", "BOOKS", "DESK ITEMS",

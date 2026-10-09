@@ -1,0 +1,24 @@
+{
+  // Pantry: a separate small room after the kitchen. Area 1 sorts by container type, area 2 by purpose.
+  "levels": [
+    { "id": "pantry_01", "title": "Line up the jars", "role": "teach", "teaches": "container type",
+      "cue": "Sort by what each item is packed in.",
+      "boards": [ { "objects": "jam_jar honey_jar pickle_jar spice_jar cereal_box pasta_box cracker_box flour_bag", "targets": "JARS PACKAGES" } ] },
+    { "id": "pantry_02", "title": "Stack the cans", "role": "breather",
+      "boards": [ { "objects": "jam_jar pickle_jar honey_jar tin_can soup_can tin_can pasta_box cereal_box cracker_box", "targets": "JARS CANS PACKAGES" } ] },
+    { "id": "pantry_03", "title": "Restore the jar shelf", "role": "breather", "finish": "milestone",
+      "boards": [ { "objects": "spice_jar honey_jar jam_jar soup_can tin_can soup_can flour_bag pasta_box cracker_box", "targets": "JARS CANS PACKAGES" } ] },
+
+    { "id": "pantry_04", "title": "Breakfast or baking?", "role": "teach", "teaches": "purpose over container",
+      "cue": "Now sort by what each item is for.",
+      "boards": [ { "objects": "cereal_box jam_jar honey_jar flour_bag spice_jar cracker_box cookie", "targets": "BREAKFAST BAKING SNACKS" } ] },
+    { "id": "pantry_05", "title": "Share the top shelf", "role": "challenge", "cue": "The shelf holds both.",
+      "boards": [ { "objects": "jam_jar honey_jar pickle_jar spice_jar tin_can soup_can tin_can soup_can",
+        "targets": [ { "id": "jar_rack", "label": "JAR RACK", "accepts": ["JARS"], "capacity": 2, "style": "basket" },
+                     { "id": "top_shelf", "label": "JARS + CANS", "accepts": ["JARS", "CANS"], "capacity": 6, "style": "tray", "colorHex": "FF6FAE" } ] } ] },
+    { "id": "pantry_06", "title": "Finish the pantry", "role": "challenge", "finish": "room",
+      "boards": [
+        { "objects": "pickle_jar spice_jar jam_jar tin_can soup_can tin_can pasta_box flour_bag cereal_box", "targets": "JARS CANS PACKAGES" },
+        { "objects": "cereal_box honey_jar jam_jar flour_bag spice_jar cracker_box cookie", "targets": "BREAKFAST BAKING SNACKS" } ] }
+  ]
+}

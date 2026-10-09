@@ -170,6 +170,24 @@ namespace SortEverything.Prototype
             D("tennis_racket", "Tennis Racket", Toys, Red, 2, L, Plastic, Outdoors, Ext, "sport");
             D("dumbbell", "Dumbbell", Toys, Purple, 5, M, Metal, Outdoors, Ext, "sport", "heavy");
 
+            // ---- Kitchen chapter and pantry (full-house campaign) ------------------------------------
+            D("pepper", "Bell Pepper", Food, Red, 2, M, Organic, Kitchen, Ext, "vegetable", "food");
+            D("corn", "Corn", Food, Yellow, 2, M, Organic, Kitchen, Ext, "vegetable", "food");
+            D("water_bottle", "Water Bottle", Food, Blue, 3, M, Plastic, Kitchen, Ext, "drink", "bottle");
+            D("juice_carton", "Juice Carton", Food, None, 3, M, Paper, Kitchen, Ext, "drink", "breakfast");
+            D("soda_can", "Soda Can", Food, Red, 2, S, Metal, Kitchen, Ext, "drink", "can");
+            D("fork", "Fork", Home, None, 1, M, Metal, Kitchen, Ext, "kitchen", "cutlery");
+            D("mug", "Mug", Home, Purple, 2, S, Ceramic, Kitchen, Ext, "kitchen", "tableware");
+            D("pan", "Frying Pan", Home, None, 4, L, Metal, Kitchen, Ext, "kitchen", "cooking");
+            D("tin_can", "Can of Beans", Food, Green, 3, S, Metal, Kitchen, Ext, "pantry", "can");
+            D("soup_can", "Soup Can", Food, Red, 3, S, Metal, Kitchen, Ext, "pantry", "can");
+            D("pasta_box", "Pasta Box", Food, Blue, 2, M, Paper, Kitchen, Ext, "pantry", "box");
+            D("cracker_box", "Cracker Box", Food, Yellow, 2, M, Paper, Kitchen, Ext, "pantry", "box", "snack");
+            D("flour_bag", "Flour Bag", Food, None, 3, M, Paper, Kitchen, Ext, "pantry", "baking");
+            D("honey_jar", "Honey Jar", Food, Yellow, 3, S, Glass, Kitchen, Ext, "pantry", "jar", "breakfast");
+            D("pickle_jar", "Pickle Jar", Food, Green, 3, M, Glass, Kitchen, Ext, "pantry", "jar");
+            D("spice_jar", "Spice Jar", Food, None, 1, S, Glass, Kitchen, Ext, "pantry", "jar", "baking");
+
             ApplyCategories();
         }
 

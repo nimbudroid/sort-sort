@@ -12,7 +12,8 @@ T=../../../../../Tools/ArtCheck
 
 Colliders are built from `VectorPainter.RasterizeSilhouette`, so rendering-only changes must leave it byte-identical.
 `silhouette_baseline_dae71c2.txt` holds the SHA-256 of every object's mask at commit dae71c2. The test exits 1 if any
-of those changes; objects added since are listed but not failed.
+of those changes; objects added since are listed but not failed. `silhouette_baseline_full_house.txt` extends it
+with the kitchen and pantry objects added for the full-house campaign; verify both.
 
 ```
 mcs -out:/tmp/sil.exe $SRC $T/SilhouetteHashes.cs && mono /tmp/sil.exe verify $T/silhouette_baseline_dae71c2.txt

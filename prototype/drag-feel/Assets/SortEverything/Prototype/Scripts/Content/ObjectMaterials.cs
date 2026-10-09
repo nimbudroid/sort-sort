@@ -34,6 +34,10 @@ namespace SortEverything.Prototype
             // Food that is a container or packaging, not an inflated food mass.
             { "ketchup", ToyFamily.Plastic }, { "milk_carton", ToyFamily.Plastic }, { "jam_jar", ToyFamily.Plastic },
             { "cereal_box", ToyFamily.Paper },
+            { "water_bottle", ToyFamily.Plastic }, { "juice_carton", ToyFamily.Plastic }, { "soda_can", ToyFamily.Plastic },
+            { "tin_can", ToyFamily.Plastic }, { "soup_can", ToyFamily.Plastic }, { "honey_jar", ToyFamily.Plastic },
+            { "pickle_jar", ToyFamily.Plastic }, { "spice_jar", ToyFamily.Plastic },
+            { "pasta_box", ToyFamily.Paper }, { "cracker_box", ToyFamily.Paper }, { "flour_bag", ToyFamily.Paper },
             // Baked / dry food.
             { "pizza_slice", ToyFamily.Matte }, { "bread", ToyFamily.Matte }, { "cookie", ToyFamily.Matte },
             { "burger", ToyFamily.Matte }, { "fries", ToyFamily.Matte },

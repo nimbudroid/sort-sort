@@ -59,8 +59,8 @@ namespace SortEverything.Prototype
             new[] { "avocado", "FRUIT", "FOOD GROCERIES" },
             new[] { "watermelon", "FRUIT", "FOOD SUMMER PICNIC" },
             new[] { "bread", "BAKERY", "FOOD BREAKFAST GROCERIES" },
-            new[] { "cereal_box", "BREAKFAST", "FOOD GROCERIES" },
-            new[] { "jam_jar", "FOOD", "BREAKFAST GROCERIES" },
+            new[] { "cereal_box", "BREAKFAST", "FOOD GROCERIES PACKAGES" },
+            new[] { "jam_jar", "FOOD", "BREAKFAST GROCERIES JARS" },
             // Extended office
             new[] { "ruler", "SCHOOL", "STATIONERY OFFICE" },
             new[] { "folder", "OFFICE", "PAPER STATIONERY SCHOOL DOCUMENTS" },
@@ -138,6 +138,24 @@ namespace SortEverything.Prototype
             new[] { "soccer_ball", "SPORTS", "BALL_SPORTS BALLS TEAM_SPORTS OUTDOOR_SPORTS SPORTS_EQUIPMENT" },
             new[] { "tennis_racket", "SPORTS", "BALL_SPORTS SPORTS_EQUIPMENT" },
             new[] { "dumbbell", "FITNESS", "SPORTS GYM SPORTS_EQUIPMENT" },
+            // Kitchen chapter: the GDD's four kitchen categories (each object belongs to exactly one of them).
+            new[] { "pepper", "VEGETABLES", "FOOD GROCERIES" },
+            new[] { "corn", "VEGETABLES", "FOOD GROCERIES" },
+            new[] { "water_bottle", "DRINKS", "" },
+            new[] { "juice_carton", "DRINKS", "BREAKFAST GROCERIES" },
+            new[] { "soda_can", "DRINKS", "CANS PARTY" },
+            new[] { "fork", "KITCHENWARE", "KITCHEN TABLEWARE CUTLERY" },
+            new[] { "mug", "KITCHENWARE", "KITCHEN TABLEWARE CUPS" },
+            new[] { "pan", "KITCHENWARE", "KITCHEN COOKING COOKING_TOOLS" },
+            // Pantry: container type (JARS / CANS / PACKAGES) and purpose (BREAKFAST / BAKING / SNACKS).
+            new[] { "tin_can", "CANS", "FOOD GROCERIES DINNER" },
+            new[] { "soup_can", "CANS", "FOOD GROCERIES LUNCH" },
+            new[] { "pasta_box", "PACKAGES", "FOOD GROCERIES DINNER" },
+            new[] { "cracker_box", "PACKAGES", "SNACKS FOOD" },
+            new[] { "flour_bag", "PACKAGES", "BAKING GROCERIES" },
+            new[] { "honey_jar", "JARS", "BREAKFAST FOOD" },
+            new[] { "pickle_jar", "JARS", "FOOD GROCERIES" },
+            new[] { "spice_jar", "JARS", "BAKING COOKING" },
         };
 
         static void ApplyCategories()

@@ -81,6 +81,11 @@ namespace SortEverything.Prototype
             { "spoon", Spoon }, { "plate", Plate }, { "bowl", Bowl }, { "teapot", Teapot }, { "spatula", Spatula },
             { "flip_flops", FlipFlops }, { "seashell", Seashell }, { "beach_ball", BeachBall },
             { "soccer_ball", SoccerBall }, { "tennis_racket", TennisRacket }, { "dumbbell", Dumbbell },
+            // Kitchen chapter and pantry
+            { "pepper", BellPepper }, { "corn", Corn }, { "water_bottle", WaterBottle }, { "juice_carton", JuiceCarton },
+            { "soda_can", SodaCan }, { "fork", Fork }, { "mug", Mug }, { "pan", FryingPan },
+            { "tin_can", BeanCan }, { "soup_can", SoupCan }, { "pasta_box", PastaBox }, { "cracker_box", CrackerBox },
+            { "flour_bag", FlourBag }, { "honey_jar", HoneyJar }, { "pickle_jar", PickleJar }, { "spice_jar", SpiceJar },
         };
 
         public static bool Has(string id) { return drawings.ContainsKey(id); }
@@ -1375,6 +1380,179 @@ namespace SortEverything.Prototype
             p.Box(-0.77f, 0f, 0.09f, 0.3f, Purple.Dark(0.1f), 0.05f);
             p.Box(0.77f, 0f, 0.09f, 0.3f, Purple.Dark(0.1f), 0.05f);
             p.Pop();
+        }
+
+        // =====================================================================================
+        // Kitchen chapter and pantry
+        // =====================================================================================
+
+        static void BellPepper(VectorPainter p)
+        {
+            p.Capsule(0.02f, 0.52f, 0.1f, 0.86f, 0.08f, DarkGreen);
+            p.Add(Sd.Union(Sd.Union(Sd.Ellipse(-0.3f, -0.08f, 0.38f, 0.64f, 8f), Sd.Ellipse(0.3f, -0.08f, 0.38f, 0.64f, -8f)),
+                Sd.Ellipse(0f, -0.14f, 0.34f, 0.7f, 0f)), Red);
+            p.Ellipse(0.02f, 0.5f, 0.3f, 0.1f, LeafGreen);
+            p.Line(-0.04f, -0.7f, -0.02f, 0.3f, 0.03f, Red.Dark(0.3f));
+            p.Shine(-0.42f, 0f, 0.07f, 0.28f, 8f);
+        }
+
+        static void Corn(VectorPainter p)
+        {
+            p.Push(-18f);
+            p.Ellipse(0f, 0.16f, 0.32f, 0.76f, Yellow);
+            for (int r = 0; r < 7; r++)
+                for (int c = -1; c <= 1; c++)
+                    p.Dot(c * 0.15f, -0.3f + r * 0.15f, 0.055f, Yellow.Dark(0.2f));
+            p.Poly(LeafGreen, 0.05f, -0.4f, -0.9f, -0.04f, -0.9f, -0.12f, -0.3f, -0.36f, -0.1f);
+            p.Poly(LeafGreen.Dark(0.1f), 0.05f, 0.4f, -0.9f, 0.04f, -0.9f, 0.12f, -0.3f, 0.36f, -0.14f);
+            p.Pop();
+        }
+
+        static void WaterBottle(VectorPainter p)
+        {
+            var body = Blue.Light(0.35f);
+            p.Box(0f, 0.8f, 0.15f, 0.1f, Blue.Dark(0.15f), 0.04f);
+            p.Poly(body, 0.06f, -0.15f, 0.7f, 0.15f, 0.7f, 0.36f, 0.42f, -0.36f, 0.42f);
+            p.Box(0f, -0.22f, 0.36f, 0.68f, body, 0.16f);
+            p.Box(0f, -0.16f, 0.36f, 0.2f, Blue, 0f).Detail().Clip(Sd.Box(0f, -0.22f, 0.36f, 0.68f, 0.16f));
+            p.Line(-0.26f, -0.62f, 0.26f, -0.62f, 0.03f, Blue.Dark(0.05f));
+            p.Line(-0.26f, -0.74f, 0.26f, -0.74f, 0.03f, Blue.Dark(0.05f));
+            p.Shine(-0.24f, 0.1f, 0.05f, 0.28f, 0f);
+        }
+
+        static void JuiceCarton(VectorPainter p)
+        {
+            p.Box(0f, -0.25f, 0.46f, 0.6f, Orange, 0.04f);
+            p.Poly(Orange.Light(0.25f), 0.03f, -0.46f, 0.35f, 0.46f, 0.35f, 0.2f, 0.75f, -0.2f, 0.75f);
+            p.Box(0f, 0.8f, 0.22f, 0.07f, Orange.Dark(0.12f), 0.02f);
+            p.Circle(0f, -0.25f, 0.26f, White);
+            p.Circle(0f, -0.25f, 0.17f, Orange.Light(0.1f)).Detail();
+            p.Ellipse(0.12f, -0.02f, 0.1f, 0.05f, LeafGreen, 20f).Detail();
+            p.Capsule(0.24f, 0.52f, 0.24f, 0.92f, 0.04f, Pink);
+        }
+
+        static void SodaCan(VectorPainter p)
+        {
+            p.Box(0f, -0.04f, 0.38f, 0.74f, Red, 0.12f);
+            p.Ellipse(0f, 0.7f, 0.34f, 0.08f, Gray).NoLine();
+            p.Ellipse(0.06f, 0.71f, 0.08f, 0.03f, Steel).Detail();
+            p.Box(0f, -0.76f, 0.34f, 0.05f, Gray, 0.03f).Detail();
+            p.Add(Sd.Ellipse(0.08f, -0.06f, 0.5f, 0.16f, -18f), White).Detail().Clip(Sd.Box(0f, -0.04f, 0.38f, 0.74f, 0.12f));
+            p.Shine(-0.24f, 0.1f, 0.05f, 0.3f, 0f);
+        }
+
+        static void Fork(VectorPainter p)
+        {
+            p.Push(-35f);
+            p.Capsule(0f, -0.88f, 0f, 0.06f, 0.09f, Gray);
+            p.Box(0f, 0.2f, 0.22f, 0.12f, Gray, 0.08f);
+            for (int i = 0; i < 4; i++) p.Capsule(-0.165f + i * 0.11f, 0.28f, -0.165f + i * 0.11f, 0.84f, 0.045f, Gray);
+            p.Pop();
+        }
+
+        static void Mug(VectorPainter p)
+        {
+            p.Ring(0.44f, -0.08f, 0.28f, 0.1f, Purple);
+            p.Box(-0.12f, -0.12f, 0.52f, 0.64f, Purple, 0.14f);
+            p.Ellipse(-0.12f, 0.5f, 0.5f, 0.1f, Purple.Dark(0.15f)).NoLine();
+            p.Ellipse(-0.12f, 0.5f, 0.42f, 0.07f, Purple.Dark(0.35f)).NoLine();
+            p.Box(-0.12f, -0.12f, 0.52f, 0.1f, White, 0f).Detail().Clip(Sd.Box(-0.12f, -0.12f, 0.5f, 0.62f, 0.12f));
+            p.Box(-0.12f, -0.12f, 0.52f, 0.04f, Purple.Light(0.3f), 0f).Detail().Clip(Sd.Box(-0.12f, -0.12f, 0.5f, 0.62f, 0.12f));
+            p.Shine(-0.48f, 0.05f, 0.06f, 0.28f);
+        }
+
+        static void FryingPan(VectorPainter p)
+        {
+            p.Push(-20f);
+            p.Capsule(0.5f, 0f, 0.95f, 0f, 0.09f, DarkBrown);
+            p.Circle(-0.18f, 0f, 0.66f, DarkGray);
+            p.Circle(-0.18f, 0f, 0.52f, Black.Light(0.15f)).NoLine();
+            p.Shine(-0.4f, 0.22f, 0.06f, 0.2f, -40f, 0.35f);
+            p.Pop();
+        }
+
+        static void BeanCan(VectorPainter p)
+        {
+            p.Box(0f, -0.04f, 0.46f, 0.66f, Steel, 0.08f);
+            p.Box(0f, -0.06f, 0.46f, 0.46f, Green, 0f).Clip(Sd.Box(0f, -0.04f, 0.46f, 0.66f, 0.08f));
+            p.Ellipse(0f, 0.62f, 0.42f, 0.08f, Gray).NoLine();
+            p.Ellipse(0f, -0.06f, 0.26f, 0.2f, Cream).Detail();
+            for (int i = 0; i < 5; i++) p.Ellipse(-0.12f + i * 0.06f, -0.06f + (i % 2) * 0.06f - 0.03f, 0.05f, 0.035f, Brown, 20f).Detail();
+            p.Line(-0.4f, 0.42f, 0.4f, 0.42f, 0.03f, Steel.Dark(0.2f));
+            p.Line(-0.4f, -0.56f, 0.4f, -0.56f, 0.03f, Steel.Dark(0.2f));
+        }
+
+        static void SoupCan(VectorPainter p)
+        {
+            p.Box(0f, -0.04f, 0.42f, 0.7f, Red, 0.08f);
+            p.Ellipse(0f, 0.66f, 0.38f, 0.08f, Gray).NoLine();
+            p.Box(0f, -0.3f, 0.42f, 0.22f, Cream, 0f).Clip(Sd.Box(0f, -0.04f, 0.42f, 0.7f, 0.08f));
+            p.Ellipse(0f, -0.3f, 0.16f, 0.1f, Orange).Detail();
+            p.Ellipse(0.12f, -0.2f, 0.08f, 0.04f, LeafGreen, 25f).Detail();
+            p.Line(-0.36f, 0.2f, 0.36f, 0.2f, 0.035f, Yellow);
+            p.Shine(-0.28f, 0.2f, 0.05f, 0.25f, 0f);
+        }
+
+        static void PastaBox(VectorPainter p)
+        {
+            p.Box(0f, 0f, 0.5f, 0.84f, Blue, 0.05f);
+            p.Box(0f, 0.1f, 0.3f, 0.36f, Cream, 0.08f);
+            for (int i = 0; i < 4; i++) p.Capsule(-0.18f + i * 0.12f, -0.16f, -0.12f + i * 0.12f, 0.36f, 0.035f, Yellow.Dark(0.05f)).Detail();
+            p.Box(0f, 0.66f, 0.4f, 0.08f, White, 0.03f);
+            p.Box(0f, -0.58f, 0.36f, 0.1f, Yellow, 0.04f);
+        }
+
+        static void CrackerBox(VectorPainter p)
+        {
+            p.Box(0f, 0f, 0.62f, 0.66f, Yellow, 0.05f);
+            p.Box(0f, 0.5f, 0.54f, 0.09f, Red, 0.03f);
+            p.Circle(-0.18f, -0.12f, 0.24f, Tan);
+            p.Circle(0.2f, -0.18f, 0.24f, Tan.Light(0.08f));
+            foreach (var x in new[] { -0.26f, -0.1f, 0.12f, 0.28f }) p.Dot(x, -0.14f, 0.025f, Brown);
+        }
+
+        static void FlourBag(VectorPainter p)
+        {
+            p.Poly(Cream.Light(0.3f), 0.08f, -0.5f, -0.86f, 0.5f, -0.86f, 0.44f, 0.5f, -0.44f, 0.5f);
+            p.Poly(Cream, 0.04f, -0.44f, 0.5f, 0.44f, 0.5f, 0.32f, 0.82f, -0.32f, 0.82f);
+            p.Line(-0.34f, 0.62f, 0.34f, 0.62f, 0.03f, Tan);
+            p.Box(0f, -0.2f, 0.32f, 0.26f, Blue, 0.06f);
+            p.Line(0f, -0.38f, 0f, -0.02f, 0.03f, Yellow);
+            for (int i = 0; i < 3; i++)
+            {
+                p.Ellipse(-0.06f, -0.28f + i * 0.1f, 0.06f, 0.03f, Yellow, 30f).Detail();
+                p.Ellipse(0.06f, -0.28f + i * 0.1f, 0.06f, 0.03f, Yellow, -30f).Detail();
+            }
+        }
+
+        static void HoneyJar(VectorPainter p)
+        {
+            p.Add(Sd.Union(Sd.Box(0f, -0.2f, 0.56f, 0.6f, 0.28f), Sd.Box(0f, 0.4f, 0.38f, 0.12f, 0.06f)), Yellow);
+            p.Box(0f, 0.6f, 0.46f, 0.14f, Tan, 0.06f);
+            p.Line(-0.4f, 0.5f, 0.4f, 0.5f, 0.03f, Brown);
+            p.Star(0f, -0.18f, 0.24f, 0.21f, 6, Cream, 0.02f, 30f);
+            p.Ellipse(0f, -0.18f, 0.08f, 0.1f, Orange).Detail();
+            p.Shine(-0.38f, -0.2f, 0.06f, 0.3f);
+        }
+
+        static void PickleJar(VectorPainter p)
+        {
+            p.Box(0f, -0.12f, 0.5f, 0.74f, Green.Light(0.3f), 0.18f);
+            p.Box(0f, 0.72f, 0.44f, 0.14f, Gray, 0.05f);
+            p.Capsule(-0.22f, -0.6f, -0.18f, 0.3f, 0.12f, Green.Dark(0.15f)).Detail();
+            p.Capsule(0.04f, -0.62f, 0.08f, 0.36f, 0.12f, Green.Dark(0.25f)).Detail();
+            p.Capsule(0.26f, -0.58f, 0.24f, 0.24f, 0.11f, Green.Dark(0.1f)).Detail();
+            p.Box(0f, -0.1f, 0.5f, 0.16f, White, 0f).Detail().Clip(Sd.Box(0f, -0.12f, 0.5f, 0.74f, 0.18f));
+            p.Shine(-0.36f, 0.2f, 0.05f, 0.25f);
+        }
+
+        static void SpiceJar(VectorPainter p)
+        {
+            p.Box(0f, -0.14f, 0.3f, 0.7f, Glass, 0.1f);
+            p.Box(0f, -0.3f, 0.3f, 0.5f, Brown.Light(0.2f), 0f).Detail().Clip(Sd.Box(0f, -0.14f, 0.3f, 0.7f, 0.1f));
+            p.Box(0f, 0.7f, 0.32f, 0.16f, Red, 0.06f);
+            p.Box(0f, -0.08f, 0.3f, 0.16f, Cream, 0f).Detail().Clip(Sd.Box(0f, -0.14f, 0.3f, 0.7f, 0.1f));
+            p.Shine(-0.2f, 0.25f, 0.04f, 0.2f);
         }
     }
 }

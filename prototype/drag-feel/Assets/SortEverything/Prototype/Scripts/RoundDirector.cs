@@ -238,7 +238,8 @@ namespace SortEverything.Prototype
             for (int i = 0; i < binCount; i++)
             {
                 float x = left + margin + binW / 2f + i * (binW + gap);
-                Bins.Add(Bin.Create(i, def.targets[i], new Vector2(x, floorY), binW, binH, staticMaterial, worldRoot));
+                Bins.Add(Bin.Create(i, def.targets[i], new Vector2(x, floorY), binW, binH, staticMaterial, worldRoot,
+                    CategoryIcons(def.targets[i], board)));
             }
 
             float baseSize = Units.DpToWorld(56f);
@@ -266,6 +267,27 @@ namespace SortEverything.Prototype
             }
             for (int t = 0; t < Bins.Count; t++) RefreshTarget(t, false);
             melody = MakeMelody(Mathf.Max(2, Objects.Count));
+        }
+
+        /// <summary>
+        /// One icon per accepted category (up to two): the art of the first object on this board that has the category,
+        /// so icons always show something the player can actually see. Colour-only targets keep their colour chip.
+        /// </summary>
+        static Sprite[] CategoryIcons(TargetDef target, BoardModel board)
+        {
+            if (target.accepts == null || target.accepts.Length == 0 || target.color != SortColor.None) return null;
+            int n = Mathf.Min(2, target.accepts.Length);
+            var icons = new Sprite[n];
+            for (int c = 0; c < n; c++)
+                for (int i = 0; i < board.ObjectCount; i++)
+                {
+                    var od = board.Objects[i];
+                    if (od == null || !od.HasCategory(target.accepts[c])) continue;
+                    Sprite sprite;
+                    Vector2[] hull;
+                    if (ObjectArt.TryGet(od, out sprite, out hull)) { icons[c] = sprite; break; }
+                }
+            return icons;
         }
 
         /// <summary>Large variants show their space cost ("2") on a small badge that travels with them.</summary>
