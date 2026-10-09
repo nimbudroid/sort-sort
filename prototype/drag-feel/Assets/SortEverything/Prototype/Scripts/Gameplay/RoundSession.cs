@@ -118,11 +118,12 @@ namespace SortEverything.Prototype
         {
             if (IsFinished || objectIndex < 0 || objectIndex >= sorted.Length || sorted[objectIndex]) return DropResult.Ignored;
             if (binIndex < 0 || binIndex >= BinCount.Length) return DropResult.Ignored;
-            if (State == SessionState.Ready) BeginDrag(); // something reached a bin before any drag (a roll-in)
             MultiplierRaised = false;
 
             if (!Accepts(binIndex, objectIndex))
             {
+                // Rolled into the wrong bin before any drag: rejected, but no penalty and the clock stays idle.
+                if (State == SessionState.Ready) return DropResult.Wrong;
                 WrongDrops++;
                 LastPenalty = Timer.ApplyPenalty(Level.wrongDropPenalty);
                 Streak = 0;
@@ -130,6 +131,7 @@ namespace SortEverything.Prototype
                 return DropResult.Wrong;
             }
 
+            if (State == SessionState.Ready) BeginDrag(); // a correct roll-in before any drag still starts the clock
             sorted[objectIndex] = true;
             BinCount[binIndex]++;
             SortedCount++;
