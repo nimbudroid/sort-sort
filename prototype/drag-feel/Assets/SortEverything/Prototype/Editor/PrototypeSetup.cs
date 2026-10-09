@@ -7,6 +7,10 @@ using UnityEngine;
 
 namespace SortEverything.Prototype.EditorTools
 {
+    // The game's own SortEverything.Prototype.PlayerSettings (enclosing namespace) would otherwise win over
+    // "using UnityEditor;". An alias declared inside this namespace is looked up first.
+    using PlayerSettings = UnityEditor.PlayerSettings;
+
     /// <summary>
     /// One-time project setup: portrait player settings, mobile identifiers and a DragFeel scene in the build.
     /// Runs automatically the first time the project is opened, and from the menu
