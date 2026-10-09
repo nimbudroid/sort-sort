@@ -3,8 +3,9 @@
 // Writes <id>.rgba (res x res, row 0 = bottom), <id>.shadow.rgba (ToyShading.ShadowRes, Molded only),
 // index.txt (id|name|tier|category|family) and timing.txt.
 // Build (from Assets/SortEverything/Prototype/Scripts/Content):
-//   mcs -out:artpreview.exe ObjectDefs.cs VectorPainter.cs VectorPainter.Molded.cs ToyShading.cs ObjectMaterials.cs
-//       ObjectLibrary.cs ObjectDrawings.cs ../../../../../Tools/ArtCheck/ArtPreview.cs
+//   mcs -out:artpreview.exe ObjectDefs.cs Categories.cs VectorPainter.cs VectorPainter.Molded.cs
+//       VectorPainter.Sculpted.cs ToyShading.cs ObjectMaterials.cs ObjectLibrary.cs ObjectLibrary.Categories.cs
+//       ObjectDrawings.cs ../../../../../Tools/ArtCheck/ArtPreview.cs
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;

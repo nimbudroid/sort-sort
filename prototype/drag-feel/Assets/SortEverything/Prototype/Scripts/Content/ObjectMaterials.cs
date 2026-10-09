@@ -42,7 +42,8 @@ namespace SortEverything.Prototype
             { "sock", ToyFamily.Matte }, { "towel", ToyFamily.Matte }, { "teddy_bear", ToyFamily.Matte },
             { "wallet", ToyFamily.Paper }, { "wizard_hat", ToyFamily.Matte },
             // Inflated / squishy.
-            { "pillow", ToyFamily.Soft }, { "toy_ball", ToyFamily.Soft }, { "rubber_duck", ToyFamily.Soft },
+            { "pillow", ToyFamily.Soft }, { "toy_ball", ToyFamily.Soft }, { "beach_ball", ToyFamily.Soft },
+            { "soccer_ball", ToyFamily.Soft }, { "rubber_duck", ToyFamily.Soft },
             { "soap", ToyFamily.Soft }, { "dragon_egg", ToyFamily.Soft }, { "monster", ToyFamily.Soft },
             { "alien", ToyFamily.Soft },
             // Nature that is hard and dry.

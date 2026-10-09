@@ -4,7 +4,8 @@
 //   record:  SilhouetteHashes.exe record <baseline.txt>
 //   verify:  SilhouetteHashes.exe verify <baseline.txt>   (exit code 1 on any mismatch)
 // Build (from Assets/SortEverything/Prototype/Scripts/Content):
-//   mcs -out:silhouette.exe ObjectDefs.cs VectorPainter.cs ToyShading.cs ObjectMaterials.cs ObjectLibrary.cs
+//   mcs -out:silhouette.exe ObjectDefs.cs Categories.cs VectorPainter.cs VectorPainter.Molded.cs
+//       VectorPainter.Sculpted.cs ToyShading.cs ObjectMaterials.cs ObjectLibrary.cs ObjectLibrary.Categories.cs
 //       ObjectDrawings.cs ../../../../../Tools/ArtCheck/SilhouetteHashes.cs
 using System;
 using System.Collections.Generic;
@@ -50,8 +51,12 @@ static class SilhouetteHashes
             else if (now != kv.Value) { Console.WriteLine("CHANGED " + kv.Key); bad++; }
             else ok++;
         }
-        foreach (var id in current.Keys) if (!baseline.ContainsKey(id)) { Console.WriteLine("NEW " + id); bad++; }
-        Console.WriteLine(bad == 0 ? "PASS: " + ok + "/" + baseline.Count + " silhouettes byte-identical" : "FAIL: " + bad + " mismatches, " + ok + " identical");
+        // Objects added since the baseline have no hash to compare; they are listed, not failed.
+        int added = 0;
+        foreach (var id in current.Keys) if (!baseline.ContainsKey(id)) { Console.WriteLine("added (not in baseline) " + id); added++; }
+        Console.WriteLine(bad == 0
+            ? "PASS: " + ok + "/" + baseline.Count + " baseline silhouettes byte-identical" + (added > 0 ? ", " + added + " objects added" : "")
+            : "FAIL: " + bad + " mismatches, " + ok + " identical");
         return bad == 0 ? 0 : 1;
     }
 }

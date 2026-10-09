@@ -3,10 +3,10 @@ using System.Collections.Generic;
 namespace SortEverything.Prototype
 {
     /// <summary>
-    /// The object database. To add an object: add one D(...) line here and one drawing in ObjectDrawings.
-    /// Nothing else (drag, bins, rounds) needs to change.
+    /// The object database. To add an object: add one D(...) line here, its sorting categories in
+    /// ObjectLibrary.Categories.cs and one drawing in ObjectDrawings. Nothing else (drag, bins, rounds) needs to change.
     /// </summary>
-    public static class ObjectLibrary
+    public static partial class ObjectLibrary
     {
         public static readonly List<ObjectDef> All = new List<ObjectDef>();
         static readonly Dictionary<string, ObjectDef> byId = new Dictionary<string, ObjectDef>();
@@ -156,6 +156,21 @@ namespace SortEverything.Prototype
             D("wizard_hat", "Wizard Hat", Fantasy, Blue, 1, L, Fabric, FantasyRoom, Later, "fantasy", "magic", "wearable");
             D("dinosaur_bone", "Dinosaur Bone", Fantasy, None, 3, L, Stone, FantasyRoom, Later, "fantasy", "fossil");
             D("rocket", "Rocket", Fantasy, Red, 3, L, Metal, FantasyRoom, Later, "fantasy", "space", "vehicle");
+
+            // ---- Extended: kitchenware, beach and sports (added for category levels) ------------------
+            D("spoon", "Spoon", Home, Green, 1, M, Plastic, Kitchen, Ext, "kitchen", "cutlery");
+            D("plate", "Plate", Home, Red, 2, M, Ceramic, Kitchen, Ext, "kitchen", "tableware");
+            D("bowl", "Bowl", Home, Yellow, 2, M, Ceramic, Kitchen, Ext, "kitchen", "tableware");
+            D("teapot", "Teapot", Home, Yellow, 3, M, Ceramic, Kitchen, Ext, "kitchen", "drink");
+            D("spatula", "Spatula", Home, Yellow, 1, M, Plastic, Kitchen, Ext, "kitchen", "cooking");
+            D("flip_flops", "Flip-Flops", Home, Green, 1, M, Rubber, Outdoors, Ext, "beach", "wearable", "summer");
+            D("seashell", "Seashell", Nature, None, 1, S, Stone, Outdoors, Ext, "beach", "ocean");
+            D("beach_ball", "Beach Ball", Toys, Blue, 1, M, Rubber, Outdoors, Ext, "toy", "beach", "round", "bouncy");
+            D("soccer_ball", "Soccer Ball", Toys, None, 2, M, Rubber, Outdoors, Ext, "sport", "round", "bouncy");
+            D("tennis_racket", "Tennis Racket", Toys, Red, 2, L, Plastic, Outdoors, Ext, "sport");
+            D("dumbbell", "Dumbbell", Toys, Purple, 5, M, Metal, Outdoors, Ext, "sport", "heavy");
+
+            ApplyCategories();
         }
 
         static void D(string id, string name, ObjectCategory category, SortColor color, int mass, SizeClass size,

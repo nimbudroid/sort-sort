@@ -77,6 +77,10 @@ namespace SortEverything.Prototype
             { "monster", Monster }, { "alien", Alien }, { "ufo", Ufo }, { "treasure_chest", TreasureChest },
             { "magic_wand", MagicWand }, { "dragon_egg", DragonEgg }, { "wizard_hat", WizardHat },
             { "dinosaur_bone", DinosaurBone }, { "rocket", Rocket },
+            // Extended: kitchenware, beach and sports
+            { "spoon", Spoon }, { "plate", Plate }, { "bowl", Bowl }, { "teapot", Teapot }, { "spatula", Spatula },
+            { "flip_flops", FlipFlops }, { "seashell", Seashell }, { "beach_ball", BeachBall },
+            { "soccer_ball", SoccerBall }, { "tennis_racket", TennisRacket }, { "dumbbell", Dumbbell },
         };
 
         public static bool Has(string id) { return drawings.ContainsKey(id); }
@@ -1251,6 +1255,126 @@ namespace SortEverything.Prototype
             p.Add(Sd.Union(Sd.Ellipse(0f, 0.05f, 0.3f, 0.66f), Sd.Box(0f, -0.4f, 0.25f, 0.2f, 0.06f)), Red);
             p.Circle(0f, 0.15f, 0.14f, Glass);
             p.Box(0f, -0.55f, 0.27f, 0.05f, Gray, 0.02f);
+        }
+
+        // ---- Extended: kitchenware, beach and sports ------------------------------------------------
+
+        static void Spoon(VectorPainter p)
+        {
+            p.Push(-35f);
+            p.Capsule(0f, -0.88f, 0f, 0.02f, 0.1f, Green);
+            p.Ellipse(0f, 0.42f, 0.32f, 0.44f, Green);
+            p.Ellipse(0f, 0.46f, 0.2f, 0.3f, Green.Dark(0.2f)).NoLine();
+            p.Pop();
+        }
+
+        static void Plate(VectorPainter p)
+        {
+            p.Circle(0f, 0f, 0.86f, Red);
+            p.Circle(0f, 0f, 0.56f, Red.Light(0.25f));
+            p.Dot(-0.3f, 0.3f, 0.05f, White);
+            p.Dot(0.32f, -0.28f, 0.05f, White);
+        }
+
+        static void Bowl(VectorPainter p)
+        {
+            p.Box(0f, -0.62f, 0.32f, 0.12f, Yellow.Dark(0.12f), 0.06f);
+            p.Add(Sd.Circle(0f, 0.12f, 0.86f), Yellow).Clip(Sd.HalfPlaneY(0.14f, true));
+            p.Ellipse(0f, 0.14f, 0.86f, 0.2f, Yellow.Light(0.2f));
+            p.Ellipse(0f, 0.16f, 0.7f, 0.12f, Yellow.Dark(0.35f)).NoLine();
+        }
+
+        static void Teapot(VectorPainter p)
+        {
+            p.Ring(0.6f, 0.0f, 0.24f, 0.07f, Yellow.Dark(0.08f));
+            p.Taper(-0.42f, -0.05f, -0.9f, 0.36f, 0.14f, 0.07f, Yellow);
+            p.Ellipse(0f, -0.14f, 0.62f, 0.52f, Yellow);
+            p.Ellipse(0f, 0.36f, 0.36f, 0.13f, Yellow.Dark(0.12f));
+            p.Circle(0f, 0.54f, 0.1f, Yellow.Dark(0.12f));
+            p.Line(-0.48f, -0.12f, 0.48f, -0.12f, 0.05f, White);
+        }
+
+        static void Spatula(VectorPainter p)
+        {
+            p.Push(-30f);
+            p.Capsule(0f, -0.9f, 0f, -0.12f, 0.09f, Yellow.Dark(0.25f));
+            p.Box(0f, 0.36f, 0.32f, 0.44f, Yellow, 0.14f);
+            for (int i = -1; i <= 1; i++) p.Line(i * 0.14f, 0.12f, i * 0.14f, 0.6f, 0.07f, Yellow.Dark(0.35f));
+            p.Pop();
+        }
+
+        static void FlipFlops(VectorPainter p)
+        {
+            p.Push(-18f);
+            p.Ellipse(0f, 0f, 0.44f, 0.88f, Green);
+            p.Ellipse(0f, 0.02f, 0.32f, 0.72f, Green.Light(0.3f)).NoLine();
+            p.Capsule(0f, 0.46f, -0.3f, 0.02f, 0.07f, White);
+            p.Capsule(0f, 0.46f, 0.3f, 0.02f, 0.07f, White);
+            p.Circle(0f, 0.46f, 0.08f, White);
+            p.Pop();
+        }
+
+        static void Seashell(VectorPainter p)
+        {
+            p.Box(0f, -0.56f, 0.3f, 0.16f, Pink.Dark(0.12f), 0.08f);
+            p.Add(Sd.Circle(0f, -0.02f, 0.8f), Pink).Clip(Sd.HalfPlaneY(-0.42f, false));
+            for (int i = -3; i <= 3; i++)
+            {
+                double a = Math.PI / 2 + i * 0.36;
+                p.Line(0f, -0.38f, (float)Math.Cos(a) * 0.68f, -0.02f + (float)Math.Sin(a) * 0.68f, 0.05f, Pink.Dark(0.25f));
+            }
+        }
+
+        static void BeachBall(VectorPainter p)
+        {
+            p.Circle(0f, 0f, 0.84f, Blue);
+            p.Add(Sd.Ellipse(-0.42f, 0f, 0.2f, 0.9f), Yellow).Clip(Sd.Circle(0f, 0f, 0.84f)).NoLine();
+            p.Add(Sd.Ellipse(0.42f, 0f, 0.2f, 0.9f), Red).Clip(Sd.Circle(0f, 0f, 0.84f)).NoLine();
+            p.Circle(0f, 0.6f, 0.13f, White);
+        }
+
+        static void SoccerBall(VectorPainter p)
+        {
+            p.Circle(0f, 0f, 0.84f, White);
+            p.Star(0f, 0f, 0.27f, 0.27f * 0.809f, 5, Black, 0.02f);
+            for (int k = 0; k < 5; k++)
+            {
+                double a = Math.PI / 2 + k * Math.PI * 2 / 5;
+                float cx = (float)Math.Cos(a) * 0.8f, cy = (float)Math.Sin(a) * 0.8f;
+                float ix = (float)Math.Cos(a) * 0.27f, iy = (float)Math.Sin(a) * 0.27f;
+                p.Add(Sd.Star(cx, cy, 0.24f, 0.24f * 0.809f, 5, 0.02f, 180f + k * 72f), Black).Clip(Sd.Circle(0f, 0f, 0.84f)).NoLine();
+                p.Line(ix, iy, cx * 0.72f, cy * 0.72f, 0.04f, Gray);
+            }
+        }
+
+        static void TennisRacket(VectorPainter p)
+        {
+            p.Push(-30f);
+            p.Capsule(0f, -0.92f, 0f, -0.3f, 0.08f, DarkGray);
+            p.Poly(Red, 0.03f, -0.1f, -0.32f, 0.1f, -0.32f, 0.24f, -0.08f, -0.24f, -0.08f);
+            p.Ellipse(0f, 0.34f, 0.46f, 0.56f, Red);
+            p.Ellipse(0f, 0.34f, 0.34f, 0.44f, Cream).NoLine();
+            for (int i = -3; i <= 3; i++)
+            {
+                float y = 0.34f + i * 0.11f;
+                float hw = 0.34f * (float)Math.Sqrt(Math.Max(0.0, 1.0 - Math.Pow((y - 0.34f) / 0.44f, 2)));
+                p.Line(-hw, y, hw, y, 0.025f, Gray);
+                float x = i * 0.09f;
+                float hh = 0.44f * (float)Math.Sqrt(Math.Max(0.0, 1.0 - Math.Pow(x / 0.34f, 2)));
+                p.Line(x, 0.34f - hh, x, 0.34f + hh, 0.025f, Gray);
+            }
+            p.Pop();
+        }
+
+        static void Dumbbell(VectorPainter p)
+        {
+            p.Push(-12f);
+            p.Capsule(-0.72f, 0f, 0.72f, 0f, 0.08f, Steel);
+            p.Box(-0.5f, 0f, 0.15f, 0.44f, Purple, 0.08f);
+            p.Box(0.5f, 0f, 0.15f, 0.44f, Purple, 0.08f);
+            p.Box(-0.77f, 0f, 0.09f, 0.3f, Purple.Dark(0.1f), 0.05f);
+            p.Box(0.77f, 0f, 0.09f, 0.3f, Purple.Dark(0.1f), 0.05f);
+            p.Pop();
         }
     }
 }

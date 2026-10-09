@@ -4,15 +4,15 @@ Plain-C# checks for the library object art. Run outside Unity with mono (`mcs` /
 `Assets/SortEverything/Prototype/Scripts/Content`.
 
 ```
-SRC="ObjectDefs.cs VectorPainter.cs VectorPainter.Molded.cs VectorPainter.Sculpted.cs ToyShading.cs ObjectMaterials.cs ObjectLibrary.cs ObjectDrawings.cs"
+SRC="ObjectDefs.cs Categories.cs VectorPainter.cs VectorPainter.Molded.cs VectorPainter.Sculpted.cs ToyShading.cs ObjectMaterials.cs ObjectLibrary.cs ObjectLibrary.Categories.cs ObjectDrawings.cs"
 T=../../../../../Tools/ArtCheck
 ```
 
 ## Silhouette test
 
 Colliders are built from `VectorPainter.RasterizeSilhouette`, so rendering-only changes must leave it byte-identical.
-`silhouette_baseline_dae71c2.txt` holds the SHA-256 of every object's mask at commit dae71c2. The test exits 1 on any
-change.
+`silhouette_baseline_dae71c2.txt` holds the SHA-256 of every object's mask at commit dae71c2. The test exits 1 if any
+of those changes; objects added since are listed but not failed.
 
 ```
 mcs -out:/tmp/sil.exe $SRC $T/SilhouetteHashes.cs && mono /tmp/sil.exe verify $T/silhouette_baseline_dae71c2.txt

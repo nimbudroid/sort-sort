@@ -23,8 +23,14 @@ namespace SortEverything.Prototype
     public enum ObjectPool { Core, CoreAndExtended, Everything }
 
     /// <summary>
-    /// One sortable thing. Only id, sortColor, mass and size affect the current prototype; the rest is metadata
-    /// for later rule types (category, size, material, room, tags, special properties) and for telemetry.
+    /// One sortable thing. One definition is reused by every level; levels only reference it by id.
+    ///   - id: also the visual asset reference (the drawing in ObjectDrawings and the cached sprite in ObjectArt).
+    ///   - sortColor: the primary colour, the only colour bin rules match on. None = no bin colour.
+    ///   - secondaryColors: descriptive only, never used for matching.
+    ///   - PrimaryCategory / Categories: the sorting categories (CategoryLibrary ids). A category bin matches any of
+    ///     them; the primary is only a default for display and tooling. Set from ObjectLibrary's category table.
+    ///   - category (ObjectCategory): the coarse legacy group used by content spreading and the default material
+    ///     family (ObjectMaterials); it is not a sorting category.
     /// </summary>
     public sealed class ObjectDef
     {
@@ -40,6 +46,18 @@ namespace SortEverything.Prototype
         public readonly string[] tags;
         public readonly string[] special;      // reserved for later mechanics (e.g. "fragile"); empty for now
 
+        static readonly string[] NoCategories = new string[0];
+        static readonly SortColor[] NoColors = new SortColor[0];
+
+        /// <summary>Main sorting category (CategoryLibrary id), or null when none is assigned.</summary>
+        public string PrimaryCategory { get; private set; }
+        /// <summary>Further sorting categories (CategoryLibrary ids).</summary>
+        public string[] SecondaryCategories { get; private set; }
+        /// <summary>Primary followed by secondary categories; what category bins match against.</summary>
+        public string[] Categories { get; private set; }
+        /// <summary>Descriptive extra colours. Never used for matching.</summary>
+        public SortColor[] SecondaryColors { get; private set; }
+
         public ObjectDef(string id, string displayName, ObjectCategory category, SortColor sortColor, int mass,
             SizeClass size, MaterialKind material, Room room, ContentTier tier, string[] tags, string[] special = null)
         {
@@ -54,6 +72,29 @@ namespace SortEverything.Prototype
             this.tier = tier;
             this.tags = tags ?? new string[0];
             this.special = special ?? new string[0];
+            SecondaryCategories = NoCategories;
+            Categories = NoCategories;
+            SecondaryColors = NoColors;
+        }
+
+        /// <summary>Assigns the sorting categories (called once by ObjectLibrary while building the library).</summary>
+        internal void SetCategories(string primary, string[] secondary, SortColor[] secondaryColors)
+        {
+            PrimaryCategory = primary;
+            SecondaryCategories = secondary ?? NoCategories;
+            var all = new string[SecondaryCategories.Length + 1];
+            all[0] = primary;
+            for (int i = 0; i < SecondaryCategories.Length; i++) all[i + 1] = SecondaryCategories[i];
+            Categories = all;
+            SecondaryColors = secondaryColors ?? NoColors;
+        }
+
+        /// <summary>True when the category is the primary or any secondary category (no implicit hierarchy).</summary>
+        public bool HasCategory(string categoryId)
+        {
+            var c = Categories;
+            for (int i = 0; i < c.Length; i++) if (string.Equals(c[i], categoryId, System.StringComparison.Ordinal)) return true;
+            return false;
         }
 
         public bool ColorSortable { get { return sortColor != SortColor.None; } }
