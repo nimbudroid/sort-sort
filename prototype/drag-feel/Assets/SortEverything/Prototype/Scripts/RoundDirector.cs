@@ -5,23 +5,13 @@ using UnityEngine;
 namespace SortEverything.Prototype
 {
     /// <summary>
-    /// Builds the portrait diorama (pile on a table, three bins along the bottom thumb zone) and runs an
-    /// endless series of 10-object colour sorts. P1 is about feel only: no timer, no fail state, no Oops.
+    /// Builds the portrait diorama (pile on a table, bins along the bottom thumb zone) for the current playlist
+    /// level and connects the scene to the plain-C# RoundSession: bins ask the session whether a drop is correct,
+    /// the session owns the timer, and this class plays the existing feedback, the completion celebration and the
+    /// TIME'S UP state.
     /// </summary>
     public class RoundDirector : MonoBehaviour
     {
-        public const int ObjectsPerRound = 10;
-        public const int BinsPerRound = 3;
-
-        static readonly Color[] Palette =
-        {
-            new Color32(0xF2, 0x56, 0x3A, 0xFF), // tomato red   — solid
-            new Color32(0x3D, 0x7B, 0xF2, 0xFF), // blue         — dots
-            new Color32(0xF5, 0xC3, 0x27, 0xFF), // yellow       — stripes
-            new Color32(0x43, 0xC4, 0x6B, 0xFF), // green        — waves
-            new Color32(0x9B, 0x5D, 0xE5, 0xFF), // purple       — checker
-        };
-
         public readonly List<SortObject> Objects = new List<SortObject>();
         public readonly List<Bin> Bins = new List<Bin>();
 
@@ -35,6 +25,25 @@ namespace SortEverything.Prototype
         public float ComboTime { get; private set; }
         public Vector2 ComboWorldPos { get; private set; }
 
+        // Levels, session and timer.
+        public Playlist Playlist { get; private set; }
+        public RoundSession Session { get; private set; }
+        public LevelDef Level { get { return Session != null ? Session.Level : null; } }
+        public TimerText TimerText { get; private set; }
+        public float TimerStartedAt { get; private set; }
+        public float PenaltyAt { get; private set; }
+        public string PenaltyText { get; private set; }
+        public bool TimeUp { get; private set; }
+        public float TimeUpAt { get; private set; }
+        public bool ShowRetry { get; private set; }
+        // Results (formatted once at completion).
+        public string ResultTimeText { get; private set; }
+        public string ResultBestText { get; private set; }
+        public bool ResultNewBest { get; private set; }
+
+        IBestTimeStore bestTimes;
+        bool appFocused = true;
+
         // Layout (world units), recomputed every round so rotation / resolution changes are picked up.
         public float TableTop { get; private set; }
         public float ContainerZoneTop { get { return TableTop - 0.05f; } }
@@ -47,24 +56,24 @@ namespace SortEverything.Prototype
         float roundStart;
         int[] melody;
         int noteIndex;
+        int audioStreak;
         float lastCorrect = -10f;
 
-        // Library object ids used in the last rounds, so consecutive rounds don't repeat objects.
-        const int RecentRounds = 2;
-        readonly Queue<List<string>> recentRounds = new Queue<List<string>>();
-
-        /// <summary>Content mode the current round was actually built with (falls back to Shapes if the pool is too small).</summary>
+        /// <summary>Content the round was built with (telemetry). Levels always use library objects.</summary>
         public ContentMode RoundMode { get; private set; }
 
         void Awake()
         {
             objectMaterial = new PhysicsMaterial2D("Toy") { friction = 0.7f, bounciness = 0.08f };
             staticMaterial = new PhysicsMaterial2D("Static") { friction = 0.6f, bounciness = 0f };
-            RoundMode = ContentSettings.Mode;
+            RoundMode = ContentMode.RealObjects;
+            Playlist = new Playlist(LevelLibrary.Playlist);
+            bestTimes = new PlayerPrefsBestTimeStore();
         }
 
         public int NextPileOrder() { return ++pileOrder; }
 
+        /// <summary>(Re)builds the current playlist level from scratch: timer idle, every object back on the pile.</summary>
         public void StartRound()
         {
             StopAllCoroutines();
@@ -79,16 +88,57 @@ namespace SortEverything.Prototype
             RoundComplete = false;
             ShowNext = false;
             InputLive = false;
+            TimeUp = false;
+            ShowRetry = false;
             Combo = 0;
+            audioStreak = 0;
             noteIndex = 0;
             pileOrder = 100;
+            ResultTimeText = ResultBestText = null;
+            ResultNewBest = false;
+
+            var level = Playlist.Current;
+            Session = new RoundSession(level);
+            TimerText = new TimerText(level.timerSeconds);
+            TimerStartedAt = -10f;
+            PenaltyAt = -10f;
 
             ComputeLayout();
             BuildStatics();
-            BuildBinsAndObjects();
+            BuildBinsAndObjects(level);
             StartCoroutine(Intro());
-            StartCoroutine(PrewarmArt());
+            StartCoroutine(PrewarmArt(Playlist.Peek(1)));
         }
+
+        /// <summary>Plays the given playlist entry (observer panel).</summary>
+        public void SelectLevel(int index)
+        {
+            Playlist.Select(index);
+            StartRound();
+        }
+
+        void Update()
+        {
+            if (Session == null) return;
+            Session.Paused = !appFocused || (Proto.Hud != null && Proto.Hud.PanelOpen);
+            // The clock starts on the first drag of a sortable object; looking at the level costs nothing.
+            if (Session.State == SessionState.Ready && InputLive && Proto.Drag != null && Proto.Drag.IsHolding)
+            {
+                Session.BeginDrag();
+                TimerStartedAt = Time.unscaledTime;
+            }
+            // Unscaled so completion slow-motion never changes the clock; clamped so a hitch can't eat seconds.
+            Session.Tick(Mathf.Min(Time.unscaledDeltaTime, 0.1f));
+        }
+
+        void LateUpdate()
+        {
+            // After this frame's drops: a completion in the same frame has already stopped the clock and wins.
+            if (Session != null && Session.EndFrame()) StartCoroutine(OnTimeUp());
+        }
+
+        void OnApplicationFocus(bool focus) { appFocused = focus; }
+        void OnApplicationPause(bool paused) { appFocused = !paused; }
 
         void ComputeLayout()
         {
@@ -147,101 +197,51 @@ namespace SortEverything.Prototype
                 new Color(ToyStyle.Ink.r, ToyStyle.Ink.g, ToyStyle.Ink.b, 0.14f), -11);
         }
 
-        void BuildBinsAndObjects()
+        void BuildBinsAndObjects(LevelDef level)
         {
-            var mode = ContentSettings.Mode;
-            var pool = ContentSettings.Pool;
-
-            // Three of the five colour categories.
-            var cats = new List<int> { 0, 1, 2, 3, 4 };
-            if (mode != ContentMode.Shapes)
-            {
-                // Only colours with enough library objects to fill a 4-object bin without repeating an object.
-                cats.Clear();
-                foreach (var c in RoundContent.ColorsWithAtLeast(pool, 4)) cats.Add((int)c);
-                if (cats.Count < BinsPerRound)
-                {
-                    Debug.LogWarning("Object pool too small for a real-object round; using shapes.");
-                    mode = ContentMode.Shapes;
-                    cats = new List<int> { 0, 1, 2, 3, 4 };
-                }
-            }
-            RoundMode = mode;
-            Shuffle(cats);
-            cats.RemoveRange(BinsPerRound, cats.Count - BinsPerRound);
-            cats.Sort();
-
-            var counts = new List<int> { 4, 3, 3 };
-            Shuffle(counts);
-
-            float gap = Units.DpToWorld(12f);
-            float margin = Units.DpToWorld(16f);
-            float binW = ((right - left) - 2f * margin - (BinsPerRound - 1) * gap) / BinsPerRound;
+            // Bins: count, rules, labels and colours come only from the level definition.
+            int binCount = level.bins.Length;
+            float gap = Units.DpToWorld(binCount > 3 ? 8f : 12f);
+            float margin = Units.DpToWorld(binCount > 3 ? 10f : 16f);
+            float binW = ((right - left) - 2f * margin - (binCount - 1) * gap) / binCount;
             float binH = BinsTop - floorY;
-            for (int i = 0; i < BinsPerRound; i++)
+            for (int i = 0; i < binCount; i++)
             {
                 float x = left + margin + binW / 2f + i * (binW + gap);
-                var bin = Bin.Create(cats[i], Palette[cats[i]], cats[i], counts[i], new Vector2(x, floorY), binW, binH,
+                var bin = Bin.Create(i, level.bins[i], Session.BinCapacity[i], new Vector2(x, floorY), binW, binH,
                     staticMaterial, worldRoot);
                 Bins.Add(bin);
             }
 
-            // Mass classes 1..5 twice over, so every round exercises light and heavy drags.
-            var masses = new List<int> { 1, 1, 2, 2, 3, 3, 4, 4, 5, 5 };
-            Shuffle(masses);
-            var categories = new List<int>();
-            for (int i = 0; i < BinsPerRound; i++)
-                for (int k = 0; k < counts[i]; k++) categories.Add(cats[i]);
-            Shuffle(categories);
-
-            // Real / Mixed: ask the object library which recognisable objects fill which slots.
-            RoundSlot[] plan = null;
-            if (mode != ContentMode.Shapes)
-            {
-                var real = new bool[ObjectsPerRound];
-                var order = new List<int>();
-                for (int i = 0; i < ObjectsPerRound; i++) order.Add(i);
-                Shuffle(order);
-                int realCount = mode == ContentMode.RealObjects ? ObjectsPerRound : ObjectsPerRound / 2;
-                for (int i = 0; i < realCount; i++) real[order[i]] = true;
-
-                var colors = new SortColor[ObjectsPerRound];
-                for (int i = 0; i < ObjectsPerRound; i++) colors[i] = (SortColor)categories[i];
-                var recent = new HashSet<string>();
-                foreach (var ids in recentRounds) recent.UnionWith(ids);
-                plan = RoundContent.Fill(colors, real, pool, recent, n => Random.Range(0, n));
-            }
-
-            var shapes = (ShapeKind[])System.Enum.GetValues(typeof(ShapeKind));
+            // Objects: the level's explicit list, each the shared library definition and its cached sprite.
             float baseSize = Units.DpToWorld(56f);
-            var usedIds = new List<string>();
-            for (int i = 0; i < ObjectsPerRound; i++)
+            for (int i = 0; i < Session.Objects.Length; i++)
             {
-                SortObject o = null;
-                if (plan != null && plan[i].def != null)
-                {
-                    var def = plan[i].def;
-                    o = SortObject.CreateFromDef(i, def, Palette[categories[i]], baseSize * def.SizeScale,
-                        new Vector2(-1000f, -1000f), objectMaterial, NextPileOrder(), worldRoot);
-                    if (o != null) usedIds.Add(def.id);
-                }
+                var def = Session.Objects[i];
+                int correct = Session.CorrectBin(i);
+                Color binColor = correct >= 0 ? Bins[correct].color : Color.white;
+                var o = SortObject.CreateFromDef(i, def, binColor, baseSize * def.SizeScale,
+                    new Vector2(-1000f, -1000f), objectMaterial, NextPileOrder(), worldRoot);
                 if (o == null)
                 {
-                    int m = masses[i];
-                    float size = baseSize * (1f + 0.075f * (m - 1)); // 56 dp .. ~73 dp
-                    var shape = shapes[Random.Range(0, shapes.Length)];
-                    o = SortObject.Create(i, categories[i], categories[i], Palette[categories[i]], shape, m, size,
-                        new Vector2(-1000f, -1000f), objectMaterial, NextPileOrder(), worldRoot);
+                    Debug.LogError("No art for " + def.id + " in level " + level.id);
+                    continue;
                 }
                 ToyStyle.AddObjectShadow(o); // visual style: stylised drop shadow
                 o.gameObject.SetActive(false);
                 Objects.Add(o);
             }
 
-            recentRounds.Enqueue(usedIds);
-            while (recentRounds.Count > RecentRounds) recentRounds.Dequeue();
+            // Pour order is shuffled so bins are not filled in authoring order.
+            for (int i = Objects.Count - 1; i > 0; i--)
+            {
+                int j = Random.Range(0, i + 1);
+                var tmp = Objects[i];
+                Objects[i] = Objects[j];
+                Objects[j] = tmp;
+            }
 
-            melody = MakeMelody(ObjectsPerRound);
+            melody = MakeMelody(Mathf.Max(2, Objects.Count));
         }
 
         IEnumerator Intro()
@@ -270,15 +270,18 @@ namespace SortEverything.Prototype
         /// Rasterise the rest of the current pool's art in the background (one object per frame), so later rounds
         /// don't pay for it during their build.
         /// </summary>
-        IEnumerator PrewarmArt()
+        /// <summary>
+        /// Rasterise the next level's art in the background (one object per frame, never during a drag), so NEXT
+        /// doesn't pay for it during its build.
+        /// </summary>
+        IEnumerator PrewarmArt(LevelDef next)
         {
-            if (ContentSettings.Mode == ContentMode.Shapes) yield break;
             yield return new WaitForSeconds(1.5f);
-            var all = ObjectLibrary.All;
-            for (int i = 0; i < all.Count; i++)
+            if (next == null) yield break;
+            for (int i = 0; i < next.objectIds.Length; i++)
             {
-                var d = all[i];
-                if (!d.ColorSortable || !d.InPool(ContentSettings.Pool) || ObjectArt.IsCached(d.id)) continue;
+                var d = ObjectLibrary.Get(next.objectIds[i]);
+                if (d == null || ObjectArt.IsCached(d.id)) continue;
                 while (Proto.Drag != null && Proto.Drag.IsHolding) yield return null; // never hitch a drag
                 Sprite sprite;
                 Vector2[] hull;
@@ -303,34 +306,51 @@ namespace SortEverything.Prototype
 
         // ---- feedback hooks from bins --------------------------------------------------------
 
+        /// <summary>Asked by a bin when an object's centre enters its mouth. The session decides.</summary>
+        public DropResult Judge(Bin bin, SortObject o)
+        {
+            if (Session == null || TimeUp) return DropResult.Ignored;
+            return Session.Drop(o.id, bin.index);
+        }
+
         public void OnCorrect(Bin bin, SortObject o)
         {
             float now = Time.time;
-            Combo = now - lastCorrect <= 1.2f ? Combo + 1 : 1;
+            audioStreak = now - lastCorrect <= 1.2f ? audioStreak + 1 : 1;
             lastCorrect = now;
-            if (Combo >= 2) { ComboTime = Time.unscaledTime; ComboWorldPos = bin.MouthCenter; }
+
+            // Cosmetic combo pop-up only when the level enables it.
+            if (Session.MultiplierRaised)
+            {
+                Combo = Session.Multiplier;
+                ComboTime = Time.unscaledTime;
+                ComboWorldPos = bin.MouthCenter;
+            }
 
             int degree = melody[Mathf.Min(noteIndex, melody.Length - 1)];
             noteIndex++;
             if (Proto.Config.juice)
             {
                 Proto.Audio.Note(degree);
-                if (Combo >= 3) Proto.Audio.Note(degree + 2, 0.35f); // harmony a third above
+                if (audioStreak >= 3) Proto.Audio.Note(degree + 2, 0.35f); // harmony a third above
             }
             else
             {
                 Proto.Audio.Pop(1f);
             }
 
-            bool allSorted = true;
-            for (int i = 0; i < Objects.Count; i++)
-                if (Objects[i].state != ObjState.Sorted) { allSorted = false; break; }
-            if (allSorted) StartCoroutine(Complete());
+            if (Session.State == SessionState.Complete) StartCoroutine(Complete());
         }
 
         public void OnWrong(Bin bin, SortObject o)
         {
+            audioStreak = 0;
             Combo = 0;
+            if (Session.LastPenalty > 0f)
+            {
+                PenaltyAt = Time.unscaledTime;
+                PenaltyText = "-" + Session.LastPenalty.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture);
+            }
         }
 
         IEnumerator Complete()
@@ -340,6 +360,15 @@ namespace SortEverything.Prototype
             CompleteTime = Time.unscaledTime;
             Proto.Telemetry.OnRoundComplete(Round, Time.time - roundStart);
 
+            // Results, formatted once.
+            var inv = System.Globalization.CultureInfo.InvariantCulture;
+            float seconds = Session.CompletionSeconds;
+            float best;
+            bool hadPrevious;
+            ResultNewBest = BestTimeBook.Submit(bestTimes, Session.Level.id, seconds, out best, out hadPrevious);
+            ResultTimeText = seconds.ToString("0.00", inv) + "s";
+            if (hadPrevious) ResultBestText = ResultNewBest ? "NEW BEST!" : "BEST " + best.ToString("0.00", inv) + "s";
+
             if (Proto.Config.juice)
             {
                 Time.timeScale = 0.35f;
@@ -348,7 +377,7 @@ namespace SortEverything.Prototype
             }
 
             // Cadence: bins hop left to right on an ascending phrase.
-            int[] cadence = { 5, 7, 9 };
+            int[] cadence = { 5, 7, 9, 12 };
             for (int i = 0; i < Bins.Count; i++)
             {
                 Bins[i].Hop();
@@ -365,10 +394,52 @@ namespace SortEverything.Prototype
             ShowNext = true;
         }
 
+        /// <summary>Time ran out: stop input, put any held object back on the pile, show TIME'S UP with retry / skip.</summary>
+        IEnumerator OnTimeUp()
+        {
+            TimeUp = true;
+            InputLive = false;
+            TimeUpAt = Time.unscaledTime;
+            if (Proto.Drag != null)
+            {
+                var held = new List<SortObject>();
+                for (int i = 0; i < Objects.Count; i++) if (Objects[i].state == ObjState.Held) held.Add(Objects[i]);
+                Proto.Drag.ReleaseAll();
+                foreach (var o in held)
+                {
+                    if (o.state == ObjState.Guided) continue; // already tweening into a bin; the session ignores it
+                    o.transform.position = RandomPileLandingPoint();
+                    o.rb.SetVelocity(Vector2.zero);
+                    o.state = ObjState.Pile;
+                    o.SetSimulated(true);
+                }
+            }
+            Proto.Audio.Bwomp();
+            Haptics.Play(Haptics.Kind.Medium);
+            yield return new WaitForSecondsRealtime(0.6f);
+            ShowRetry = true;
+        }
+
         public void Next()
         {
             if (!ShowNext) return;
             Proto.Telemetry.OnNextTapped(Time.unscaledTime - CompleteTime);
+            Playlist.Advance();
+            StartRound();
+        }
+
+        /// <summary>TIME'S UP: play the same level again from idle with every object restored.</summary>
+        public void Retry()
+        {
+            if (!ShowRetry) return;
+            StartRound();
+        }
+
+        /// <summary>TIME'S UP: continue to the next playlist entry.</summary>
+        public void Skip()
+        {
+            if (!ShowRetry) return;
+            Playlist.Advance();
             StartRound();
         }
 
@@ -386,17 +457,6 @@ namespace SortEverything.Prototype
             }
             notes[length - 1] = 5; // resolve on the tonic
             return notes;
-        }
-
-        static void Shuffle<T>(List<T> list)
-        {
-            for (int i = list.Count - 1; i > 0; i--)
-            {
-                int j = Random.Range(0, i + 1);
-                T tmp = list[i];
-                list[i] = list[j];
-                list[j] = tmp;
-            }
         }
 
         void StaticBox(string name, Vector2 center, Vector2 size)

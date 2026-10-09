@@ -6,11 +6,15 @@ namespace SortEverything.Prototype
     /// <summary>
     /// A container with a face ("Binbuddy", GDD ch. 08). Counts an object the moment its centre is inside the
     /// mouth (GDD ch. 02 §2.5 rule 2), gulps correct objects and spits wrong ones back onto the pile.
+    /// Whether a drop is correct is decided by the round session from the bin's rule (BinDef); the bin shows that
+    /// rule as a text label on its front, next to the counter.
     /// Colliders live on the root; everything that animates lives under visualRoot.
     /// </summary>
     public class Bin : MonoBehaviour
     {
-        public int category;
+        public int index;       // position in the level's bin list (what the session judges against)
+        public BinDef def;      // rule, label and colour
+        public int category;    // legacy: colour index for pattern/animation seeding
         public int capacity;
         public int count;
         public bool Closed;
@@ -28,6 +32,7 @@ namespace SortEverything.Prototype
         float eyeRadius;
         TextMesh counter;
         TextMesh[] counterOutline; // visual style: ink copies around the counter for a chunky outline
+        float counterSize;
         Transform lidHinge;
         SpriteRenderer lidSprite;
         BoxCollider2D lidCollider;
@@ -44,15 +49,18 @@ namespace SortEverything.Prototype
         public float InnerRight { get { return bottomCenter.x + width / 2f - wall; } }
         public Vector2 MouthCenter { get { return new Vector2(bottomCenter.x, Top); } }
 
-        public static Bin Create(int category, Color color, int pattern, int capacity, Vector2 bottomCenter,
+        public static Bin Create(int index, BinDef def, int capacity, Vector2 bottomCenter,
             float width, float height, PhysicsMaterial2D material, Transform parent)
         {
-            var go = new GameObject("Bin" + category);
+            var go = new GameObject("Bin" + index + "_" + def.label);
             go.transform.SetParent(parent, false);
             go.transform.position = bottomCenter;
             var bin = go.AddComponent<Bin>();
-            bin.category = category;
-            bin.color = color;
+            bin.index = index;
+            bin.def = def;
+            bin.category = def.rule.HasColor ? (int)def.rule.color : index;
+            bin.color = ToyStyle.Hex(def.colorHex);
+            int pattern = def.rule.HasColor ? (int)def.rule.color : -1; // colour chip only for colour rules
             bin.capacity = capacity;
             bin.width = width;
             bin.height = height;
@@ -89,44 +97,53 @@ namespace SortEverything.Prototype
             Sliced("Rim", ToyStyle.Strip(Color.Lerp(color, Color.white, 0.45f)), new Vector2(0f, height - wall * 0.8f),
                 new Vector2(width + wall * 0.4f, wall * 2f), Color.white, 300);
 
-            // Face.
-            eyeRadius = Mathf.Min(width * 0.13f, height * 0.11f);
+            // Face: the eyes peek over the front lip so the front panel can carry the rule label.
+            eyeRadius = Mathf.Min(width * 0.13f, height * 0.1f);
             var circle = ProcSprites.Circle();
             var eye = ToyStyle.Eye();
-            eyeL = Disc("EyeL", eye, new Vector2(-width * 0.2f, height * 0.31f), eyeRadius * 2f, Color.white, 302);
-            eyeR = Disc("EyeR", eye, new Vector2(width * 0.2f, height * 0.31f), eyeRadius * 2f, Color.white, 302);
+            eyeL = Disc("EyeL", eye, new Vector2(-width * 0.2f, EyeHeight), eyeRadius * 2f, Color.white, 302);
+            eyeR = Disc("EyeR", eye, new Vector2(width * 0.2f, EyeHeight), eyeRadius * 2f, Color.white, 302);
             pupilL = Disc("PupilL", circle, Vector2.zero, 0.5f, new Color(0.12f, 0.1f, 0.14f), 303, eyeL);
             pupilR = Disc("PupilR", circle, Vector2.zero, 0.5f, new Color(0.12f, 0.1f, 0.14f), 303, eyeR);
             pupilLBase = pupilL.localPosition;
             pupilRBase = pupilR.localPosition;
 
-            // Rule chip (colour + pattern, never text) and capacity counter.
-            var chip = new GameObject("Chip");
-            chip.transform.SetParent(visualRoot, false);
-            chip.transform.localPosition = new Vector3(-width * 0.17f, height * 0.11f, 0f);
-            chip.transform.localScale = Vector3.one * height * 0.16f;
-            var chipSr = chip.AddComponent<SpriteRenderer>();
-            chipSr.sprite = ProcSprites.Shape(ShapeKind.Circle, pattern);
-            chipSr.color = color;
-            chipSr.sortingOrder = 302;
+            // Rule label (text is the rule; the colour chip only supports it) and capacity counter.
+            BuildLabel(def != null ? def.label : "");
+            bool chipShown = pattern >= 0;
+            if (chipShown)
+            {
+                var chip = new GameObject("Chip");
+                chip.transform.SetParent(visualRoot, false);
+                chip.transform.localPosition = new Vector3(-width * 0.17f, height * 0.11f, 0f);
+                chip.transform.localScale = Vector3.one * Mathf.Min(height * 0.16f, width * 0.26f);
+                var chipSr = chip.AddComponent<SpriteRenderer>();
+                chipSr.sprite = ProcSprites.Shape(ShapeKind.Circle, pattern);
+                chipSr.color = color;
+                chipSr.sortingOrder = 302;
+            }
 
+            float counterX = chipShown ? width * 0.14f : 0f;
+            float badgeW = chipShown ? width * 0.46f : width * 0.56f;
+            // The counter shrinks with narrow (four-bin) layouts so "4/4" always fits its badge.
+            counterSize = Mathf.Min(height * 0.13f * 10f / 64f * 1.4f * 0.85f, badgeW * 0.75f / 1.9f * 10f / 64f);
             var txt = new GameObject("Counter");
             txt.transform.SetParent(visualRoot, false);
-            txt.transform.localPosition = new Vector3(width * 0.14f, height * 0.11f, 0f);
+            txt.transform.localPosition = new Vector3(counterX, height * 0.11f, 0f);
             // Visual style: the counter sits on a small layered game-piece badge.
             var badge = new GameObject("CounterBadge");
             badge.transform.SetParent(visualRoot, false);
-            badge.transform.localPosition = new Vector3(width * 0.14f, height * 0.105f, 0f);
+            badge.transform.localPosition = new Vector3(counterX, height * 0.105f, 0f);
             var badgeSr = badge.AddComponent<SpriteRenderer>();
             badgeSr.sprite = ToyStyle.Badge(ToyStyle.Hex("3B2F7A"));
             badgeSr.drawMode = SpriteDrawMode.Sliced;
-            badgeSr.size = new Vector2(width * 0.46f, height * 0.21f);
+            badgeSr.size = new Vector2(badgeW, height * 0.21f);
             badgeSr.sortingOrder = 303;
 
             counter = MakeCounterText(txt, Color.white, 305);
             // Chunky outline: eight ink copies around the white counter.
             counterOutline = new TextMesh[8];
-            float ow = height * 0.018f;
+            float ow = counterSize * 64f / 10f * 0.12f;
             for (int i = 0; i < counterOutline.Length; i++)
             {
                 var o = new GameObject("CounterOutline");
@@ -228,8 +245,9 @@ namespace SortEverything.Prototype
                 if (o.state != ObjState.Pile) continue;
                 Vector2 p = o.Position;
                 if (p.y >= Top || p.y <= Bottom || !ColumnContains(p.x)) continue;
-                if (o.category == category) Accept(o);
-                else Reject(o);
+                var result = Proto.Director.Judge(this, o);
+                if (result == DropResult.Correct) Accept(o);
+                else if (result == DropResult.Wrong) Reject(o);
             }
         }
 
@@ -253,6 +271,7 @@ namespace SortEverything.Prototype
         {
             o.state = ObjState.Spitting;
             o.SetSimulated(false);
+            o.spring.Kick(new Vector2(0.82f, 1.18f)); // the object flinches too
             disgustUntil = Time.time + 0.6f;
             flashUntil = Time.time + 0.35f;
             Haptics.Play(Haptics.Kind.Medium);
@@ -321,6 +340,85 @@ namespace SortEverything.Prototype
             spring.Kick(new Vector2(0.92f, 1.1f));
         }
 
+        float EyeHeight { get { return height * 0.58f; } }
+
+        /// <summary>
+        /// The rule as text on the front panel, between the counter badge and the front lip. Sized to fit the bin:
+        /// one line when it fits, otherwise a two-word label wraps to two lines; never smaller than the smallest
+        /// HUD text (12 dp).
+        /// </summary>
+        void BuildLabel(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return;
+            var font = ToyStyle.Display;
+            float maxW = width * 0.9f;
+            float bandBottom = height * 0.215f, bandTop = height * 0.44f;
+            float maxH = bandTop - bandBottom;
+            float baseEm = Mathf.Min(Units.DpToWorld(18f), height * 0.13f);
+            float minEm = Units.DpToWorld(12f);
+
+            float singleEm = Mathf.Min(baseEm, maxW / Mathf.Max(0.01f, EmWidth(font, text)), maxH / 1.05f);
+            string shown = text;
+            float em = singleEm;
+            int space = text.IndexOf(' ');
+            if (space > 0 && singleEm < baseEm * 0.85f)
+            {
+                // Split at the space nearest the middle.
+                int best = space;
+                for (int i = space; i >= 0 && i < text.Length; i = text.IndexOf(' ', i + 1))
+                    if (Mathf.Abs(i - text.Length / 2) < Mathf.Abs(best - text.Length / 2)) best = i;
+                string l1 = text.Substring(0, best), l2 = text.Substring(best + 1);
+                float twoEm = Mathf.Min(baseEm, maxW / Mathf.Max(0.01f, Mathf.Max(EmWidth(font, l1), EmWidth(font, l2))), maxH / 2.1f);
+                if (twoEm > singleEm) { shown = l1 + "\n" + l2; em = twoEm; }
+            }
+            em = Mathf.Max(em, minEm);
+
+            var go = new GameObject("RuleLabel");
+            go.transform.SetParent(visualRoot, false);
+            go.transform.localPosition = new Vector3(0f, (bandBottom + bandTop) / 2f, 0f);
+            float size = em * 10f / 64f;
+            MakeLabelText(go, shown, ToyGui.TextCream, size, 307);
+            float ow = em * 0.11f;
+            for (int i = 0; i < 8; i++)
+            {
+                var o = new GameObject("RuleLabelOutline");
+                o.transform.SetParent(go.transform, false);
+                float a = i * Mathf.PI / 4f;
+                o.transform.localPosition = new Vector3(Mathf.Cos(a) * ow, Mathf.Sin(a) * ow - ow * 0.45f, 0f);
+                MakeLabelText(o, shown, ToyStyle.Ink, size, 306);
+            }
+        }
+
+        /// <summary>Width of a single line in ems (advance at font size 64 / 64).</summary>
+        static float EmWidth(Font font, string s)
+        {
+            font.RequestCharactersInTexture(s, 64);
+            float w = 0f;
+            for (int i = 0; i < s.Length; i++)
+            {
+                CharacterInfo ci;
+                if (font.GetCharacterInfo(s[i], out ci, 64)) w += ci.advance;
+            }
+            return w / 64f;
+        }
+
+        TextMesh MakeLabelText(GameObject go, string text, Color c, float size, int order)
+        {
+            var t = go.AddComponent<TextMesh>();
+            t.font = ToyStyle.Display;
+            var mr = go.GetComponent<MeshRenderer>();
+            mr.sharedMaterial = t.font.material;
+            mr.sortingOrder = order;
+            t.fontSize = 64;
+            t.characterSize = size;
+            t.anchor = TextAnchor.MiddleCenter;
+            t.alignment = TextAlignment.Center;
+            t.lineSpacing = 0.92f;
+            t.color = c;
+            t.text = text;
+            return t;
+        }
+
         void UpdateCounter()
         {
             counter.text = count + "/" + capacity;
@@ -336,7 +434,7 @@ namespace SortEverything.Prototype
             mr.sharedMaterial = t.font.material;
             mr.sortingOrder = order;
             t.fontSize = 64;
-            t.characterSize = height * 0.13f * 10f / 64f * 1.4f * 0.85f; // Titan One is wider than the old font
+            t.characterSize = counterSize; // Titan One is wider than the old font; capped by the badge width
             t.anchor = TextAnchor.MiddleCenter;
             t.alignment = TextAlignment.Center;
             t.color = c;
@@ -369,7 +467,7 @@ namespace SortEverything.Prototype
 
             // Pupils track the object under the finger (or drift when idle).
             Vector2 look;
-            Vector2 eyesWorld = (Vector2)visualRoot.position + new Vector2(0f, height * 0.31f);
+            Vector2 eyesWorld = (Vector2)visualRoot.position + new Vector2(0f, EyeHeight);
             Vector2 target;
             if (juice && Proto.Drag != null && Proto.Drag.TryGetHeldPosition(out target))
                 look = Vector2.ClampMagnitude((target - eyesWorld) * 0.6f, 1f);

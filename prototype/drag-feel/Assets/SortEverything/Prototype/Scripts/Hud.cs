@@ -3,7 +3,8 @@ using UnityEngine;
 namespace SortEverything.Prototype
 {
     /// <summary>
-    /// Minimal in-game HUD (round number, combo, "SORTED!" stamp, NEXT) plus the observer's tuning panel.
+    /// In-game HUD (level badge, countdown timer, rule banner, wrong-drop penalty, combo, "SORTED!" results with time
+    /// and best time, "TIME'S UP!" with retry / skip) plus the observer's tuning panel.
     /// Testers never see which E1 variant they are in; the panel (gear button, top-right) is for the observer.
     /// Drawn with IMGUI so the prototype needs no UI packages or prefabs.
     /// </summary>
@@ -30,6 +31,11 @@ namespace SortEverything.Prototype
 
         float u; // pixels per dp
         GUIStyle small, label, title, stamp, combo, button, bigButton, panelBg, value, hudLabel, stats;
+        GUIStyle timerDigits, timerCaption, penaltyStyle, bannerTitle, bannerDetail, resultTime, resultBest, midButton;
+        // Strings built once per round (no per-frame string allocation while playing).
+        string levelText, bannerTitleText, bannerDetailText, timeUpProgress;
+        bool timeUpSeen;
+        int bannerFitRound = -1;
         // Visual-style animation clocks (pop-ins); presentation only.
         int lastRound = -1;
         float roundPopAt = -10f, nextPopAt = -10f, toastPopAt = -10f;
@@ -122,6 +128,14 @@ namespace SortEverything.Prototype
             button = new GUIStyle(GUI.skin.label) { font = display, fontSize = Px(14), alignment = TextAnchor.MiddleCenter, clipping = TextClipping.Overflow };
             bigButton = new GUIStyle(button) { fontSize = Px(38) };
             hudLabel = new GUIStyle(button) { fontSize = Px(17) };
+            timerDigits = new GUIStyle(button) { fontSize = Px(28) };
+            timerCaption = new GUIStyle(button) { fontSize = Px(12) };
+            penaltyStyle = new GUIStyle(button) { fontSize = Px(20) };
+            bannerTitle = new GUIStyle(button) { fontSize = Px(24), wordWrap = false };
+            bannerDetail = new GUIStyle(button) { fontSize = Px(16) };
+            resultTime = new GUIStyle(button) { fontSize = Px(34) };
+            resultBest = new GUIStyle(button) { fontSize = Px(19) };
+            midButton = new GUIStyle(button) { fontSize = Px(22) };
             stats = new GUIStyle(GUI.skin.label) { font = f, fontSize = Px(12), wordWrap = true };
             stats.normal.textColor = new Color(0.9f, 0.88f, 1f);
             panelBg = new GUIStyle();
@@ -139,7 +153,15 @@ namespace SortEverything.Prototype
             EnsureStyles();
             var d = Proto.Director;
             Rect safe = SafeGui;
-            if (d.Round != lastRound) { lastRound = d.Round; roundPopAt = Time.unscaledTime; }
+            if (d.Round != lastRound)
+            {
+                lastRound = d.Round;
+                roundPopAt = Time.unscaledTime;
+                levelText = "LEVEL " + d.Playlist.Number;
+                bannerTitleText = d.Level != null ? d.Level.BannerTitle : null;
+                bannerDetailText = d.Level != null ? d.Level.BannerDetail : null;
+                timeUpSeen = false;
+            }
             if (d.ShowNext && !nextWasShown) nextPopAt = Time.unscaledTime;
             nextWasShown = d.ShowNext;
 
@@ -148,7 +170,7 @@ namespace SortEverything.Prototype
                 DrawEdgeGlow(new Color(1f, 0.6f, 0.15f, 0.35f + 0.15f * Mathf.Sin(Time.unscaledTime * 10f)));
 
             {
-                string roundText = "ROUND " + d.Round;
+                string roundText = levelText;
                 float pw = hudLabel.CalcSize(new GUIContent(roundText)).x + 30 * u;
                 var pill = new Rect(safe.x + 10 * u, safe.y + 10 * u, pw, 42 * u);
                 float pop = Pop(roundPopAt, 0.35f, 1.18f);
@@ -178,6 +200,9 @@ namespace SortEverything.Prototype
                 GUI.matrix = cm;
             }
 
+            DrawTimer(d);
+            DrawBanner(d);
+
             if (d.RoundComplete && d.StampTime > d.CompleteTime)
             {
                 float sinceStamp = Time.unscaledTime - d.StampTime;
@@ -185,6 +210,7 @@ namespace SortEverything.Prototype
                 DrawStamp(d);
             }
             if (d.ShowNext) DrawNext(d);
+            if (d.TimeUp) DrawTimeUp(d);
 
             if (Proto.Config.debugOverlay && !PanelOpen)
             {
@@ -240,6 +266,151 @@ namespace SortEverything.Prototype
             GUIUtility.ScaleAroundPivot(new Vector2(scale, scale), centre);
             ToyGui.Logo(rect, "SORTED!", stamp, ToyGui.TextCream, ToyGui.TextDepthWarm, 5.6f, 9f);
             GUI.matrix = m;
+
+            // Completion time and best time under the stamp.
+            float a = Mathf.Clamp01((t - 0.2f) / 0.2f);
+            if (a > 0f && d.ResultTimeText != null)
+            {
+                var tr = new Rect(centre.x - 160 * u, centre.y + 50 * u, 320 * u, 44 * u);
+                ToyGui.Logo(tr, d.ResultTimeText, resultTime, new Color(1f, 0.98f, 0.91f, a), ToyStyle.Hex("1C3FC4"), 3.2f, 3.6f);
+                if (d.ResultBestText != null)
+                {
+                    var br = new Rect(centre.x - 160 * u, centre.y + 94 * u, 320 * u, 28 * u);
+                    Color face = d.ResultNewBest ? new Color(1f, 0.85f, 0.2f, a) : new Color(1f, 0.98f, 0.91f, a);
+                    ToyGui.Logo(br, d.ResultBestText, resultBest, face, ToyStyle.Ink, 2.6f, 2.4f);
+                }
+            }
+        }
+
+        // ---- timer, rule banner, time's up ----------------------------------------------------
+
+        Rect TimerRect
+        {
+            get
+            {
+                Rect safe = SafeGui;
+                float w = 112f * u, h = 56f * u;
+                return new Rect(safe.x + (safe.width - w) / 2f, safe.y + 8f * u, w, h);
+            }
+        }
+
+        /// <summary>Countdown pill in the toy language: blue when calm, orange when low, red with a gentle pulse when critical.</summary>
+        void DrawTimer(RoundDirector d)
+        {
+            var session = d.Session;
+            if (session == null || d.TimerText == null) return;
+            var timer = session.Timer;
+            var urgency = timer.Urgency;
+            ToyTone tone = urgency == TimerUrgency.Critical ? ToyTone.Danger
+                : urgency == TimerUrgency.Low ? ToyTone.Warning : ToyTone.Secondary;
+            if (session.State == SessionState.Complete) tone = ToyTone.Primary;
+
+            Rect r = TimerRect;
+            float pulse = 1f;
+            if (urgency == TimerUrgency.Critical && timer.IsRunning && !timer.Paused)
+                pulse = 1f + 0.05f * Mathf.Abs(Mathf.Sin(Time.unscaledTime * Mathf.PI * 1.6f));
+            Matrix4x4 m = GUI.matrix;
+            GUIUtility.ScaleAroundPivot(new Vector2(pulse, pulse), r.center);
+            ToyGui.Pill(r, tone, ToySize.Medium);
+            float lift = ToyGui.Depth(ToySize.Medium) * 0.5f;
+            ToyGui.Logo(new Rect(r.x, r.y + 2f * u - lift, r.width, 16f * u), "TIME", timerCaption,
+                ToyGui.TextCream, ToyStyle.Ink, 1.6f, 1.2f, false);
+            ToyGui.Logo(new Rect(r.x, r.y + 15f * u - lift, r.width, r.height - 15f * u), d.TimerText.For(timer.DisplayTenths),
+                timerDigits, ToyGui.TextCream, ToyStyle.Ink, 2.6f, 2.6f, false);
+            GUI.matrix = m;
+
+            // Wrong-drop penalty, floating up from under the timer.
+            float since = Time.unscaledTime - d.PenaltyAt;
+            if (d.PenaltyText != null && since >= 0f && since < 0.9f)
+            {
+                float a = 1f - Mathf.Clamp01((since - 0.45f) / 0.45f);
+                var pr = new Rect(r.x, r.yMax + 6f * u - since * 18f * u, r.width, 26f * u);
+                ToyGui.Logo(pr, d.PenaltyText, penaltyStyle, new Color(1f, 0.42f, 0.36f, a), ToyStyle.Ink, 2.4f, 2f, false);
+            }
+        }
+
+        /// <summary>The rule, shown while the level waits for its first drag; pops away when the clock starts.</summary>
+        void DrawBanner(RoundDirector d)
+        {
+            var session = d.Session;
+            if (session == null || bannerTitleText == null || d.TimeUp || d.RoundComplete) return;
+            float since = Time.unscaledTime - d.TimerStartedAt;
+            bool waiting = session.State == SessionState.Ready;
+            if (!waiting && since > 0.25f) return;
+            float scale = waiting ? Pop(roundPopAt, 0.35f, 0.6f) : 1f - Mathf.Clamp01(since / 0.25f); // shrinks away
+            if (scale <= 0.01f) return;
+
+            float maxW = Screen.width * 0.92f;
+            if (bannerFitRound != d.Round)
+            {
+                // Fit once per level: shrink the headline (not below 16 dp) and the bin list (not below 12 dp,
+                // the smallest HUD text) so long rules stay on screen on narrow phones.
+                bannerFitRound = d.Round;
+                FitFont(bannerTitle, bannerTitleText, 24f, 16f, maxW - 48f * u);
+                FitFont(bannerDetail, bannerDetailText, 16f, 12f, maxW - 32f * u);
+            }
+            float tw = bannerTitle.CalcSize(new GUIContent(bannerTitleText)).x;
+            float dw = bannerDetail.CalcSize(new GUIContent(bannerDetailText)).x;
+            float w = Mathf.Min(maxW, Mathf.Max(tw, dw) + 48f * u);
+            float h = 86f * u;
+            float bottom = Units.WorldToGui(new Vector2(0f, d.TableTop + 2.2f)).y;
+            float topLimit = TimerRect.yMax + 14f * u;
+            float y = Mathf.Max(topLimit, bottom - h);
+            var r = new Rect((Screen.width - w) / 2f, y, w, h);
+
+            Matrix4x4 m = GUI.matrix;
+            GUIUtility.ScaleAroundPivot(new Vector2(scale, scale), r.center);
+            ToyGui.Pill(r, ToyTone.Purple, ToySize.Medium);
+            float lift = ToyGui.Depth(ToySize.Medium) * 0.5f;
+            ToyGui.Logo(new Rect(r.x, r.y + 8f * u - lift, r.width, 36f * u), bannerTitleText, bannerTitle,
+                ToyGui.TextCream, ToyGui.TextDepthWarm, 2.8f, 2.6f, false);
+            ToyGui.Logo(new Rect(r.x + 8f * u, r.y + 44f * u - lift, r.width - 16f * u, 30f * u), bannerDetailText, bannerDetail,
+                ToyStyle.Hex("FFE58A"), ToyStyle.Ink, 2.2f, 2f, false);
+            GUI.matrix = m;
+        }
+
+        void FitFont(GUIStyle style, string text, float dp, float minDp, float maxWidth)
+        {
+            style.fontSize = Px(dp);
+            float w = style.CalcSize(new GUIContent(text)).x;
+            if (w > maxWidth) style.fontSize = Mathf.Max(Px(minDp), Mathf.FloorToInt(style.fontSize * maxWidth / w));
+        }
+
+        void DrawTimeUp(RoundDirector d)
+        {
+            float t = Time.unscaledTime - d.TimeUpAt;
+            if (!timeUpSeen)
+            {
+                timeUpSeen = true;
+                var s = d.Session;
+                timeUpProgress = s.SortedCount + " / " + s.Objects.Length + " SORTED";
+            }
+            ToyGui.Dim(0.45f * Mathf.Clamp01(t / 0.25f));
+            float scale = Proto.Config.juice ? Mathf.Lerp(1.8f, 1f, Juice.EaseOutBack(Mathf.Clamp01(t / 0.2f))) : 1f;
+            Vector2 centre = Units.WorldToGui(new Vector2(0f, d.TableTop + 2.4f));
+            var rect = new Rect(centre.x - 240 * u, centre.y - 50 * u, 480 * u, 100 * u);
+            Matrix4x4 m = GUI.matrix;
+            GUIUtility.RotateAroundPivot(-6f, centre);
+            GUIUtility.ScaleAroundPivot(new Vector2(scale, scale), centre);
+            ToyGui.Logo(rect, "TIME'S UP!", stamp, ToyGui.TextCream, ToyStyle.Hex("E8333A"), 5.6f, 9f);
+            GUI.matrix = m;
+            ToyGui.Logo(new Rect(centre.x - 160 * u, centre.y + 52 * u, 320 * u, 30 * u), timeUpProgress, resultBest,
+                ToyGui.TextCream, ToyStyle.Ink, 2.6f, 2.4f);
+
+            if (!d.ShowRetry) return;
+            float y = Units.WorldToGui(new Vector2(0f, (d.TableTop + d.BinsTop) / 2f)).y;
+            float w = Screen.width * 0.72f, h = 84f * u;
+            var r = new Rect((Screen.width - w) / 2f, y - h / 2f, w, h);
+            float pop = Pop(d.TimeUpAt + 0.6f, 0.35f, 0.6f);
+            Matrix4x4 pm = GUI.matrix;
+            GUIUtility.ScaleAroundPivot(new Vector2(pop, pop), r.center);
+            bool retry = ToyGui.Button(r, "RETRY", ToyTone.Primary, bigButton, null, ToySize.Large);
+            GUI.matrix = pm;
+            float sw = Screen.width * 0.46f, sh = 50f * u;
+            var sr = new Rect((Screen.width - sw) / 2f, r.yMax + 16f * u, sw, sh);
+            bool skip = ToyGui.Button(sr, "SKIP  >", ToyTone.Secondary, midButton, null, ToySize.Medium);
+            if (retry) d.Retry();
+            else if (skip) d.Skip();
         }
 
         void DrawNext(RoundDirector d)
@@ -312,19 +483,23 @@ namespace SortEverything.Prototype
             }
             y += row + 6 * u;
 
-            // Content: what the rounds are made of. Switching starts a new round straight away.
-            GUI.Label(new Rect(0, y, w, row * 0.7f), "Content  (round: " + ContentSettings.ModeLabel(Proto.Director.RoundMode) + ")", label);
+            // Levels: jump to any playlist entry (observer testing). Starts that level straight away.
+            var dir = Proto.Director;
+            GUI.Label(new Rect(0, y, w, row * 0.7f), "Level  (playing " + dir.Playlist.Number + " / " + dir.Playlist.Count
+                + ", design level " + (dir.Level != null ? dir.Level.designLevel : 0) + ")", label);
             y += row * 0.75f;
-            float cw = w / 4f;
-            for (int i = 0; i < 3; i++)
+            int count = dir.Playlist.Count;
+            float cw = w / count;
+            for (int i = 0; i < count; i++)
             {
-                var m = (ContentMode)i;
-                if (ToyGui.Button(new Rect(i * cw + 2, y, cw - 4, row - 4), ContentSettings.ModeLabel(m),
-                        ContentSettings.Mode == m ? ToyTone.Purple : ToyTone.Inactive, button))
-                    SelectContent(m, ContentSettings.Pool);
+                if (ToyGui.Button(new Rect(i * cw + 2, y, cw - 4, row - 4), (i + 1).ToString(),
+                        dir.Playlist.Index == i ? ToyTone.Purple : ToyTone.Inactive, button))
+                {
+                    Close();
+                    dir.SelectLevel(i);
+                    Toast("Level " + (i + 1));
+                }
             }
-            if (ToyGui.Button(new Rect(3 * cw + 2, y, cw - 4, row - 4), ContentSettings.PoolLabel(ContentSettings.Pool), ToyTone.Secondary, button))
-                SelectContent(ContentSettings.Mode, (ObjectPool)(((int)ContentSettings.Pool + 1) % 3));
             y += row + 6 * u;
 
             var c = Proto.Config;
@@ -369,7 +544,7 @@ namespace SortEverything.Prototype
             y += pathH + 4 * u;
 
             float aw = w / 2f;
-            if (ToyGui.Button(new Rect(0, y, aw - 4, row - 4), "New round", ToyTone.Primary, button)) { Close(); Proto.Director.StartRound(); }
+            if (ToyGui.Button(new Rect(0, y, aw - 4, row - 4), "Restart level", ToyTone.Primary, button)) { Close(); Proto.Director.StartRound(); }
             if (ToyGui.Button(new Rect(aw, y, aw - 4, row - 4), "Reset stats", ToyTone.Warning, button)) { Proto.Telemetry.ResetStats(); Toast("Stats reset"); }
             y += row;
             if (ToyGui.Button(new Rect(0, y, aw - 4, row - 4), "Copy summary", ToyTone.Secondary, button))
@@ -401,16 +576,6 @@ namespace SortEverything.Prototype
             if (!ToyGui.Button(r, name + (v ? ": ON" : ": off"), v ? ToyTone.Primary : ToyTone.Inactive, button)) return false;
             v = !v;
             return true;
-        }
-
-        void SelectContent(ContentMode mode, ObjectPool pool)
-        {
-            ContentSettings.Mode = mode;
-            ContentSettings.Pool = pool;
-            ContentSettings.Save();
-            Proto.Telemetry.OnContentChanged(ContentSettings.ModeLabel(mode) + "/" + pool);
-            Proto.Director.StartRound();
-            Toast(ContentSettings.ModeLabel(mode) + " · " + ContentSettings.PoolLabel(pool));
         }
 
         void SelectVariant(FeelVariant v)

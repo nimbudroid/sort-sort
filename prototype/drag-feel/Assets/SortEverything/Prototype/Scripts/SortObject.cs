@@ -119,7 +119,7 @@ namespace SortEverything.Prototype
             so.shape = ShapeKind.Circle; // unused for library objects
             so.objectKey = def.id;
             so.displayName = def.displayName;
-            so.objectCategory = def.category.ToString();
+            so.objectCategory = def.PrimaryCategory ?? def.category.ToString(); // sorting category (telemetry)
 
             var c = so.gameObject.AddComponent<PolygonCollider2D>();
             c.SetPath(0, hull);
