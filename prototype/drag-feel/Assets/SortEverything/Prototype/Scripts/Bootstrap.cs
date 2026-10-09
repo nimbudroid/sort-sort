@@ -48,13 +48,14 @@ namespace SortEverything.Prototype
             Proto.Director = gameObject.AddComponent<RoundDirector>();
             Proto.Drag = gameObject.AddComponent<DragController>();
             Proto.Hud = gameObject.AddComponent<Hud>();
+            Proto.Flow = gameObject.AddComponent<AppFlow>();
             Proto.Telemetry.OnVariantChanged(variant + (custom ? "*" : ""));
             Proto.Telemetry.OnContentChanged(ContentSettings.ModeLabel(ContentSettings.Mode) + "/" + ContentSettings.Pool);
         }
 
         void Start()
         {
-            Proto.Director.StartRound();
+            Proto.Flow.Launch();
         }
 
         static Camera SetupCamera()

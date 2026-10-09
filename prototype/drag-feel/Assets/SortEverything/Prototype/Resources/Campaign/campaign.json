@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  // Whole-house campaign: House -> Room -> Area -> Section (one level). Rooms with "available": false are shown
+  // locked in the house overview until their levels are authored.
+  "house": { "id": "house", "finalMilestoneId": "house_complete" },
+  "levelFiles": [],
+  "labFile": "lab",
+
+  // Body colours for one-category targets. Category targets avoid the five rule colours where possible.
+  "categoryColors": {
+    "FRUIT": "F28C28", "VEGETABLES": "7BC043", "DRINKS": "22B8B0", "KITCHENWARE": "B9875A",
+    "KITCHEN": "22B8B0", "TOYS": "FF6FAE", "BEACH": "22B8B0", "OFFICE": "B9875A", "SPORTS": "F28C28",
+    "FOOD": "F28C28", "JARS": "E9A03B", "CANS": "8FA3B8", "PACKAGES": "C98B4E",
+    "BREAKFAST": "F2B230", "BAKING": "E8C9A0", "SNACKS": "F28C28"
+  },
+
+  // GDD capacity templates (units: normal objects 1, large objects 2).
+  "templates": {
+    "P1": [
+      { "id": "fruit_basket", "label": "FRUIT BASKET", "accepts": ["FRUIT"], "capacity": 2, "style": "basket" },
+      { "id": "produce_tray", "label": "FRUIT + VEG TRAY", "accepts": ["FRUIT", "VEGETABLES"], "capacity": 6, "style": "tray", "colorHex": "FF6FAE" }
+    ],
+    "P2": [
+      { "id": "fruit_bin", "accepts": ["FRUIT"], "capacity": 2, "style": "basket" },
+      { "id": "vegetables_bin", "accepts": ["VEGETABLES"], "capacity": 2, "style": "basket" },
+      { "id": "drinks_bin", "accepts": ["DRINKS"], "capacity": 2, "style": "tray" },
+      { "id": "shared_shelf", "label": "SHARED SHELF", "accepts": ["FRUIT", "VEGETABLES", "DRINKS"], "capacity": 6, "style": "tray", "colorHex": "FF6FAE" }
+    ],
+    "P3": [
+      { "id": "fruit_bin", "accepts": ["FRUIT"], "capacity": 2, "style": "basket" },
+      { "id": "vegetables_bin", "accepts": ["VEGETABLES"], "capacity": 2, "style": "basket" },
+      { "id": "drinks_bin", "accepts": ["DRINKS"], "capacity": 2, "style": "tray" },
+      { "id": "shared_shelf", "label": "SHARED SHELF", "accepts": ["FRUIT", "VEGETABLES", "DRINKS", "KITCHENWARE"], "capacity": 10, "style": "tray", "colorHex": "FF6FAE" }
+    ],
+    "P4": [
+      { "id": "fv_basket", "label": "FRUIT + VEG", "accepts": ["FRUIT", "VEGETABLES"], "capacity": 2, "style": "basket", "colorHex": "F28C28" },
+      { "id": "vd_basket", "label": "VEG + DRINKS", "accepts": ["VEGETABLES", "DRINKS"], "capacity": 2, "style": "basket", "colorHex": "7BC043" },
+      { "id": "fd_basket", "label": "FRUIT + DRINKS", "accepts": ["FRUIT", "DRINKS"], "capacity": 2, "style": "basket", "colorHex": "22B8B0" }
+    ]
+  },
+
+  "rooms": [
+    { "id": "kitchen", "name": "Kitchen", "available": false, "plannedAreas": 4, "icons": ["apple", "milk_carton", "spoon"],
+      "theme": { "wall": "FCE7C8", "wallAccent": "F6D3A4", "surface": "C98B4E", "pattern": "tiles", "accent": "F28C28" }, "areas": [] },
+    { "id": "pantry", "name": "Pantry", "available": false, "plannedAreas": 2, "icons": ["jam_jar", "cereal_box"],
+      "theme": { "wall": "EFE3CF", "wallAccent": "E0CCAA", "surface": "B07A4A", "pattern": "planks", "accent": "E9A03B" }, "areas": [] },
+    { "id": "kids_room", "name": "Kids' Room", "available": false, "plannedAreas": 4, "icons": ["teddy_bear", "toy_ball", "book"],
+      "theme": { "wall": "DDEBFF", "wallAccent": "C6DCFA", "surface": "E8B86A", "pattern": "dots", "accent": "FF6FAE" }, "areas": [] },
+    { "id": "bathroom", "name": "Bathroom", "available": false, "plannedAreas": 3, "icons": ["soap", "towel", "toothbrush"],
+      "theme": { "wall": "D8F3F1", "wallAccent": "BDE8E4", "surface": "DDE6EE", "pattern": "tiles", "accent": "22B8B0" }, "areas": [] },
+    { "id": "entryway", "name": "Shoe Cabinet", "available": false, "plannedAreas": 3, "icons": ["shoe", "flip_flops", "umbrella"],
+      "theme": { "wall": "EDE4F7", "wallAccent": "DCCDEF", "surface": "9C6B48", "pattern": "stripes", "accent": "9B5DE5" }, "areas": [] },
+    { "id": "office", "name": "Home Office", "available": false, "plannedAreas": 3, "icons": ["stapler", "notebook", "calculator"],
+      "theme": { "wall": "E3EEDD", "wallAccent": "CFE2C6", "surface": "A8784F", "pattern": "planks", "accent": "43C46B" }, "areas": [] }
+  ]
+}

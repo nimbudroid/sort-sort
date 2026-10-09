@@ -16,6 +16,7 @@ namespace SortEverything.Prototype
         public static Juice Juice;
         public static Telemetry Telemetry;
         public static Hud Hud;
+        public static AppFlow Flow;
     }
 
     /// <summary>

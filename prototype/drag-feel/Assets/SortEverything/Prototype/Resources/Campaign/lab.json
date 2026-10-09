@@ -1,0 +1,24 @@
+{
+  // Debug-only levels (observer panel). The former timer/category experiment levels, kept for testing colour,
+  // combined and mixed rules, plus a capacity check. Not part of the campaign.
+  "levels": [
+    { "id": "lab_01", "title": "Lab: colours", "boards": [ { "objects": "apple alarm_clock notebook shoe calculator small_plant",
+      "targets": [ { "color": "RED" }, { "color": "BLUE" }, { "color": "GREEN" } ] } ] },
+    { "id": "lab_02", "title": "Lab: more colours", "boards": [ { "objects": "banana pencil toy_ball stapler popsicle coffee_mug strawberry sock",
+      "targets": [ { "color": "YELLOW" }, { "color": "BLUE" }, { "color": "RED" } ] } ] },
+    { "id": "lab_03", "title": "Lab: categories", "boards": [ { "objects": "apple banana orange toy_ball teddy_bear toy_car plate spoon",
+      "targets": "FRUIT TOYS KITCHEN" } ] },
+    { "id": "lab_04", "title": "Lab: beach, office, sports", "boards": [ { "objects": "sunglasses flip_flops beach_ball stapler paper_clip sticky_note soccer_ball tennis_racket dumbbell",
+      "targets": "BEACH OFFICE SPORTS" } ] },
+    { "id": "lab_05", "title": "Lab: colour + category", "boards": [ { "objects": "apple strawberry watermelon_slice toy_train toy_robot beach_ball bowl teapot spatula",
+      "targets": [ { "color": "RED", "accepts": ["FRUIT"] }, { "color": "BLUE", "accepts": ["TOYS"] }, { "color": "YELLOW", "accepts": ["KITCHEN"] } ] } ] },
+    { "id": "lab_06", "title": "Lab: overlapping categories", "boards": [ { "objects": "plate coffee_mug spoon bowl teddy_bear toy_car toy_robot sunglasses flip_flops seashell",
+      "targets": "KITCHENWARE TOYS BEACH" } ] },
+    { "id": "lab_07", "title": "Lab: mixed rules", "boards": [ { "objects": "apple banana strawberry notebook stapler coffee_mug shoe toy_ball teddy_bear toy_car",
+      "targets": [ { "accepts": ["FRUIT"] }, { "color": "BLUE" }, { "accepts": ["TOYS"] } ] } ] },
+    { "id": "lab_08", "title": "Lab: four bins", "boards": [ { "objects": "pizza_slice cupcake apple teddy_bear toy_car building_block soccer_ball tennis_racket dumbbell stapler paper_clip sticky_note",
+      "targets": "FOOD TOYS SPORTS OFFICE" } ] },
+    { "id": "lab_09", "title": "Lab: shared tray (P1)", "cue": "This tray holds both.", "boards": [ { "objects": "apple banana orange strawberry carrot broccoli carrot broccoli",
+      "targets": "P1" } ] }
+  ]
+}

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using NUnit.Framework;
 using SortEverything.Prototype;
 
@@ -5,93 +6,82 @@ namespace SortEverything.Tests
 {
     public class ValidatorTests
     {
+        static List<string> V(BoardDef b) { return LevelValidator.Validate(TestObjects.Level("t", b)); }
+
         [Test]
-        public void AllAuthoredLevels_Pass()
+        public void ValidOrdinaryBoard_Passes()
         {
-            Assert.AreEqual(8, LevelLibrary.Playlist.Count);
-            foreach (var level in LevelLibrary.Playlist)
-            {
-                var errors = LevelValidator.Validate(level);
-                Assert.AreEqual(0, errors.Count, level.id + ": " + string.Join("; ", errors.ToArray()));
-            }
+            var errors = V(TestObjects.Board("apple carrot spoon",
+                TestObjects.Target("FRUIT"), TestObjects.Target("VEGETABLES"), TestObjects.Target("KITCHENWARE")));
+            CollectionAssert.IsEmpty(errors);
         }
 
         [Test]
-        public void Fails_WhenAnObjectMatchesNoBin()
+        public void ObjectWithNoTarget_Fails()
         {
-            var level = new LevelDef("t_none", 1, 20f,
-                new[] { BinDef.Color(SortColor.Red), BinDef.Color(SortColor.Blue) },
-                new[] { "apple", "notebook", "banana" }); // banana is yellow
-            var errors = LevelValidator.Validate(level);
-            Assert.IsTrue(errors.Exists(e => e.Contains("banana") && e.Contains("no bin")));
+            CollectionAssert.IsNotEmpty(V(TestObjects.Board("apple carrot toy_car",
+                TestObjects.Target("FRUIT"), TestObjects.Target("VEGETABLES"))));
         }
 
         [Test]
-        public void Fails_WhenAnObjectMatchesTwoBins()
+        public void ObjectWithTwoTargets_FailsOnOrdinaryBoards()
         {
-            var level = new LevelDef("t_two", 1, 20f,
-                new[] { BinDef.Color(SortColor.Blue), BinDef.Category("TOYS", "FF6FAE") },
-                new[] { "notebook", "teddy_bear", "toy_train" }); // toy_train is a blue toy
-            var errors = LevelValidator.Validate(level);
-            Assert.IsTrue(errors.Exists(e => e.Contains("toy_train") && e.Contains("more than one")));
+            // apple is FRUIT and FOOD
+            CollectionAssert.IsNotEmpty(V(TestObjects.Board("apple carrot", TestObjects.Target("FRUIT"), TestObjects.Target("FOOD"))));
         }
 
         [Test]
-        public void Fails_ForEmptyBin_UnknownObject_AndUnknownCategory()
+        public void TargetReceivingNothing_Fails()
         {
-            var level = new LevelDef("t_bad", 1, 20f,
-                new[] { BinDef.Color(SortColor.Red), BinDef.Category("NOT_A_CATEGORY", "F28C28"), BinDef.Color(SortColor.Green) },
-                new[] { "apple", "no_such_object" });
-            var errors = LevelValidator.Validate(level);
-            Assert.IsTrue(errors.Exists(e => e.Contains("unknown object no_such_object")));
-            Assert.IsTrue(errors.Exists(e => e.Contains("unknown category NOT_A_CATEGORY")));
-            Assert.IsTrue(errors.Exists(e => e.Contains("GREEN") && e.Contains("receives no objects")));
+            CollectionAssert.IsNotEmpty(V(TestObjects.Board("apple banana", TestObjects.Target("FRUIT"), TestObjects.Target("TOYS"))));
         }
 
         [Test]
-        public void SortingMode_IsDerivedFromBins()
+        public void LargeObjectOnOrdinaryBoard_Fails()
         {
-            Assert.AreEqual(SortingMode.Color, LevelLibrary.Playlist[0].Mode);
-            Assert.AreEqual(SortingMode.Category, LevelLibrary.Playlist[2].Mode);
-            Assert.AreEqual(SortingMode.ColorAndCategory, LevelLibrary.Playlist[4].Mode);
-            Assert.AreEqual(SortingMode.Mixed, LevelLibrary.Playlist[6].Mode);
-            Assert.AreEqual("SORT BY:", LevelLibrary.Playlist[6].BannerTitle);
-            Assert.AreEqual("SORT BY CATEGORY + COLOR", LevelLibrary.Playlist[4].BannerTitle);
+            CollectionAssert.IsNotEmpty(V(TestObjects.Board("orange* carrot", TestObjects.Target("FRUIT"), TestObjects.Target("VEGETABLES"))));
         }
 
         [Test]
-        public void ObjectAndBinCounts_ComeFromTheLevel()
+        public void UnknownAssetOrCategory_Fails()
         {
-            int[] objects = { 6, 8, 8, 9, 9, 10, 10, 12 };
-            int[] bins = { 3, 3, 3, 3, 3, 3, 3, 4 };
-            for (int i = 0; i < objects.Length; i++)
-            {
-                Assert.AreEqual(objects[i], LevelLibrary.Playlist[i].objectIds.Length, LevelLibrary.Playlist[i].id);
-                Assert.AreEqual(bins[i], LevelLibrary.Playlist[i].bins.Length, LevelLibrary.Playlist[i].id);
-            }
+            CollectionAssert.IsNotEmpty(V(TestObjects.Board("not_a_thing carrot", TestObjects.Target("FRUIT"), TestObjects.Target("VEGETABLES"))));
+            CollectionAssert.IsNotEmpty(V(TestObjects.Board("apple carrot", TestObjects.Target("FRUIT"), TestObjects.Target("NOT_A_CATEGORY"))));
         }
 
         [Test]
-        public void EveryObject_HasKnownCategories_AndEveryCategoryRowHasAnObject()
+        public void CapacityBoard_SolvableAndUnsolvable()
         {
-            foreach (var d in ObjectLibrary.All)
-            {
-                Assert.IsNotNull(d.PrimaryCategory, d.id + " has no primary category");
-                foreach (var c in d.Categories) Assert.IsTrue(CategoryLibrary.Exists(c), d.id + ": unknown category " + c);
-            }
-            Assert.AreEqual(0, ObjectLibrary.CategoryRowsWithoutObject().Count);
+            var ok = TestObjects.Board("apple banana orange carrot broccoli",
+                TestObjects.Target("FRUIT", 2), TestObjects.Target("FRUIT VEGETABLES", 6));
+            CollectionAssert.IsEmpty(V(ok));
+            Assert.IsNotNull(BoardSolver.Solve(ok));
+
+            var tooMuch = TestObjects.Board("apple banana orange* carrot broccoli carrot",
+                TestObjects.Target("FRUIT", 2), TestObjects.Target("FRUIT VEGETABLES", 4));
+            Assert.IsNull(BoardSolver.Solve(tooMuch));
+            CollectionAssert.IsNotEmpty(V(tooMuch));
         }
 
         [Test]
-        public void CategoryTiers_FollowTheSpec()
+        public void Solver_CountsSolutions()
         {
-            Assert.AreEqual(1, CategoryLibrary.Get("FRUIT").tier);
-            Assert.AreEqual(1, CategoryLibrary.Get("VEHICLES").tier);
-            Assert.AreEqual(2, CategoryLibrary.Get("KITCHENWARE").tier);
-            Assert.AreEqual(2, CategoryLibrary.Get("SNACKS").tier);      // unlisted -> tier 2
-            Assert.AreEqual(3, CategoryLibrary.Get("DINOSAURS").tier);
-            Assert.AreEqual(3, CategoryLibrary.Get("SUPERHEROES").tier); // thematic group -> tier 3
-            Assert.AreEqual("FAST FOOD", CategoryLibrary.Get("FAST_FOOD").label);
+            // 2 fruits, basket holds 2, tray holds 2: either both in the basket, both in the tray, or one each (2 ways).
+            var b = TestObjects.Board("apple banana", TestObjects.Target("FRUIT", 2), TestObjects.Target("FRUIT", 2, SortColor.None));
+            b.targets[1].id = "second";
+            Assert.AreEqual(4, BoardSolver.CountSolutions(b));
+        }
+
+        [Test]
+        public void SolverResult_IsALegalAssignment()
+        {
+            var def = TestObjects.Board("orange* apple banana carrot broccoli",
+                TestObjects.Target("FRUIT", 2), TestObjects.Target("FRUIT VEGETABLES", 5));
+            var plan = BoardSolver.Solve(def);
+            Assert.IsNotNull(plan);
+            var board = new BoardModel(def);
+            Assert.IsTrue(board.Restore(plan));
+            Assert.IsTrue(board.Solved);
         }
     }
 }

@@ -11,7 +11,7 @@ namespace SortEverything.Prototype
     /// </summary>
     public class DragController : MonoBehaviour
     {
-        const int MaxHeld = 2;
+        const int MaxHeld = 1; // GDD: one active pointer owns the drag
         const float VelocityWindow = 0.06f; // seconds of finger history used for release velocity
 
         struct Sample
@@ -37,6 +37,11 @@ namespace SortEverything.Prototype
 
         readonly List<Grab> grabs = new List<Grab>();
         readonly List<Grab> shadowPool = new List<Grab>();
+
+        /// <summary>Raised after an object is picked up (the board records where it came from).</summary>
+        public event System.Action<SortObject> Picked;
+        /// <summary>Raised after an object is let go; `cancelled` = interrupted (pause, panel, background).</summary>
+        public event System.Action<SortObject, bool> Released;
 
         public float LastReleaseSpeedDp { get; private set; }
         public string LastReleaseType { get; private set; }
@@ -159,6 +164,7 @@ namespace SortEverything.Prototype
             Proto.Audio.Pop(Mathf.Lerp(1.3f, 0.8f, (best.mass - 1) / 4f));
             Haptics.Play(Haptics.Kind.Light);
             Proto.Telemetry.OnPickup(best);
+            if (Picked != null) Picked(best);
         }
 
         void Track(int fingerId, Vector2 screen)
@@ -303,6 +309,7 @@ namespace SortEverything.Prototype
             LastReleaseType = record.type;
             o.pendingDrop = record;
             Proto.Telemetry.OnRelease(record);
+            if (Released != null) Released(o, cancelled);
         }
 
         Vector2 ReleaseVelocity(Grab g)

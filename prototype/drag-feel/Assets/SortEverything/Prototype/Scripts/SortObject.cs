@@ -38,9 +38,15 @@ namespace SortEverything.Prototype
         public int baseOrder;
 
         public DropRecord pendingDrop;
+        public Transform unitBadge;     // space-cost badge on large variants (rendered just above the object)
         float lastImpactSfx;
 
-        public bool Grabbable { get { return state == ObjState.Pile && gameObject.activeInHierarchy; } }
+        /// <summary>Placed objects stay pickable on planning (capacity) boards; the board decides via `movable`.</summary>
+        public bool movable;
+        public bool Grabbable
+        {
+            get { return (state == ObjState.Pile || (state == ObjState.Sorted && movable)) && gameObject.activeInHierarchy; }
+        }
         public float HalfExtent { get { return size * 0.5f; } }
         public Vector2 Position { get { return transform.position; } }
 
@@ -177,6 +183,11 @@ namespace SortEverything.Prototype
         public void SetOrder(int order)
         {
             sr.sortingOrder = order;
+            if (unitBadge != null)
+            {
+                var rs = unitBadge.GetComponentsInChildren<Renderer>();
+                for (int i = 0; i < rs.Length; i++) rs[i].sortingOrder = order + 1 + i;
+            }
         }
 
         void OnCollisionEnter2D(Collision2D c)

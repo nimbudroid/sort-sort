@@ -3,8 +3,8 @@ using UnityEngine;
 namespace SortEverything.Prototype
 {
     /// <summary>
-    /// In-game HUD (level badge, countdown timer, rule banner, wrong-drop penalty, combo, "SORTED!" results with time
-    /// and best time, "TIME'S UP!" with retry / skip) plus the observer's tuning panel.
+    /// In-game HUD (room + section badge, sorted-count progress, rule banner, refusal reason, Mastery time and streak,
+    /// "SORTED!" result with an explicit Next) plus the observer's tuning panel. No countdown and no failure state.
     /// Testers never see which E1 variant they are in; the panel (gear button, top-right) is for the observer.
     /// Drawn with IMGUI so the prototype needs no UI packages or prefabs.
     /// </summary>
@@ -31,11 +31,11 @@ namespace SortEverything.Prototype
 
         float u; // pixels per dp
         GUIStyle small, label, title, stamp, combo, button, bigButton, panelBg, value, hudLabel, stats;
-        GUIStyle timerDigits, timerCaption, penaltyStyle, bannerTitle, bannerDetail, resultTime, resultBest, midButton;
-        // Strings built once per round (no per-frame string allocation while playing).
-        string levelText, bannerTitleText, bannerDetailText, timeUpProgress;
-        bool timeUpSeen;
-        int bannerFitRound = -1;
+        GUIStyle timerDigits, timerCaption, reasonStyle, bannerTitle, bannerDetail, resultBest, nameStyle;
+        // Strings built once per round / per value change (no per-frame string allocation while playing).
+        string levelText, bannerTitleText, bannerDetailText, progressText, comboText;
+        int progressAssigned = -1, progressTotal = -1, comboValue = -1;
+        int bannerFitRound = -1, bannerBoard = -1;
         // Visual-style animation clocks (pop-ins); presentation only.
         int lastRound = -1;
         float roundPopAt = -10f, nextPopAt = -10f, toastPopAt = -10f;
@@ -89,6 +89,8 @@ namespace SortEverything.Prototype
         {
             if (PanelOpen) return true;
             var gui = new Vector2(screen.x, Screen.height - screen.y);
+            var d = Proto.Director;
+            if (d != null && d.ShowNext && NextRect(d).Contains(gui)) return true;
             Rect gear = GearRect;
             float grow = 8f * Units.DpToPx(1f);
             gear.xMin -= grow; gear.yMin -= grow; gear.xMax += grow; gear.yMax += grow;
@@ -130,12 +132,11 @@ namespace SortEverything.Prototype
             hudLabel = new GUIStyle(button) { fontSize = Px(17) };
             timerDigits = new GUIStyle(button) { fontSize = Px(28) };
             timerCaption = new GUIStyle(button) { fontSize = Px(12) };
-            penaltyStyle = new GUIStyle(button) { fontSize = Px(20) };
+            reasonStyle = new GUIStyle(button) { fontSize = Px(18) };
             bannerTitle = new GUIStyle(button) { fontSize = Px(24), wordWrap = false };
             bannerDetail = new GUIStyle(button) { fontSize = Px(16) };
-            resultTime = new GUIStyle(button) { fontSize = Px(34) };
             resultBest = new GUIStyle(button) { fontSize = Px(19) };
-            midButton = new GUIStyle(button) { fontSize = Px(22) };
+            nameStyle = new GUIStyle(small) { alignment = TextAnchor.UpperCenter, fontSize = Px(11), wordWrap = false, clipping = TextClipping.Overflow };
             stats = new GUIStyle(GUI.skin.label) { font = f, fontSize = Px(12), wordWrap = true };
             stats.normal.textColor = new Color(0.9f, 0.88f, 1f);
             panelBg = new GUIStyle();
@@ -153,55 +154,71 @@ namespace SortEverything.Prototype
             EnsureStyles();
             var d = Proto.Director;
             Rect safe = SafeGui;
+
+            if (Proto.Flow != null && Proto.Flow.LoadError != null)
+                GUI.Label(new Rect(safe.x + 12 * u, safe.yMax - 60 * u, safe.width - 24 * u, 54 * u), Proto.Flow.LoadError, small);
+            if (d.Level == null || d.Attempt == null)
+            {
+                DrawGear();
+                return;
+            }
+
             if (d.Round != lastRound)
             {
                 lastRound = d.Round;
                 roundPopAt = Time.unscaledTime;
-                levelText = "LEVEL " + d.Playlist.Number;
-                bannerTitleText = d.Level != null ? d.Level.BannerTitle : null;
-                bannerDetailText = d.Level != null ? d.Level.BannerDetail : null;
-                timeUpSeen = false;
+                levelText = LevelBadge(d.Level);
+                bannerBoard = -1;
+            }
+            if (d.Attempt.BoardIndex != bannerBoard)
+            {
+                bannerBoard = d.Attempt.BoardIndex;
+                bannerTitleText = d.Level.title;
+                bannerDetailText = !string.IsNullOrEmpty(d.Level.cue) && bannerBoard == 0 ? d.Level.cue : d.Level.RuleText(bannerBoard);
+                bannerFitRound = -1;
             }
             if (d.ShowNext && !nextWasShown) nextPopAt = Time.unscaledTime;
             nextWasShown = d.ShowNext;
 
-            // Combo edge glow at x5 (GDD ch. 01 §1.5).
+            // Mastery streak edge glow at 5 (cosmetic).
             if (Proto.Config.juice && d.Combo >= 5 && Time.unscaledTime - d.ComboTime < 1.2f)
                 DrawEdgeGlow(new Color(1f, 0.6f, 0.15f, 0.35f + 0.15f * Mathf.Sin(Time.unscaledTime * 10f)));
 
             {
-                string roundText = levelText;
-                float pw = hudLabel.CalcSize(new GUIContent(roundText)).x + 30 * u;
+                float pw = Mathf.Min(hudLabel.CalcSize(new GUIContent(levelText)).x + 30 * u, safe.width * 0.36f);
                 var pill = new Rect(safe.x + 10 * u, safe.y + 10 * u, pw, 42 * u);
                 float pop = Pop(roundPopAt, 0.35f, 1.18f);
                 Matrix4x4 pm = GUI.matrix;
                 GUIUtility.ScaleAroundPivot(new Vector2(pop, pop), pill.center);
                 ToyGui.Pill(pill, ToyTone.Purple, ToySize.Medium);
-                ToyGui.Logo(new Rect(pill.x, pill.y - ToyGui.Depth(ToySize.Medium) * 0.5f, pill.width, pill.height), roundText, hudLabel,
+                ToyGui.Logo(new Rect(pill.x, pill.y - ToyGui.Depth(ToySize.Medium) * 0.5f, pill.width, pill.height), levelText, hudLabel,
                     ToyGui.TextCream, ToyGui.TextDepthWarm, 2.8f, 2.6f, false);
                 GUI.matrix = pm;
             }
 
             if (Proto.Config.debugOverlay && Proto.Drag != null && Proto.Drag.LastReleaseType != null)
-                GUI.Label(new Rect(safe.x + 12 * u, safe.y + 50 * u, 320 * u, 24 * u),
+                GUI.Label(new Rect(safe.x + 12 * u, safe.y + 58 * u, 320 * u, 24 * u),
                     "last release: " + Proto.Drag.LastReleaseType + " @ " + Proto.Drag.LastReleaseSpeedDp.ToString("F0") + " dp/s", small);
 
-            // Combo pop-up above the bin.
+            // Mastery streak pop-up above the bin.
             float since = Time.unscaledTime - d.ComboTime;
-            if (Proto.Config.juice && d.Combo >= 2 && since < 0.6f)
+            if (Proto.Config.juice && d.Combo >= 2 && since < 0.8f)
             {
+                if (comboValue != d.Combo) { comboValue = d.Combo; comboText = d.Combo + " IN A ROW"; }
                 Vector2 p = Units.WorldToGui(d.ComboWorldPos);
                 var c = combo.normal.textColor;
-                var r = new Rect(p.x - 60 * u, p.y - 50 * u - since * 60 * u, 120 * u, 40 * u);
-                float pop = Mathf.Lerp(1.7f, 1f, Juice.EaseOutBack(Mathf.Clamp01(since / 0.16f)));
+                var r = new Rect(p.x - 110 * u, p.y - 50 * u - since * 50 * u, 220 * u, 40 * u);
+                float pop = Mathf.Lerp(1.5f, 1f, Juice.EaseOutBack(Mathf.Clamp01(since / 0.16f)));
                 Matrix4x4 cm = GUI.matrix;
                 GUIUtility.ScaleAroundPivot(new Vector2(pop, pop), r.center);
-                ToyGui.Logo(r, "x" + d.Combo, combo, new Color(c.r, c.g, c.b, 1f - since / 0.6f), ToyStyle.Hex("D45A00"), 4.2f, 4.6f);
+                ToyGui.Logo(r, comboText, reasonStyle, new Color(c.r, c.g, c.b, 1f - since / 0.8f), ToyStyle.Hex("D45A00"), 3.2f, 3.4f);
                 GUI.matrix = cm;
             }
 
-            DrawTimer(d);
+            DrawProgress(d);
             DrawBanner(d);
+            DrawReason(d);
+            if (PlayerSettings.ShowItemNames && !PanelOpen) DrawItemNames(d);
 
             if (d.RoundComplete && d.StampTime > d.CompleteTime)
             {
@@ -210,19 +227,6 @@ namespace SortEverything.Prototype
                 DrawStamp(d);
             }
             if (d.ShowNext) DrawNext(d);
-            if (d.TimeUp) DrawTimeUp(d);
-
-            if (Proto.Config.debugOverlay && !PanelOpen)
-            {
-                for (int i = 0; i < d.Objects.Count; i++)
-                {
-                    var o = d.Objects[i];
-                    if (!o.gameObject.activeInHierarchy || o.state == ObjState.Sorted) continue;
-                    Vector2 g = Units.WorldToGui(o.Position + Vector2.down * o.HalfExtent);
-                    ToyGui.Text(new Rect(g.x - 60 * u, g.y, 120 * u, 18 * u), o.displayName,
-                        new GUIStyle(small) { alignment = TextAnchor.UpperCenter, fontSize = Px(10) }, Color.white, 1.2f, 0f);
-                }
-            }
 
             if (toast != null && Time.unscaledTime < toastUntil)
             {
@@ -238,6 +242,11 @@ namespace SortEverything.Prototype
                 GUI.matrix = tm;
             }
 
+            DrawGear();
+        }
+
+        void DrawGear()
+        {
             if (!PanelOpen)
             {
                 if (ToyGui.Button(GearRect, "•••", ToyTone.Purple, button, null, ToySize.Medium)) { PanelOpen = true; scroll = Vector2.zero; }
@@ -248,13 +257,31 @@ namespace SortEverything.Prototype
             }
         }
 
+        /// <summary>"KITCHEN 3" for campaign levels (room name + section within the room), "LAB 4" for lab levels.</summary>
+        static string LevelBadge(LevelDef level)
+        {
+            var campaign = Proto.Flow != null ? Proto.Flow.Campaign : null;
+            if (campaign != null)
+            {
+                int lab = campaign.Lab.IndexOf(level);
+                if (lab >= 0) return "LAB " + (lab + 1);
+                var room = campaign.Room(level.roomId);
+                if (room != null)
+                {
+                    int n = campaign.LevelsInRoom(room.id).IndexOf(level) + 1;
+                    return room.name.ToUpperInvariant() + " " + n;
+                }
+            }
+            return level.title != null ? level.title.ToUpperInvariant() : level.id;
+        }
+
         void DrawStamp(RoundDirector d)
         {
             float t = Time.unscaledTime - d.StampTime;
             float scale = Proto.Config.juice ? Mathf.Lerp(2f, 1f, Juice.EaseOutBack(Mathf.Clamp01(t / 0.18f))) : 1f;
             Vector2 centre = Units.WorldToGui(new Vector2(0f, d.TableTop + 2.4f));
             var rect = new Rect(centre.x - 240 * u, centre.y - 50 * u, 480 * u, 100 * u);
-            if (Proto.Config.juice)
+            if (Proto.Config.juice && !PlayerSettings.ReducedMotion)
             {
                 // Soft golden light burst behind the headline (decoration only).
                 float grow = Juice.EaseOutBack(Mathf.Clamp01(t / 0.3f));
@@ -267,75 +294,58 @@ namespace SortEverything.Prototype
             ToyGui.Logo(rect, "SORTED!", stamp, ToyGui.TextCream, ToyGui.TextDepthWarm, 5.6f, 9f);
             GUI.matrix = m;
 
-            // Completion time and best time under the stamp.
+            // Mastery only: the active time for this clear (never affects rewards or unlocks).
             float a = Mathf.Clamp01((t - 0.2f) / 0.2f);
-            if (a > 0f && d.ResultTimeText != null)
+            if (a > 0f && PlayerSettings.Mastery && d.Level.recordsEnabled)
             {
-                var tr = new Rect(centre.x - 160 * u, centre.y + 50 * u, 320 * u, 44 * u);
-                ToyGui.Logo(tr, d.ResultTimeText, resultTime, new Color(1f, 0.98f, 0.91f, a), ToyStyle.Hex("1C3FC4"), 3.2f, 3.6f);
-                if (d.ResultBestText != null)
-                {
-                    var br = new Rect(centre.x - 160 * u, centre.y + 94 * u, 320 * u, 28 * u);
-                    Color face = d.ResultNewBest ? new Color(1f, 0.85f, 0.2f, a) : new Color(1f, 0.98f, 0.91f, a);
-                    ToyGui.Logo(br, d.ResultBestText, resultBest, face, ToyStyle.Ink, 2.6f, 2.4f);
-                }
+                var tr = new Rect(centre.x - 160 * u, centre.y + 54 * u, 320 * u, 30 * u);
+                ToyGui.Logo(tr, d.TimerText.For(d.Attempt.Clock.DisplayTenths), resultBest, new Color(1f, 0.98f, 0.91f, a), ToyStyle.Ink, 2.6f, 2.4f);
             }
         }
 
-        // ---- timer, rule banner, time's up ----------------------------------------------------
+        // ---- progress, rule banner, refusal reason --------------------------------------------
 
-        Rect TimerRect
+        Rect ProgressRect
         {
             get
             {
                 Rect safe = SafeGui;
-                float w = 112f * u, h = 56f * u;
+                float w = 104f * u, h = 56f * u;
                 return new Rect(safe.x + (safe.width - w) / 2f, safe.y + 8f * u, w, h);
             }
         }
 
-        /// <summary>Countdown pill in the toy language: blue when calm, orange when low, red with a gentle pulse when critical.</summary>
-        void DrawTimer(RoundDirector d)
+        /// <summary>Sorted-count pill ("4 / 9"); in Mastery it also shows the active time underneath.</summary>
+        void DrawProgress(RoundDirector d)
         {
-            var session = d.Session;
-            if (session == null || d.TimerText == null) return;
-            var timer = session.Timer;
-            var urgency = timer.Urgency;
-            ToyTone tone = urgency == TimerUrgency.Critical ? ToyTone.Danger
-                : urgency == TimerUrgency.Low ? ToyTone.Warning : ToyTone.Secondary;
-            if (session.State == SessionState.Complete) tone = ToyTone.Primary;
-
-            Rect r = TimerRect;
-            float pulse = 1f;
-            if (urgency == TimerUrgency.Critical && timer.IsRunning && !timer.Paused)
-                pulse = 1f + 0.05f * Mathf.Abs(Mathf.Sin(Time.unscaledTime * Mathf.PI * 1.6f));
-            Matrix4x4 m = GUI.matrix;
-            GUIUtility.ScaleAroundPivot(new Vector2(pulse, pulse), r.center);
-            ToyGui.Pill(r, tone, ToySize.Medium);
-            float lift = ToyGui.Depth(ToySize.Medium) * 0.5f;
-            ToyGui.Logo(new Rect(r.x, r.y + 2f * u - lift, r.width, 16f * u), "TIME", timerCaption,
-                ToyGui.TextCream, ToyStyle.Ink, 1.6f, 1.2f, false);
-            ToyGui.Logo(new Rect(r.x, r.y + 15f * u - lift, r.width, r.height - 15f * u), d.TimerText.For(timer.DisplayTenths),
-                timerDigits, ToyGui.TextCream, ToyStyle.Ink, 2.6f, 2.6f, false);
-            GUI.matrix = m;
-
-            // Wrong-drop penalty, floating up from under the timer.
-            float since = Time.unscaledTime - d.PenaltyAt;
-            if (d.PenaltyText != null && since >= 0f && since < 0.9f)
+            var board = d.Attempt.Board;
+            if (board.AssignedCount != progressAssigned || board.ObjectCount != progressTotal)
             {
-                float a = 1f - Mathf.Clamp01((since - 0.45f) / 0.45f);
-                var pr = new Rect(r.x, r.yMax + 6f * u - since * 18f * u, r.width, 26f * u);
-                ToyGui.Logo(pr, d.PenaltyText, penaltyStyle, new Color(1f, 0.42f, 0.36f, a), ToyStyle.Ink, 2.4f, 2f, false);
+                progressAssigned = board.AssignedCount;
+                progressTotal = board.ObjectCount;
+                progressText = progressAssigned + " / " + progressTotal;
+            }
+            Rect r = ProgressRect;
+            ToyGui.Pill(r, d.Attempt.State == AttemptState.Complete ? ToyTone.Primary : ToyTone.Secondary, ToySize.Medium);
+            float lift = ToyGui.Depth(ToySize.Medium) * 0.5f;
+            ToyGui.Logo(new Rect(r.x, r.y + 2f * u - lift, r.width, 16f * u), "SORTED", timerCaption,
+                ToyGui.TextCream, ToyStyle.Ink, 1.6f, 1.2f, false);
+            ToyGui.Logo(new Rect(r.x, r.y + 15f * u - lift, r.width, r.height - 15f * u), progressText,
+                timerDigits, ToyGui.TextCream, ToyStyle.Ink, 2.6f, 2.6f, false);
+
+            if (PlayerSettings.Mastery && d.Level.recordsEnabled)
+            {
+                var tr = new Rect(r.x - 20f * u, r.yMax + 2f * u, r.width + 40f * u, 22f * u);
+                ToyGui.Logo(tr, d.TimerText.For(d.Attempt.Clock.DisplayTenths), timerCaption, ToyStyle.Hex("FFE58A"), ToyStyle.Ink, 2f, 1.6f, false);
             }
         }
 
-        /// <summary>The rule, shown while the level waits for its first drag; pops away when the clock starts.</summary>
+        /// <summary>The rule, shown before the first pickup of each board; pops away once sorting starts.</summary>
         void DrawBanner(RoundDirector d)
         {
-            var session = d.Session;
-            if (session == null || bannerTitleText == null || d.TimeUp || d.RoundComplete) return;
-            float since = Time.unscaledTime - d.TimerStartedAt;
-            bool waiting = session.State == SessionState.Ready;
+            if (bannerTitleText == null || d.RoundComplete) return;
+            bool waiting = d.Attempt.State == AttemptState.Ready && d.FirstPickupAt < 0f;
+            float since = Time.unscaledTime - d.FirstPickupAt;
             if (!waiting && since > 0.25f) return;
             float scale = waiting ? Pop(roundPopAt, 0.35f, 0.6f) : 1f - Mathf.Clamp01(since / 0.25f); // shrinks away
             if (scale <= 0.01f) return;
@@ -343,18 +353,18 @@ namespace SortEverything.Prototype
             float maxW = Screen.width * 0.92f;
             if (bannerFitRound != d.Round)
             {
-                // Fit once per level: shrink the headline (not below 16 dp) and the bin list (not below 12 dp,
+                // Fit once per level: shrink the headline (not below 16 dp) and the rule (not below 12 dp,
                 // the smallest HUD text) so long rules stay on screen on narrow phones.
                 bannerFitRound = d.Round;
                 FitFont(bannerTitle, bannerTitleText, 24f, 16f, maxW - 48f * u);
-                FitFont(bannerDetail, bannerDetailText, 16f, 12f, maxW - 32f * u);
+                bannerDetail.fontSize = Px(15);
             }
             float tw = bannerTitle.CalcSize(new GUIContent(bannerTitleText)).x;
-            float dw = bannerDetail.CalcSize(new GUIContent(bannerDetailText)).x;
-            float w = Mathf.Min(maxW, Mathf.Max(tw, dw) + 48f * u);
-            float h = 86f * u;
+            float w = Mathf.Min(maxW, Mathf.Max(tw + 48f * u, Screen.width * 0.7f));
+            float dh = bannerDetail.CalcHeight(new GUIContent(bannerDetailText), w - 32f * u);
+            float h = 52f * u + dh + 10f * u;
             float bottom = Units.WorldToGui(new Vector2(0f, d.TableTop + 2.2f)).y;
-            float topLimit = TimerRect.yMax + 14f * u;
+            float topLimit = ProgressRect.yMax + 26f * u;
             float y = Mathf.Max(topLimit, bottom - h);
             var r = new Rect((Screen.width - w) / 2f, y, w, h);
 
@@ -364,8 +374,9 @@ namespace SortEverything.Prototype
             float lift = ToyGui.Depth(ToySize.Medium) * 0.5f;
             ToyGui.Logo(new Rect(r.x, r.y + 8f * u - lift, r.width, 36f * u), bannerTitleText, bannerTitle,
                 ToyGui.TextCream, ToyGui.TextDepthWarm, 2.8f, 2.6f, false);
-            ToyGui.Logo(new Rect(r.x + 8f * u, r.y + 44f * u - lift, r.width - 16f * u, 30f * u), bannerDetailText, bannerDetail,
-                ToyStyle.Hex("FFE58A"), ToyStyle.Ink, 2.2f, 2f, false);
+            bannerDetail.wordWrap = true;
+            ToyGui.Text(new Rect(r.x + 16f * u, r.y + 46f * u - lift, r.width - 32f * u, dh), bannerDetailText, bannerDetail,
+                ToyStyle.Hex("FFE58A"), 2f, 1.6f);
             GUI.matrix = m;
         }
 
@@ -376,54 +387,56 @@ namespace SortEverything.Prototype
             if (w > maxWidth) style.fontSize = Mathf.Max(Px(minDp), Mathf.FloorToInt(style.fontSize * maxWidth / w));
         }
 
-        void DrawTimeUp(RoundDirector d)
+        /// <summary>Why a target refused an item ("FRUIT ONLY", "FULL"), floating over that target for about a second.</summary>
+        void DrawReason(RoundDirector d)
         {
-            float t = Time.unscaledTime - d.TimeUpAt;
-            if (!timeUpSeen)
-            {
-                timeUpSeen = true;
-                var s = d.Session;
-                timeUpProgress = s.SortedCount + " / " + s.Objects.Length + " SORTED";
-            }
-            ToyGui.Dim(0.45f * Mathf.Clamp01(t / 0.25f));
-            float scale = Proto.Config.juice ? Mathf.Lerp(1.8f, 1f, Juice.EaseOutBack(Mathf.Clamp01(t / 0.2f))) : 1f;
-            Vector2 centre = Units.WorldToGui(new Vector2(0f, d.TableTop + 2.4f));
-            var rect = new Rect(centre.x - 240 * u, centre.y - 50 * u, 480 * u, 100 * u);
+            float since = Time.unscaledTime - d.ReasonAt;
+            if (d.ReasonText == null || since < 0f || since > 1.1f) return;
+            float a = 1f - Mathf.Clamp01((since - 0.7f) / 0.4f);
+            Vector2 p = Units.WorldToGui(d.ReasonWorldPos);
+            float w = Mathf.Min(reasonStyle.CalcSize(new GUIContent(d.ReasonText)).x + 28f * u, Screen.width * 0.6f);
+            float x = Mathf.Clamp(p.x - w / 2f, 6f * u, Screen.width - w - 6f * u);
+            var r = new Rect(x, p.y - 60f * u - since * 10f * u, w, 38f * u);
+            float pop = Pop(d.ReasonAt, 0.25f, 0.6f);
             Matrix4x4 m = GUI.matrix;
-            GUIUtility.RotateAroundPivot(-6f, centre);
-            GUIUtility.ScaleAroundPivot(new Vector2(scale, scale), centre);
-            ToyGui.Logo(rect, "TIME'S UP!", stamp, ToyGui.TextCream, ToyStyle.Hex("E8333A"), 5.6f, 9f);
+            GUIUtility.ScaleAroundPivot(new Vector2(pop, pop), r.center);
+            var old = GUI.color;
+            GUI.color = new Color(1f, 1f, 1f, a);
+            ToyGui.Pill(r, ToyTone.Warning, ToySize.Small);
+            GUI.color = old;
+            ToyGui.Logo(new Rect(r.x, r.y - ToyGui.Depth(ToySize.Small) * 0.5f, r.width, r.height), d.ReasonText, reasonStyle,
+                new Color(1f, 0.98f, 0.91f, a), ToyStyle.Ink, 2.4f, 2f, false);
             GUI.matrix = m;
-            ToyGui.Logo(new Rect(centre.x - 160 * u, centre.y + 52 * u, 320 * u, 30 * u), timeUpProgress, resultBest,
-                ToyGui.TextCream, ToyStyle.Ink, 2.6f, 2.4f);
+        }
 
-            if (!d.ShowRetry) return;
+        /// <summary>Item names under every loose item (Show Item Names, off by default).</summary>
+        void DrawItemNames(RoundDirector d)
+        {
+            for (int i = 0; i < d.Objects.Count; i++)
+            {
+                var o = d.Objects[i];
+                if (!o.gameObject.activeInHierarchy || o.state == ObjState.Sorted || string.IsNullOrEmpty(o.displayName)) continue;
+                Vector2 g = Units.WorldToGui(o.Position + Vector2.down * o.HalfExtent);
+                ToyGui.Text(new Rect(g.x - 70 * u, g.y + 2 * u, 140 * u, 18 * u), o.displayName, nameStyle, Color.white, 1.4f, 0f);
+            }
+        }
+
+        Rect NextRect(RoundDirector d)
+        {
             float y = Units.WorldToGui(new Vector2(0f, (d.TableTop + d.BinsTop) / 2f)).y;
             float w = Screen.width * 0.72f, h = 84f * u;
-            var r = new Rect((Screen.width - w) / 2f, y - h / 2f, w, h);
-            float pop = Pop(d.TimeUpAt + 0.6f, 0.35f, 0.6f);
-            Matrix4x4 pm = GUI.matrix;
-            GUIUtility.ScaleAroundPivot(new Vector2(pop, pop), r.center);
-            bool retry = ToyGui.Button(r, "RETRY", ToyTone.Primary, bigButton, null, ToySize.Large);
-            GUI.matrix = pm;
-            float sw = Screen.width * 0.46f, sh = 50f * u;
-            var sr = new Rect((Screen.width - sw) / 2f, r.yMax + 16f * u, sw, sh);
-            bool skip = ToyGui.Button(sr, "SKIP  >", ToyTone.Secondary, midButton, null, ToySize.Medium);
-            if (retry) d.Retry();
-            else if (skip) d.Skip();
+            return new Rect((Screen.width - w) / 2f, y - h / 2f, w, h);
         }
 
         void DrawNext(RoundDirector d)
         {
-            float y = Units.WorldToGui(new Vector2(0f, (d.TableTop + d.BinsTop) / 2f)).y;
-            float w = Screen.width * 0.72f, h = 84f * u;
-            var r = new Rect((Screen.width - w) / 2f, y - h / 2f, w, h);
+            var r = NextRect(d);
             float pop = Pop(nextPopAt, 0.35f, 0.6f);
             Matrix4x4 m = GUI.matrix;
             GUIUtility.ScaleAroundPivot(new Vector2(pop, pop), r.center);
             bool next = ToyGui.Button(r, "NEXT  >", ToyTone.Primary, bigButton, null, ToySize.Large);
             GUI.matrix = m;
-            if (next) d.Next();
+            if (next && Proto.Flow != null) Proto.Flow.Next();
         }
 
         void DrawEdgeGlow(Color c)
@@ -467,7 +480,7 @@ namespace SortEverything.Prototype
 
             float y = 0f;
             float w = area.width;
-            ToyGui.Logo(new Rect(0, y, w, row), "DRAG-FEEL TUNING  (observer only)", title, ToyGui.TextCream, ToyGui.TextDepthWarm, 3f, 3f, false);
+            ToyGui.Logo(new Rect(0, y, w, row), "DEBUG  (observer only)", title, ToyGui.TextCream, ToyGui.TextDepthWarm, 3f, 3f, false);
             y += row;
 
             // E1 variants.
@@ -483,23 +496,22 @@ namespace SortEverything.Prototype
             }
             y += row + 6 * u;
 
-            // Levels: jump to any playlist entry (observer testing). Starts that level straight away.
+            // Levels: jump to any campaign or lab level (observer testing). Opening or closing the panel never
+            // restarts anything; only these buttons and "Restart level" do.
             var dir = Proto.Director;
-            GUI.Label(new Rect(0, y, w, row * 0.7f), "Level  (playing " + dir.Playlist.Number + " / " + dir.Playlist.Count
-                + ", design level " + (dir.Level != null ? dir.Level.designLevel : 0) + ")", label);
-            y += row * 0.75f;
-            int count = dir.Playlist.Count;
-            float cw = w / count;
-            for (int i = 0; i < count; i++)
+            var campaign = Proto.Flow != null ? Proto.Flow.Campaign : null;
+            if (campaign != null)
             {
-                if (ToyGui.Button(new Rect(i * cw + 2, y, cw - 4, row - 4), (i + 1).ToString(),
-                        dir.Playlist.Index == i ? ToyTone.Purple : ToyTone.Inactive, button))
-                {
-                    Close();
-                    dir.SelectLevel(i);
-                    Toast("Level " + (i + 1));
-                }
+                y = LevelButtons(y, w, row, "Campaign  (" + campaign.Levels.Count + " levels)", campaign.Levels, dir.Level, "");
+                y = LevelButtons(y, w, row, "Lab  (debug levels, not part of progress)", campaign.Lab, dir.Level, "L");
             }
+
+            // Player preferences that apply immediately.
+            float pw2 = w / 2f;
+            if (Toggle(new Rect(0, y, pw2 - 4, row - 4), "Item names", ref PlayerSettings.ShowItemNames)) PlayerSettings.Save();
+            if (Toggle(new Rect(pw2, y, pw2 - 4, row - 4), "Mastery", ref PlayerSettings.Mastery)) PlayerSettings.Save();
+            y += row;
+            if (Toggle(new Rect(0, y, pw2 - 4, row - 4), "Reduced motion", ref PlayerSettings.ReducedMotion)) PlayerSettings.Save();
             y += row + 6 * u;
 
             var c = Proto.Config;
@@ -544,7 +556,7 @@ namespace SortEverything.Prototype
             y += pathH + 4 * u;
 
             float aw = w / 2f;
-            if (ToyGui.Button(new Rect(0, y, aw - 4, row - 4), "Restart level", ToyTone.Primary, button)) { Close(); Proto.Director.StartRound(); }
+            if (ToyGui.Button(new Rect(0, y, aw - 4, row - 4), "Restart level", ToyTone.Primary, button)) { Close(); Proto.Director.Restart(); }
             if (ToyGui.Button(new Rect(aw, y, aw - 4, row - 4), "Reset stats", ToyTone.Warning, button)) { Proto.Telemetry.ResetStats(); Toast("Stats reset"); }
             y += row;
             if (ToyGui.Button(new Rect(0, y, aw - 4, row - 4), "Copy summary", ToyTone.Secondary, button))
@@ -557,6 +569,33 @@ namespace SortEverything.Prototype
 
             viewHeight = y + pad;
             GUI.EndScrollView();
+
+            // Always-visible X close button (top-right corner of the card).
+            float xs = 40f * u;
+            var xr = new Rect(safe.xMax - cardInset - xs - 8f * u, safe.y + cardInset + 8f * u, xs, xs);
+            if (ToyGui.Button(xr, "X", ToyTone.Danger, button, null, ToySize.Small)) Close();
+        }
+
+        float LevelButtons(float y, float w, float row, string heading, System.Collections.Generic.List<LevelDef> levels,
+            LevelDef current, string prefix)
+        {
+            GUI.Label(new Rect(0, y, w, row * 0.7f), heading, label);
+            y += row * 0.75f;
+            const int perRow = 8;
+            float cw = w / perRow;
+            for (int i = 0; i < levels.Count; i++)
+            {
+                int col = i % perRow;
+                if (i > 0 && col == 0) y += row;
+                if (ToyGui.Button(new Rect(col * cw + 2, y, cw - 4, row - 4), prefix + (i + 1),
+                        levels[i] == current ? ToyTone.Purple : ToyTone.Inactive, button))
+                {
+                    Close();
+                    Proto.Flow.Play(levels[i]);
+                    Toast(levels[i].title ?? levels[i].id);
+                }
+            }
+            return y + row + 6 * u;
         }
 
         bool Slider(ref float y, float w, float row, string name, ref float v, float min, float max, string fmt, string unit)

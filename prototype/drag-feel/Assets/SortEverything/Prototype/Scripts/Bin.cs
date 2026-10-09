@@ -6,17 +6,16 @@ namespace SortEverything.Prototype
     /// <summary>
     /// A container with a face ("Binbuddy", GDD ch. 08). Counts an object the moment its centre is inside the
     /// mouth (GDD ch. 02 §2.5 rule 2), gulps correct objects and spits wrong ones back onto the pile.
-    /// Whether a drop is correct is decided by the round session from the bin's rule (BinDef); the bin shows that
-    /// rule as a text label on its front, next to the counter.
+    /// The bin never decides anything: when an object's centre enters its mouth it asks the RoundDirector, which
+    /// asks the board model. The bin plays the accept / reject feedback, shows its rule as a text label and its
+    /// counter, and provides deterministic display slots for the objects it holds.
     /// Colliders live on the root; everything that animates lives under visualRoot.
     /// </summary>
     public class Bin : MonoBehaviour
     {
         public int index;       // position in the level's bin list (what the session judges against)
-        public BinDef def;      // rule, label and colour
+        public TargetDef def;   // rule, capacity, label and colour
         public int category;    // legacy: colour index for pattern/animation seeding
-        public int capacity;
-        public int count;
         public bool Closed;
         public Color color;
 
@@ -49,19 +48,18 @@ namespace SortEverything.Prototype
         public float InnerRight { get { return bottomCenter.x + width / 2f - wall; } }
         public Vector2 MouthCenter { get { return new Vector2(bottomCenter.x, Top); } }
 
-        public static Bin Create(int index, BinDef def, int capacity, Vector2 bottomCenter,
+        public static Bin Create(int index, TargetDef def, Vector2 bottomCenter,
             float width, float height, PhysicsMaterial2D material, Transform parent)
         {
-            var go = new GameObject("Bin" + index + "_" + def.label);
+            var go = new GameObject("Bin" + index + "_" + def.id);
             go.transform.SetParent(parent, false);
             go.transform.position = bottomCenter;
             var bin = go.AddComponent<Bin>();
             bin.index = index;
             bin.def = def;
-            bin.category = def.rule.HasColor ? (int)def.rule.color : index;
-            bin.color = ToyStyle.Hex(def.colorHex);
-            int pattern = def.rule.HasColor ? (int)def.rule.color : -1; // colour chip only for colour rules
-            bin.capacity = capacity;
+            bin.category = def.color != SortColor.None ? (int)def.color : index;
+            bin.color = ToyStyle.Hex(def.colorHex ?? "FF6FAE");
+            int pattern = def.color != SortColor.None ? (int)def.color : -1; // colour chip only for colour rules
             bin.width = width;
             bin.height = height;
             bin.wall = Units.DpToWorld(8f);
@@ -109,7 +107,7 @@ namespace SortEverything.Prototype
             pupilRBase = pupilR.localPosition;
 
             // Rule label (text is the rule; the colour chip only supports it) and capacity counter.
-            BuildLabel(def != null ? def.label : "");
+            BuildLabel(def != null ? def.DisplayLabel : "");
             bool chipShown = pattern >= 0;
             if (chipShown)
             {
@@ -245,80 +243,72 @@ namespace SortEverything.Prototype
                 if (o.state != ObjState.Pile) continue;
                 Vector2 p = o.Position;
                 if (p.y >= Top || p.y <= Bottom || !ColumnContains(p.x)) continue;
-                var result = Proto.Director.Judge(this, o);
-                if (result == DropResult.Correct) Accept(o);
-                else if (result == DropResult.Wrong) Reject(o);
+                Proto.Director.Judge(this, o);
             }
         }
 
-        void Accept(SortObject o)
+        /// <summary>Feedback for a committed placement (the director already moved the object into a slot).</summary>
+        public void PlayAccept(SortObject o)
         {
-            o.state = ObjState.Sorted;
-            o.SetOrder(50 + count);
-            count++;
-            UpdateCounter();
             spring.Kick(new Vector2(1.12f, 0.88f));
             happyUntil = Time.time + 0.3f;
             Proto.Juice.Burst(MouthCenter, color, Random.Range(6, 11), 4f, o.size * 0.18f);
             Proto.Audio.Gulp();
             Haptics.Play(Haptics.Kind.Light);
             Proto.Telemetry.OnSorted(o, true);
-            Proto.Director.OnCorrect(this, o);
-            if (count >= capacity) Close();
         }
 
-        void Reject(SortObject o)
+        /// <summary>Gentle rejection (the director returns the object to where it last was).</summary>
+        public void PlayReject(SortObject o)
         {
-            o.state = ObjState.Spitting;
-            o.SetSimulated(false);
             o.spring.Kick(new Vector2(0.82f, 1.18f)); // the object flinches too
             disgustUntil = Time.time + 0.6f;
             flashUntil = Time.time + 0.35f;
+            spring.Kick(new Vector2(0.9f, 1.15f));
+            Proto.Audio.Bwomp();
             Haptics.Play(Haptics.Kind.Medium);
             Proto.Telemetry.OnSorted(o, false);
-            Proto.Director.OnWrong(this, o);
-            StartCoroutine(Spit(o));
         }
 
-        IEnumerator Spit(SortObject o)
+        /// <summary>
+        /// Deterministic display slot k of n, above the front lip so held objects stay recognisable. `size` is the
+        /// display size an object should be scaled to.
+        /// </summary>
+        public Vector2 SlotPosition(int k, int n, out float size)
         {
-            yield return new WaitForSeconds(0.15f);
-            if (o == null) yield break;
-            Proto.Audio.Ptoo();
-            Proto.Audio.Bwomp();
-            spring.Kick(new Vector2(0.9f, 1.15f));
-            Vector2 from = o.Position;
-            Vector2 to = Proto.Director.RandomPileLandingPoint();
-            float arc = Mathf.Max(1.5f, (to.y - from.y) * 0.5f + 1.5f);
-            float spin = Random.Range(-540f, 540f);
-            float startAngle = o.transform.eulerAngles.z;
-            const float duration = 0.45f;
-            for (float t = 0f; t < duration; t += Time.deltaTime)
-            {
-                if (o == null) yield break;
-                float k = t / duration;
-                Vector2 p = Vector2.Lerp(from, to, k) + Vector2.up * arc * 4f * k * (1f - k);
-                o.transform.position = p;
-                o.transform.rotation = Quaternion.Euler(0f, 0f, startAngle + spin * k);
-                yield return null;
-            }
-            if (o == null) yield break;
-            o.transform.position = to;
-            o.SetSimulated(true);
-            o.rb.SetVelocity(new Vector2(0f, -2f));
-            o.state = ObjState.Pile;
+            n = Mathf.Max(1, n);
+            int cols = n <= 3 ? n : Mathf.CeilToInt(n / 2f);
+            int rows = Mathf.CeilToInt(n / (float)cols);
+            float innerW = (InnerRight - InnerLeft);
+            float cellW = innerW / cols;
+            float bandBottom = height * 0.5f, bandTop = height * 1.02f;
+            float cellH = (bandTop - bandBottom) / rows;
+            size = Mathf.Min(cellW, cellH * 1.25f) * 0.95f;
+            int row = k / cols, col = k % cols;
+            int inRow = Mathf.Min(cols, n - row * cols);
+            float rowW = inRow * cellW;
+            float x = bottomCenter.x - rowW / 2f + cellW * (col + 0.5f);
+            float y = Bottom + bandBottom + cellH * (row + 0.5f);
+            return new Vector2(x, y);
+        }
+
+        /// <summary>The finishing action for ordinary targets: the lid closes once everything it takes is in.</summary>
+        public void CloseLid()
+        {
+            if (Closed) return;
+            Close();
         }
 
         void Close()
         {
             Closed = true;
             lidCollider.enabled = true;
-            StartCoroutine(CloseLid());
+            StartCoroutine(LidCloseAnim());
         }
 
-        IEnumerator CloseLid()
+        IEnumerator LidCloseAnim()
         {
-            lidSprite.sortingOrder = 310;
+            lidSprite.sortingOrder = 340;
             const float duration = 0.12f;
             for (float t = 0f; t < duration; t += Time.deltaTime)
             {
@@ -419,12 +409,16 @@ namespace SortEverything.Prototype
             return t;
         }
 
-        void UpdateCounter()
+        /// <summary>Counter text: objects held / expected on ordinary targets, units used / capacity on planning targets.</summary>
+        public void SetCounter(string text)
         {
-            counter.text = count + "/" + capacity;
+            if (counter == null || counter.text == text) return;
+            counter.text = text;
             if (counterOutline != null)
-                for (int i = 0; i < counterOutline.Length; i++) counterOutline[i].text = counter.text;
+                for (int i = 0; i < counterOutline.Length; i++) counterOutline[i].text = text;
         }
+
+        void UpdateCounter() { SetCounter("0/0"); }
 
         TextMesh MakeCounterText(GameObject go, Color c, int order)
         {

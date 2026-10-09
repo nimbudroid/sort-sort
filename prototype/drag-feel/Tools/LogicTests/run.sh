@@ -13,4 +13,4 @@ mcs -langversion:7.2 -target:library -out:$O/nunit.framework.dll $HERE/NUnitShim
 mcs -langversion:7.2 -target:library -r:$O/SortEverything.Content.dll -r:$O/SortEverything.Gameplay.dll -r:$O/nunit.framework.dll \
   -out:$O/SortEverything.Tests.EditMode.dll $P/Tests/EditMode/*.cs
 mcs -langversion:7.2 -r:$O/nunit.framework.dll -out:$O/runner.exe $HERE/Runner.cs
-cd $O && mono runner.exe $O/SortEverything.Tests.EditMode.dll
+cd $O && SE_CAMPAIGN_DIR=$P/Resources/Campaign mono runner.exe $O/SortEverything.Tests.EditMode.dll
