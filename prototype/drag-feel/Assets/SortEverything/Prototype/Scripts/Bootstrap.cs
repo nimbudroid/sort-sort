@@ -49,6 +49,7 @@ namespace SortEverything.Prototype
             Proto.Drag = gameObject.AddComponent<DragController>();
             Proto.Hud = gameObject.AddComponent<Hud>();
             Proto.Flow = gameObject.AddComponent<AppFlow>();
+            Proto.Screens = gameObject.AddComponent<Screens>();
             Proto.Telemetry.OnVariantChanged(variant + (custom ? "*" : ""));
             Proto.Telemetry.OnContentChanged(ContentSettings.ModeLabel(ContentSettings.Mode) + "/" + ContentSettings.Pool);
         }

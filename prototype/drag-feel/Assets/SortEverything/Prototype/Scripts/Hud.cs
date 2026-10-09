@@ -89,8 +89,9 @@ namespace SortEverything.Prototype
         {
             if (PanelOpen) return true;
             var gui = new Vector2(screen.x, Screen.height - screen.y);
+            if (Proto.Screens != null && Proto.Screens.BlocksInput(gui)) return true;
             var d = Proto.Director;
-            if (d != null && d.ShowNext && NextRect(d).Contains(gui)) return true;
+            if (d != null && d.ShowNext && ResultArea(d).Contains(gui)) return true;
             Rect gear = GearRect;
             float grow = 8f * Units.DpToPx(1f);
             gear.xMin -= grow; gear.yMin -= grow; gear.xMax += grow; gear.yMax += grow;
@@ -157,7 +158,8 @@ namespace SortEverything.Prototype
 
             if (Proto.Flow != null && Proto.Flow.LoadError != null)
                 GUI.Label(new Rect(safe.x + 12 * u, safe.yMax - 60 * u, safe.width - 24 * u, 54 * u), Proto.Flow.LoadError, small);
-            if (d.Level == null || d.Attempt == null)
+            var screens = Proto.Screens;
+            if (d.Level == null || d.Attempt == null || (screens != null && (screens.MenuOpen || screens.Paused || screens.Inspecting)))
             {
                 DrawGear();
                 return;
@@ -279,7 +281,7 @@ namespace SortEverything.Prototype
         {
             float t = Time.unscaledTime - d.StampTime;
             float scale = Proto.Config.juice ? Mathf.Lerp(2f, 1f, Juice.EaseOutBack(Mathf.Clamp01(t / 0.18f))) : 1f;
-            Vector2 centre = Units.WorldToGui(new Vector2(0f, d.TableTop + 2.4f));
+            Vector2 centre = Units.WorldToGui(new Vector2(0f, d.TableTop + 4.6f)); // high enough that result lines clear the Next block
             var rect = new Rect(centre.x - 240 * u, centre.y - 50 * u, 480 * u, 100 * u);
             if (Proto.Config.juice && !PlayerSettings.ReducedMotion)
             {
@@ -464,15 +466,54 @@ namespace SortEverything.Prototype
             return new Rect((Screen.width - w) / 2f, y - h / 2f, w, h);
         }
 
-        void DrawNext(RoundDirector d)
+        /// <summary>Next, its preview and the Replay / Home / Inspect row.</summary>
+        Rect ResultArea(RoundDirector d)
         {
             var r = NextRect(d);
+            return new Rect(0f, r.y - 40f * u, Screen.width, r.height + 120f * u);
+        }
+
+        // Strings for the result block, built once per completion.
+        int resultRound = -1;
+        string previewText, roomProgressText, nextLabel;
+
+        void DrawNext(RoundDirector d)
+        {
+            var flow = Proto.Flow;
+            var r = NextRect(d);
+            if (resultRound != d.Round)
+            {
+                resultRound = d.Round;
+                var next = flow != null ? flow.PeekNext(d.Level) : null;
+                var prog = flow != null ? flow.Progress : null;
+                bool campaign = prog != null && prog.IsCampaign(d.Level);
+                previewText = next != null ? "NEXT: " + LevelBadge(next) + " · " + next.title.ToUpperInvariant() : null;
+                nextLabel = next != null ? "NEXT  >" : campaign ? "HOUSE  >" : "AGAIN  >";
+                roomProgressText = null;
+                if (campaign)
+                {
+                    var room = flow.Campaign.Room(d.Level.roomId);
+                    if (room != null) roomProgressText = room.name.ToUpperInvariant() + "  " + prog.CompletedInRoom(room) + " / " + flow.Campaign.LevelsInRoom(room.id).Count;
+                }
+            }
             float pop = Pop(nextPopAt, 0.35f, 0.6f);
             Matrix4x4 m = GUI.matrix;
             GUIUtility.ScaleAroundPivot(new Vector2(pop, pop), r.center);
-            bool next = ToyGui.Button(r, "NEXT  >", ToyTone.Primary, bigButton, null, ToySize.Large);
+            if (roomProgressText != null)
+                ToyGui.Text(new Rect(r.x - 20f * u, r.y - 66f * u, r.width + 40f * u, 24f * u), roomProgressText, timerCaption, ToyGui.TextCream, 2f, 1.6f);
+            if (previewText != null)
+                ToyGui.Text(new Rect(r.x - 30f * u, r.y - 40f * u, r.width + 60f * u, 26f * u), previewText, timerCaption, ToyStyle.Hex("FFE58A"), 2f, 1.6f);
+            bool nextTap = ToyGui.Button(r, nextLabel, ToyTone.Primary, bigButton, null, ToySize.Large);
+            float bw = (r.width - 16f * u) / 3f, bh = 46f * u, by = r.yMax + 14f * u;
+            bool replay = ToyGui.Button(new Rect(r.x, by, bw, bh), "REPLAY", ToyTone.Secondary, button, null, ToySize.Medium);
+            bool home = ToyGui.Button(new Rect(r.x + bw + 8f * u, by, bw, bh), "HOME", ToyTone.Purple, button, null, ToySize.Medium);
+            bool inspect = ToyGui.Button(new Rect(r.x + 2f * (bw + 8f * u), by, bw, bh), "INSPECT", ToyTone.Inactive, button, null, ToySize.Medium);
             GUI.matrix = m;
-            if (next && Proto.Flow != null) Proto.Flow.Next();
+            if (flow == null) return;
+            if (nextTap) flow.Next();
+            else if (replay) flow.Restart();
+            else if (home) flow.GoToMenu(MenuScreen.Home);
+            else if (inspect && Proto.Screens != null) Proto.Screens.SetInspecting(true);
         }
 
         void DrawEdgeGlow(Color c)

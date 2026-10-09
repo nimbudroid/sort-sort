@@ -17,6 +17,7 @@ namespace SortEverything.Prototype
         public static Telemetry Telemetry;
         public static Hud Hud;
         public static AppFlow Flow;
+        public static Screens Screens;
     }
 
     /// <summary>

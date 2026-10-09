@@ -81,10 +81,30 @@ namespace SortEverything.Prototype
             }
         }
 
-        /// <summary>Launch: resume an unfinished level, else the next unfinished one (no home-screen decision).</summary>
+        /// <summary>
+        /// Launch. The very first launch goes straight into the first level (GDD: no home-screen decision); later
+        /// launches open Home, which offers Resume or Continue with the next scene.
+        /// </summary>
         public void Launch()
         {
             if (Campaign == null) return;
+            if (Progress != null && Proto.Screens != null && (Progress.Save.completed.Count > 0 || (Progress.Save.resume != null && Progress.Save.resume.started)))
+            {
+                Proto.Screens.Show(MenuScreen.Home);
+                return;
+            }
+            StartNextLevel();
+        }
+
+        /// <summary>Home's Continue / Resume button.</summary>
+        public void ContinueFromHome()
+        {
+            if (Proto.Screens != null) Proto.Screens.Close();
+            StartNextLevel();
+        }
+
+        void StartNextLevel()
+        {
             if (Progress != null)
             {
                 var resumed = Progress.Resume();
@@ -96,9 +116,36 @@ namespace SortEverything.Prototype
             if (first != null) Play(first);
         }
 
+        /// <summary>A section picked on the Room screen.</summary>
+        public void PlayFromMenu(LevelDef level)
+        {
+            if (Progress != null && Progress.IsCampaign(level) && !Progress.IsUnlocked(level)) return;
+            if (Proto.Screens != null) Proto.Screens.Close();
+            // Re-entering the level that has a saved unfinished state resumes it.
+            var resumed = Progress != null ? Progress.Resume() : null;
+            if (resumed != null && resumed.Level == level && Progress.Save.resume.started) { LastResult = null; Proto.Director.Play(level, Progress.Save.resume); return; }
+            Play(level);
+        }
+
+        /// <summary>Leaves the level for a menu, keeping its last committed state.</summary>
+        public void GoToMenu(MenuScreen screen, RoomDef room = null)
+        {
+            RememberCurrent();
+            Proto.Director.Clear();
+            LastResult = null;
+            Proto.Screens.Show(screen, room);
+        }
+
+        public void Restart()
+        {
+            var d = Proto.Director;
+            if (d != null && d.Level != null) Play(d.Level);
+        }
+
         public void Play(LevelDef level)
         {
             if (level == null) return;
+            if (Proto.Screens != null) Proto.Screens.Close();
             LastResult = null;
             Proto.Director.Play(level);
             if (Progress != null && Progress.IsCampaign(level))
@@ -127,6 +174,7 @@ namespace SortEverything.Prototype
             Proto.Telemetry.OnNextTapped(Time.unscaledTime - d.CompleteTime);
             var next = PeekNext(d.Level);
             if (next != null && (Progress == null || !Progress.IsCampaign(next) || Progress.IsUnlocked(next))) Play(next);
+            else if (Progress != null && Progress.IsCampaign(d.Level)) GoToMenu(MenuScreen.House); // end of what is built
             else d.Restart();
         }
 

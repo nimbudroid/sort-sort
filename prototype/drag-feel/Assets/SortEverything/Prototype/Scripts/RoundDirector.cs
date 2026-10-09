@@ -223,7 +223,16 @@ namespace SortEverything.Prototype
         RoomTheme Theme()
         {
             var room = Level != null && Proto.Flow != null && Proto.Flow.Campaign != null ? Proto.Flow.Campaign.Room(Level.roomId) : null;
-            return room != null ? room.theme : new RoomTheme();
+            if (room == null) return new RoomTheme();
+            // An equipped area variant (bought with coins after restoring the area) swaps in the room's accent wall.
+            var prog = Proto.Flow.Progress;
+            bool equipped;
+            if (prog != null && Level.areaId != null && prog.Save.variantEquipped.TryGetValue(Level.areaId, out equipped) && equipped)
+            {
+                var t = room.theme;
+                return new RoomTheme { wallHex = t.wallAccentHex, wallAccentHex = t.wallHex, surfaceHex = t.surfaceHex, pattern = t.pattern, accentHex = t.accentHex };
+            }
+            return room.theme;
         }
 
         void BuildBinsAndObjects()
