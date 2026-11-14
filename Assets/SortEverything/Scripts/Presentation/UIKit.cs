@@ -186,6 +186,7 @@ namespace SortEverything.Presentation
             var scroll = root.gameObject.AddComponent<ScrollRect>();
             scroll.horizontal = false;
             scroll.movementType = ScrollRect.MovementType.Clamped;
+            scroll.scrollSensitivity = 40; // mouse wheel / trackpad (desktop and web); touch drag is unaffected
             var content = Rect(root, "Content");
             content.anchorMin = new Vector2(0, 1); content.anchorMax = new Vector2(1, 1);
             content.pivot = new Vector2(0.5f, 1);

@@ -196,5 +196,34 @@ namespace SortEverything.Editor
             File.WriteAllText(Path.Combine(dir, "build.txt"), $"{report.summary.result} {report.summary.totalErrors} errors, {report.summary.totalSize} bytes, {report.summary.totalTime}");
             return report.summary.result == UnityEditor.Build.Reporting.BuildResult.Succeeded;
         }
+    
+        [MenuItem("Sort Everything/Build WebGL (phone browser)")]
+        public static void BuildWebGLMenu() => BuildWebGL("Builds/WebGL");
+
+        /// <summary>Command line: -executeMethod SortEverything.Editor.BuildCommands.BuildWebGLCommandLine -artifacts &lt;dir&gt;</summary>
+        public static void BuildWebGLCommandLine()
+        {
+            string dir = CatalogueCommands.ArgValue("-artifacts") ?? "Builds/WebGL";
+            EditorApplication.Exit(BuildWebGL(dir) ? 0 : 1);
+        }
+
+        /// <summary>Uncompressed WebGL build so any simple local web server can serve it to a phone on the same Wi-Fi.</summary>
+        static bool BuildWebGL(string dir)
+        {
+            Directory.CreateDirectory(dir);
+            PlayerSettings.WebGL.compressionFormat = WebGLCompressionFormat.Disabled;
+            PlayerSettings.WebGL.decompressionFallback = false;
+            PlayerSettings.WebGL.dataCaching = true;
+            var options = new BuildPlayerOptions
+            {
+                scenes = new[] { BootstrapSceneBuilder.ScenePath },
+                locationPathName = dir,
+                target = BuildTarget.WebGL,
+                options = BuildOptions.None,
+            };
+            var report = BuildPipeline.BuildPlayer(options);
+            File.WriteAllText(Path.Combine(dir, "build.txt"), $"{report.summary.result} {report.summary.totalErrors} errors, {report.summary.totalSize} bytes, {report.summary.totalTime}");
+            return report.summary.result == UnityEditor.Build.Reporting.BuildResult.Succeeded;
+        }
     }
 }

@@ -100,6 +100,7 @@ namespace SortEverything.Runtime
                     if (TryParse(File.ReadAllText(PendingPath), out _) == null) throw new IOException("pending verification failed");
                     if (FailAtStage == "promote") throw new IOException("injected promote failure");
                     Promote();
+                    BrowserStorage.Flush();
                     return true;
                 }
                 catch (Exception e)
@@ -118,6 +119,7 @@ namespace SortEverything.Runtime
                 File.Replace(PendingPath, MainPath, BackupPath, true);
             }
             catch (PlatformNotSupportedException) { RenameFallback(); }
+            catch (NotSupportedException) { RenameFallback(); }
             catch (IOException) { if (File.Exists(PendingPath)) RenameFallback(); else throw; }
         }
 

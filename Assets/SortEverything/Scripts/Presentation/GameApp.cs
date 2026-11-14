@@ -54,7 +54,9 @@ namespace SortEverything.Presentation
         void Awake()
         {
             Application.targetFrameRate = 60;
-            Screen.orientation = ScreenOrientation.Portrait;
+#if !UNITY_WEBGL
+            Screen.orientation = ScreenOrientation.Portrait; // browsers cannot lock orientation
+#endif
             EnsureSceneObjects();
         }
 
@@ -232,6 +234,9 @@ namespace SortEverything.Presentation
             var row3 = UIKit.Rect(list, "Row3"); row3.Size(46); UIKit.HStack(row3, 8);
             UIKit.Button(row3, "Records", "Records", ShowRecords);
             UIKit.Button(row3, "Settings", Strings.Get("action.settings"), ShowSettings);
+            var row4 = UIKit.Rect(list, "Row4"); row4.Size(46); UIKit.HStack(row4, 8);
+            UIKit.Button(row4, "AllLevels", "All levels", () => ShowShowcase(false));
+            UIKit.Button(row4, "AllArt", "All art", () => ShowShowcase(true));
         }
 
         int CompletedCount() => Catalogue.InstalledInArea(KitchenCatalogue.AreaId).Count(l => Save.HasSeal(l.LevelId));
@@ -309,7 +314,118 @@ namespace SortEverything.Presentation
 
         public void ShowExplore()
         {
-            if (_lastBrowseScreen == "area") ShowArea(); else ShowHome();
+            if (_lastBrowseScreen == "area") ShowArea();
+            else if (_lastBrowseScreen == "showcase") ShowShowcase(_showcaseArt);
+            else ShowHome();
+        }
+
+        // ---------- Showcase: every level and every piece of art, for reviewing on a phone ----------
+
+        bool _showcaseArt;
+
+        public void ShowShowcase(bool art)
+        {
+            ClearScreen();
+            _lastBrowseScreen = "showcase";
+            _showcaseArt = art;
+            var root = UIKit.Rect(_screenLayer, "Showcase").Stretch();
+            var top = UIKit.Rect(root, "Top").TopLeft(12, 8, 336, 48);
+            var back = UIKit.Button(top, "Home", "‹ " + Strings.Get("action.home"), () => { _lastBrowseScreen = "area"; ShowHome(); });
+            ((RectTransform)back.transform).TopLeft(0, 2, 84, 44);
+            var levelsTab = UIKit.Button(top, "LevelsTab", "All levels", () => ShowShowcase(false), primary: !art, fontSize: 14);
+            ((RectTransform)levelsTab.transform).TopLeft(92, 2, 120, 44);
+            var artTab = UIKit.Button(top, "ArtTab", "All art", () => ShowShowcase(true), primary: art, fontSize: 14);
+            ((RectTransform)artTab.transform).TopLeft(218, 2, 118, 44);
+
+            var list = UIKit.ScrollList(root, "ShowcaseList", 8);
+            ((RectTransform)list.parent).Stretch(12, 62, 12, 8);
+            if (art) BuildArtShowcase(list); else BuildLevelShowcase(list);
+        }
+
+        void BuildLevelShowcase(RectTransform list)
+        {
+            var note = UIKit.Label(list, "Note", "Every kitchen scene is open here, even locked ones. Playing one saves progress as normal.", 12, UIKit.InkSoft, TextAnchor.MiddleLeft);
+            note.Size(34);
+            foreach (var l in Catalogue.InstalledInArea(KitchenCatalogue.AreaId))
+            {
+                var status = Progression.Status(Save, Catalogue, l);
+                var row = UIKit.Panel(list, "Row_" + l.LevelId, Color.white, 14, raycast: true);
+                row.Size(84);
+                var n = UIKit.Label(row.transform, "N", l.OrdinalInArea.ToString(), 18, UIKit.InkSoft, TextAnchor.MiddleCenter, FontStyle.Bold);
+                n.rectTransform.TopLeft(4, 0, 32, 84);
+                var name = UIKit.Label(row.transform, "Name", Strings.Get(l.PurposeKey), 14, UIKit.Ink, TextAnchor.MiddleLeft, FontStyle.Bold);
+                name.rectTransform.TopLeft(40, 4, 196, 24);
+                var board = l.RequiredBoard;
+                string kind = (l.HasOptionalBoard ? "2 boards · " : "") + (board.IsPlanning || l.Boards.Any(b => b.IsPlanning) ? "Planning" : "Sorting")
+                    + $" · {board.Objects.Count} items · {board.Targets.Count} places";
+                var sub = UIKit.Label(row.transform, "Kind", kind, 11, UIKit.InkSoft, TextAnchor.MiddleLeft);
+                sub.rectTransform.TopLeft(40, 26, 200, 18);
+                // A strip of the distinct objects this scene uses.
+                var ids = board.Objects.Select(o => o.AssetId).Distinct().Take(8).ToList();
+                for (int i = 0; i < ids.Count; i++)
+                {
+                    var ic = UIKit.Icon(row.transform, "Obj" + i, SpriteFactory.Object(ids[i]), 26);
+                    ic.rectTransform.TopLeft(40 + i * 25, 50, 26, 26);
+                }
+                string chip = status == LevelStatus.Completed ? "Sorted ✓" : status == LevelStatus.Locked ? "Locked" : status == LevelStatus.InProgress ? Strings.Get("status.in_progress") : "Ready";
+                var c = UIKit.Label(row.transform, "Status", chip, 11, status == LevelStatus.Completed ? UIKit.Primary : UIKit.InkSoft, TextAnchor.MiddleRight, FontStyle.Bold);
+                c.rectTransform.TopLeft(240, 6, 88, 18);
+                var play = UIKit.Button(row.transform, "Play", "Play", null, primary: true, fontSize: 14);
+                ((RectTransform)play.transform).TopLeft(262, 34, 66, 40);
+                var captured = l;
+                play.onClick.AddListener(() => OpenFromList(captured));
+                row.gameObject.AddComponent<Button>().onClick.AddListener(() => OpenFromList(captured));
+            }
+        }
+
+        void BuildArtShowcase(RectTransform list)
+        {
+            foreach (var cat in CategoryIds.Ordered)
+            {
+                Heading(list, Strings.Get("category." + cat));
+                Grid(list, KitchenCatalogue.Assets.Where(a => a.CategoryId == cat)
+                    .Select(a => (Strings.Get("asset." + a.AssetId), SpriteFactory.Object(a.AssetId))).ToList(), 4, 72);
+            }
+            Heading(list, "Containers");
+            Grid(list, new[] { "fruit", "vegetables", "drinks", "kitchenware", "shared" }
+                .Select(k => { var st = KitchenArt.ContainerStyle(k); return (k, KitchenArt.Frame(st.key, st.rim, st.inner)); }).ToList(), 3, 92);
+            Heading(list, "Kitchen furniture");
+            Grid(list, new[] { "window", "stove", "pantry_shelf", "plate_shelf", "table", "plant", "rail", "basket" }
+                .Select(id => (id.Replace('_', ' '), KitchenArt.Prop(id))).ToList(), 3, 92);
+            Heading(list, "Surfaces");
+            Grid(list, new (string, Sprite)[] { ("wall tile", KitchenArt.WallTile()), ("wood", KitchenArt.Wood()), ("shelf back", KitchenArt.ShelfBack()),
+                ("floor", KitchenArt.Floor()), ("weave", KitchenArt.Weave()), ("crate slats", KitchenArt.Slats()), ("gingham", KitchenArt.Gingham()) }.ToList(), 4, 64, tiled: true);
+            Heading(list, "Interface");
+            Grid(list, CategoryIds.Ordered.Select(c => (Strings.Get("category." + c), SpriteFactory.CategoryIcon(c)))
+                .Concat(new[] { ("hand", SpriteFactory.Hand()) }).ToList(), 5, 52);
+            Heading(list, "Kitchen overview (current progress)");
+            var holder = UIKit.Rect(list, "Overview"); holder.Size(190);
+            KitchenOverviewView.Build(holder, Save, Catalogue, 328, 184).TopLeft(4, 2, 328, 184);
+        }
+
+        static void Heading(RectTransform list, string text)
+        {
+            var h = UIKit.Label(list, "H_" + text, text, 15, UIKit.Ink, TextAnchor.LowerLeft, FontStyle.Bold);
+            h.Size(28);
+        }
+
+        static void Grid(RectTransform list, List<(string label, Sprite sprite)> items, int perRow, float size, bool tiled = false)
+        {
+            for (int i = 0; i < items.Count; i += perRow)
+            {
+                var row = UIKit.Rect(list, "GridRow" + i); row.Size(size + 34);
+                float cell = 336f / perRow;
+                for (int j = i; j < Mathf.Min(i + perRow, items.Count); j++)
+                {
+                    float x = (j - i) * cell;
+                    var bg = UIKit.Panel(row, "Cell_" + items[j].label, new Color(1f, 0.985f, 0.95f, 0.92f), 12);
+                    bg.rectTransform.TopLeft(x + 3, 0, cell - 6, size + 32);
+                    if (tiled) KitchenArt.Tiled(bg.transform, "Tile", items[j].sprite, Color.white).rectTransform.TopLeft(8, 6, cell - 22, size - 4);
+                    else UIKit.Icon(bg.transform, "Sprite", items[j].sprite, size).rectTransform.TopLeft((cell - 6 - size) / 2, 4, size, size);
+                    var t = UIKit.Label(bg.transform, "Label", items[j].label, 11, UIKit.InkSoft, TextAnchor.MiddleCenter);
+                    t.rectTransform.TopLeft(2, size + 6, cell - 10, 22);
+                }
+            }
         }
 
         public void ShowProject()

@@ -104,3 +104,11 @@ Docs/                           validation report, test report, asset manifest
 - World progression (Sections 29–30): House overview with the Living Room, Park/Picnic Lawn, Airport, Bookshop, journey milestones, Places, recommendations, keepsakes, and the 24 extra scenes. The `journey_*`, `travel_38` and `collection_44` profiles.
 - Save migrations from schema 2/3 and content 3 (there are no older saves of this build yet).
 - PlayMode pointer tests, the device test record, the Android APK, the iOS export, and any player testing.
+
+## Play on a phone (browser)
+
+1. In Unity: **Sort Everything ▸ Build WebGL (phone browser)**. It writes `Builds/WebGL/`. Burst AOT is off for WebGL because its linker fails on this machine; the game code doesn't use Burst.
+2. Serve that folder on your Wi-Fi: `cd Builds/WebGL && python3 -m http.server 8765 --bind 0.0.0.0`
+3. On a phone on the same Wi-Fi, open `http://<your Mac's IP>:8765/`. To find the IP, run `ipconfig getifaddr en0`.
+
+On Home, **All levels** opens any of the 20 scenes, locked ones included, and **All art** shows every object, container, piece of furniture, surface and interface sprite. Progress is saved in the browser's storage, so it survives a reload.
