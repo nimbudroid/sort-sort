@@ -1,0 +1,9 @@
+{
+  "buildProfileId": "kitchen_20",
+  "manualDisplaySlots": false,
+  "movingTargets": false,
+  "forcedPlanningResearch": false,
+  "taskTraces": true,
+  "researchExtras": false,
+  "telemetryEnabled": true
+}
