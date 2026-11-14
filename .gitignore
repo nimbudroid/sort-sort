@@ -110,3 +110,6 @@ InitTestScene*.unity*
 
 # Sort Everything validation/test artifacts
 /[Aa]rtifacts/
+
+# macOS
+.DS_Store
