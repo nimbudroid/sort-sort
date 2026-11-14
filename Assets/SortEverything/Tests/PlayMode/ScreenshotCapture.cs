@@ -58,6 +58,25 @@ namespace SortEverything.Tests
                 File.WriteAllBytes(Path.Combine(outDir, name + ".png"), tex.EncodeToPNG());
             }
 
+            // Contact sheet: all 18 objects at a large size, plus a row at real gameplay size (44 units).
+            var sheet = UIKit.Panel(app.SafeArea, "ContactSheet", new Color(0.98f, 0.95f, 0.9f, 1f), 0);
+            sheet.rectTransform.Stretch();
+            for (int i = 0; i < KitchenCatalogue.Assets.Length; i++)
+            {
+                var a = KitchenCatalogue.Assets[i];
+                var ic = UIKit.Icon(sheet.transform, a.AssetId, SpriteFactory.Object(a.AssetId), 92);
+                ic.rectTransform.TopLeft(12 + (i % 3) * 116, 10 + (i / 3) * 108, 92, 92);
+                var l = UIKit.Label(sheet.transform, "L" + i, a.AssetId, 10, UIKit.InkSoft);
+                l.rectTransform.TopLeft(8 + (i % 3) * 116, 98 + (i / 3) * 108, 100, 14);
+            }
+            for (int i = 0; i < KitchenCatalogue.Assets.Length; i++)
+            {
+                var ic = UIKit.Icon(sheet.transform, "small" + i, SpriteFactory.Object(KitchenCatalogue.Assets[i].AssetId), 44);
+                ic.rectTransform.TopLeft(4 + (i % 9) * 39, 664 + (i / 9) * 50, 44, 44);
+            }
+            yield return Shot("00_objects");
+            Object.Destroy(sheet.gameObject);
+
             app.OpenLevel(KitchenCatalogue.LevelId(1), BoardScreen.EntryMode.Default);
             yield return Shot("01_kitchen1");
             foreach (var n in new[] { 6, 9, 13, 14 })

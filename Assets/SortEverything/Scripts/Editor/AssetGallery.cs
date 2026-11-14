@@ -82,7 +82,7 @@ namespace SortEverything.Editor
         {
             Directory.CreateDirectory(ExportDir);
             int n = 0;
-            foreach (var a in KitchenCatalogue.Assets) { Write(a.AssetId, SpriteFactory.Object(a.AssetId)); n++; }
+            foreach (var a in KitchenCatalogue.Assets) { Write(a.AssetId, SpriteFactory.Generated(a.AssetId)); n++; }
             foreach (var id in new[] { "hand", "circle", "ring", "shadow" }) { Write("ui_" + id, UiSprite(id)); n++; }
             foreach (var id in new[] { "window", "stove", "pantry_shelf", "plate_shelf", "table", "plant", "rail", "basket" }) { Write("prop_" + id, KitchenArt.Prop(id)); n++; }
             Write("tile_wall", KitchenArt.WallTile()); Write("tile_wood", KitchenArt.Wood()); Write("tile_floor", KitchenArt.Floor());
