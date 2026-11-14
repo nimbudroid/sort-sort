@@ -26,7 +26,7 @@ namespace SortEverything.Presentation
         public static RectTransform Build(Transform parent, SaveData save, Catalogue cat, float width, float height,
             System.Collections.Generic.Dictionary<string, string> previewVariant = null)
         {
-            var root = UIKit.Panel(parent, "KitchenOverview", UIKit.Wall, 18);
+            var root = UIKit.Panel(parent, "KitchenOverview", SpriteFactory.Hex("#B07C4D"), 18);
             var rt = root.rectTransform;
             rt.sizeDelta = new Vector2(width, height);
             float pad = 6, cw = (width - pad * 3) / 2, ch = (height - pad * 3) / 2;
@@ -37,59 +37,86 @@ namespace SortEverything.Presentation
                 bool restored = save.anchorIds.Contains(anchor.AnchorId);
                 string variant = previewVariant != null && previewVariant.TryGetValue(anchor.AnchorId, out var pv) ? pv : save.Equipped(anchor.AnchorId);
                 float x = pad + (r % 2) * (cw + pad), y = pad + (r / 2) * (ch + pad);
-                var card = UIKit.Panel(rt, "Region_" + KitchenCatalogue.Regions[r], restored ? SpriteFactory.Hex("#FBF3E4") : SpriteFactory.Hex("#E9DDCC"), 12);
+
+                // A small corner of the room: tiled wall, furniture, wooden counter.
+                var card = UIKit.Panel(rt, "Region_" + KitchenCatalogue.Regions[r], SpriteFactory.Hex("#E9DCC8"), 12);
                 card.rectTransform.TopLeft(x, y, cw, ch);
-                var title = UIKit.Label(card.transform, "Title", Titles[r], 11, UIKit.InkSoft, TextAnchor.UpperLeft, FontStyle.Bold);
-                title.rectTransform.TopLeft(6, 3, cw - 12, 16);
+                card.gameObject.AddComponent<RectMask2D>();
+                KitchenArt.Tiled(card.transform, "Wall", KitchenArt.WallTile(), Color.white).rectTransform.Stretch();
+                float counterH = 20, counterY = ch - counterH;
+                foreach (var (prop, px, size) in Furniture(r, cw, ch))
+                {
+                    var f = UIKit.Icon(card.transform, "Prop_" + prop, KitchenArt.Prop(prop), size);
+                    f.rectTransform.TopLeft(px, counterY - size + 4, size, size);
+                }
+                var counter = KitchenArt.Tiled(card.transform, "Counter", KitchenArt.Wood(), Color.white);
+                counter.rectTransform.TopLeft(0, counterY, cw, counterH);
+                var lip = UIKit.Panel(card.transform, "Lip", SpriteFactory.Hex("#A87444"), 0);
+                lip.rectTransform.TopLeft(0, ch - 5, cw, 5);
 
                 if (restored)
                 {
-                    // Counter strip and a neat arrangement of existing assets.
-                    var strip = UIKit.Panel(card.transform, "Counter", UIKit.CounterDark, 6);
-                    strip.rectTransform.TopLeft(6, ch - 18, cw - 12, 10);
                     var items = Compositions[r];
+                    float iconSize = Mathf.Min(26, (cw - 16) / items.Length);
                     float step = (cw - 16) / items.Length;
                     for (int i = 0; i < items.Length; i++)
                     {
-                        var ic = UIKit.Icon(card.transform, items[i], SpriteFactory.Object(items[i]), Mathf.Min(step, ch - 30));
-                        ic.rectTransform.Center(8 + step * (i + 0.5f), ch - 18 - Mathf.Min(step, ch - 30) / 2 + 2, Mathf.Min(step, ch - 30), Mathf.Min(step, ch - 30));
+                        var ic = UIKit.Icon(card.transform, items[i], SpriteFactory.Object(items[i]), iconSize);
+                        ic.rectTransform.TopLeft(8 + step * i + (step - iconSize) / 2, counterY - iconSize + 8, iconSize, iconSize);
                     }
                     if (!string.IsNullOrEmpty(variant))
                     {
                         // Optional appearance accent: presentation only, never changes rules.
-                        var accent = UIKit.Panel(card.transform, "Accent_" + variant, AccentColor(variant), 4);
-                        accent.rectTransform.TopLeft(6, 20, cw - 12, 5);
-                        var tag = UIKit.Label(card.transform, "AccentName", Strings.Get("variant." + variant), 9, UIKit.InkSoft, TextAnchor.UpperRight);
-                        tag.rectTransform.TopLeft(6, 3, cw - 12, 14);
+                        var accent = UIKit.Panel(card.transform, "Accent_" + variant, KitchenOverviewView.AccentColor(variant), 2);
+                        accent.rectTransform.TopLeft(0, counterY - 1, cw, 4);
                     }
                 }
                 else
                 {
-                    // Unrestored: faint clutter plus stable trace miniatures for completed scenes in this region.
+                    // Unrestored: dusty and cluttered, with a stable trace miniature for each completed scene.
+                    var dust = UIKit.Panel(card.transform, "Dust", new Color(0.55f, 0.48f, 0.42f, 0.38f), 0);
+                    dust.rectTransform.Stretch();
                     var items = Compositions[r];
                     for (int i = 0; i < items.Length; i++)
                     {
-                        var ic = UIKit.Icon(card.transform, "Clutter" + i, SpriteFactory.Object(items[i]), 18, new Color(1, 1, 1, 0.22f));
-                        ic.rectTransform.Center(14 + i * 14, ch - 14 - (i % 2) * 6, 18, 18);
-                        ic.rectTransform.localRotation = Quaternion.Euler(0, 0, BoardView.BeforeRotation(i) * 2);
+                        var ic = UIKit.Icon(card.transform, "Clutter" + i, SpriteFactory.Object(items[i]), 20, new Color(1, 1, 1, 0.75f));
+                        ic.rectTransform.Center(16 + i * 15, counterY + 4 - (i % 2) * 5, 20, 20);
+                        ic.rectTransform.localRotation = Quaternion.Euler(0, 0, BoardView.BeforeRotation(i) * 3);
                     }
                     foreach (var level in cat.Levels.Where(l => l.ProjectRegion == KitchenCatalogue.Regions[r]))
                     {
                         if (!save.traceIds.Contains(Progression.TraceId(level.LevelId))) continue;
                         var slot = TraceSlots[level.TraceIndex];
-                        var tray = UIKit.Panel(card.transform, "Trace_" + level.LevelId, SpriteFactory.Hex("#E3C79C"), 6);
-                        float tw = Mathf.Min(34, cw * 0.28f), th = 18;
-                        tray.rectTransform.Center(slot.x * cw, slot.y * ch, tw, th);
+                        float tw = Mathf.Min(36, cw * 0.28f), th = 20;
+                        var tray = UIKit.Panel(card.transform, "Trace_" + level.LevelId, SpriteFactory.Hex("#F4E3C4"), 6);
+                        tray.rectTransform.Center(slot.x * cw, 18 + slot.y * (counterY - 22), tw, th);
                         var objs = level.RequiredBoard.Objects;
                         for (int i = 0; i < 2 && i < objs.Count; i++)
                         {
-                            var mini = UIKit.Icon(tray.transform, "Mini" + i, SpriteFactory.Object(objs[i * (objs.Count / 2)].AssetId), 14);
-                            mini.rectTransform.anchoredPosition = new Vector2(-7 + i * 14, 2);
+                            var mini = UIKit.Icon(tray.transform, "Mini" + i, SpriteFactory.Object(objs[i * (objs.Count / 2)].AssetId), 16);
+                            mini.rectTransform.anchoredPosition = new Vector2(-8 + i * 16, 2);
                         }
                     }
                 }
+
+                var tag = UIKit.Panel(card.transform, "TitleTag", new Color(1f, 0.985f, 0.95f, 0.93f), 7);
+                tag.rectTransform.TopLeft(4, 4, Mathf.Min(cw - 8, 112), 17);
+                var title = UIKit.Label(tag.transform, "Title", (restored ? "✓ " : "") + Titles[r], 10, restored ? UIKit.Primary : UIKit.Ink, TextAnchor.MiddleLeft, FontStyle.Bold);
+                title.rectTransform.Stretch(5, 0, 4, 0);
             }
             return rt;
+        }
+
+        static (string prop, float x, float size)[] Furniture(int region, float cw, float ch)
+        {
+            float big = Mathf.Min(ch - 12, 70);
+            switch (region)
+            {
+                case 0: return new[] { ("window", cw * 0.5f - big * 0.45f, big * 0.9f), ("plant", cw - big * 0.5f - 4, big * 0.5f) };
+                case 1: return new[] { ("pantry_shelf", cw * 0.5f - big * 0.5f, big) };
+                case 2: return new[] { ("rail", 6, big * 0.6f), ("stove", cw * 0.5f - big * 0.4f + 10, big * 0.85f) };
+                default: return new[] { ("plate_shelf", cw * 0.5f - big * 0.55f, big * 0.85f), ("basket", cw - big * 0.45f - 6, big * 0.42f) };
+            }
         }
 
         public static Color AccentColor(string variant)

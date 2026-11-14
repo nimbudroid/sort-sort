@@ -126,6 +126,12 @@ namespace SortEverything.Presentation
             _sourceTop = 8 + spare * 0.12f;
             _targetTop = _sourceTop + BoardView.SourceHeight + 16 + spare * 0.18f;
 
+            // Kitchen wall and floor behind everything (decorative, no raycasts).
+            KitchenArt.Tiled(_root, "Wall", KitchenArt.WallTile(), Color.white).rectTransform.Stretch(0, -200, 0, -200);
+            float floorTop = hudH + _targetTop + BoardView.TargetHeight + 24;
+            var floor = KitchenArt.Tiled(_root, "Floor", KitchenArt.Floor(), Color.white);
+            floor.rectTransform.anchorMin = new Vector2(0, 0); floor.rectTransform.anchorMax = new Vector2(1, 1);
+            floor.rectTransform.offsetMin = new Vector2(0, -200); floor.rectTransform.offsetMax = new Vector2(0, -floorTop);
             BuildHud(hudH);
             _boardHolder = UIKit.Rect(_root, "BoardHolder").Stretch(0, hudH, 0, 0);
             _view = BoardView.Create(_boardHolder, _def, _sourceTop, _targetTop, _app.UiCamera, _level.PurposeProp);
@@ -144,6 +150,10 @@ namespace SortEverything.Presentation
             _hud = UIKit.Rect(_root, "HUD").TopLeft(0, 0, 0, hudH);
             _hud.anchorMax = new Vector2(1, 1);
             _hud.sizeDelta = new Vector2(0, hudH);
+            var strip = UIKit.Panel(_hud, "Strip", new Color(1f, 0.975f, 0.94f, 0.92f), 0);
+            strip.rectTransform.Stretch(0, -200, 0, 0);
+            var stripEdge = UIKit.Panel(_hud, "StripEdge", new Color(0.55f, 0.4f, 0.28f, 0.25f), 0);
+            stripEdge.rectTransform.Bottom(2, -2);
             var pause = UIKit.Button(_hud, "Pause", "II", OpenPause, fontSize: 16);
             ((RectTransform)pause.transform).TopLeft(8, 4, 48, 48);
             _taskText = UIKit.Label(_hud, "Task", Strings.Get(_level.PurposeKey), 16, UIKit.Ink, TextAnchor.UpperLeft, FontStyle.Bold);

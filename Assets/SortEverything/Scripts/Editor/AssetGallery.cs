@@ -35,6 +35,12 @@ namespace SortEverything.Editor
                 EditorGUILayout.LabelField(Strings.Get("category." + cat), EditorStyles.boldLabel);
                 Row(KitchenCatalogue.Assets.Where(a => a.CategoryId == cat).Select(a => (a.AssetId, SpriteFactory.Object(a.AssetId))).ToArray());
             }
+            EditorGUILayout.LabelField("Kitchen environment", EditorStyles.boldLabel);
+            Row(new[] { "window", "stove", "pantry_shelf", "plate_shelf", "table", "plant", "rail", "basket" }.Select(id => (id, KitchenArt.Prop(id))).ToArray());
+            Row(new (string, Sprite)[] { ("wall tile", KitchenArt.WallTile()), ("wood", KitchenArt.Wood()), ("shelf back", KitchenArt.ShelfBack()), ("floor", KitchenArt.Floor()),
+                ("weave", KitchenArt.Weave()), ("crate slats", KitchenArt.Slats()), ("gingham", KitchenArt.Gingham()) });
+            EditorGUILayout.LabelField("Containers", EditorStyles.boldLabel);
+            Row(new[] { "fruit", "vegetables", "drinks", "kitchenware", "shared" }.Select(k => { var st = KitchenArt.ContainerStyle(k); return (k, KitchenArt.Frame(st.key, st.rim, st.inner)); }).ToArray());
             EditorGUILayout.LabelField("Interface pieces", EditorStyles.boldLabel);
             Row(UiSprites.Select(id => (id, UiSprite(id))).ToArray());
             EditorGUILayout.EndScrollView();
@@ -78,6 +84,9 @@ namespace SortEverything.Editor
             int n = 0;
             foreach (var a in KitchenCatalogue.Assets) { Write(a.AssetId, SpriteFactory.Object(a.AssetId)); n++; }
             foreach (var id in new[] { "hand", "circle", "ring", "shadow" }) { Write("ui_" + id, UiSprite(id)); n++; }
+            foreach (var id in new[] { "window", "stove", "pantry_shelf", "plate_shelf", "table", "plant", "rail", "basket" }) { Write("prop_" + id, KitchenArt.Prop(id)); n++; }
+            Write("tile_wall", KitchenArt.WallTile()); Write("tile_wood", KitchenArt.Wood()); Write("tile_floor", KitchenArt.Floor());
+            Write("tile_shelfback", KitchenArt.ShelfBack()); Write("tile_weave", KitchenArt.Weave()); Write("tile_slats", KitchenArt.Slats()); n += 6;
             AssetDatabase.Refresh();
             var folder = AssetDatabase.LoadAssetAtPath<Object>(ExportDir);
             if (folder != null) { Selection.activeObject = folder; EditorGUIUtility.PingObject(folder); }

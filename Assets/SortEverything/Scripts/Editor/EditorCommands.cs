@@ -127,6 +127,7 @@ namespace SortEverything.Editor
             cam.clearFlags = CameraClearFlags.SolidColor;
             cam.backgroundColor = new Color(0.965f, 0.922f, 0.867f);
             cam.transform.position = new Vector3(0, 0, -10);
+            camGo.AddComponent<AudioListener>();
 
             var canvasGo = new GameObject("Canvas", typeof(RectTransform));
             var canvas = canvasGo.AddComponent<Canvas>();

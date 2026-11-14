@@ -57,8 +57,10 @@ namespace SortEverything.Presentation
 
         void Build(string purposeProp)
         {
-            // Source region (counter clutter) with a faint return area guide on planning boards.
-            var src = UIKit.Panel(Root, "SourceRegion", UIKit.CounterDark, 18);
+            BuildRoom();
+
+            // Source region: a cutting mat on the counter, with a return-area guide on planning boards.
+            var src = UIKit.Panel(Root, "SourceRegion", new Color(1f, 0.97f, 0.9f, 0.28f), 18);
             SourceRegion = src.rectTransform.TopLeft(6, SourceTop, Width - 12, SourceHeight);
             ReturnArea = UIKit.Panel(SourceRegion, "ReturnArea", new Color(1, 1, 1, 0), 18);
             ReturnArea.rectTransform.Stretch();
@@ -69,10 +71,18 @@ namespace SortEverything.Presentation
             TargetRegion = UIKit.Rect(Root, "TargetRegion").TopLeft(0, TargetTop, Width, TargetHeight);
             PropBacking = UIKit.Panel(TargetRegion, "PurposeProp", PropColor(purposeProp), 22);
             PropBacking.rectTransform.Stretch(2, -6, 2, -6);
-            var propLabel = UIKit.Label(PropBacking.transform, "Label", PropName(purposeProp), 11, UIKit.InkSoft, TextAnchor.LowerRight);
-            propLabel.rectTransform.Stretch(8, 4, 12, 2);
-            PropBacking.color = new Color(PropBacking.color.r, PropBacking.color.g, PropBacking.color.b, 0f);
-            propLabel.color = new Color(propLabel.color.r, propLabel.color.g, propLabel.color.b, 0f);
+            var (pattern, patternTint) = KitchenArt.PropPattern(purposeProp);
+            KitchenArt.Tiled(PropBacking.transform, "Pattern", pattern, patternTint).rectTransform.Stretch(6, 6, 6, 6);
+            var tag = UIKit.Panel(PropBacking.transform, "Tag", new Color(1, 0.98f, 0.94f, 0.95f), 8);
+            tag.rectTransform.anchorMin = tag.rectTransform.anchorMax = new Vector2(1, 0);
+            tag.rectTransform.pivot = new Vector2(1, 0);
+            tag.rectTransform.anchoredPosition = new Vector2(-8, 4);
+            tag.rectTransform.sizeDelta = new Vector2(140, 18);
+            var propLabel = UIKit.Label(tag.transform, "Label", PropName(purposeProp), 11, UIKit.Ink, TextAnchor.MiddleCenter, FontStyle.Bold);
+            propLabel.rectTransform.Stretch(4, 0, 4, 0);
+            _propGroup = PropBacking.gameObject.AddComponent<CanvasGroup>();
+            _propGroup.alpha = 0f;
+            _propGroup.blocksRaycasts = false;
 
             foreach (var t in Def.Targets)
             {
@@ -122,22 +132,46 @@ namespace SortEverything.Presentation
             }
         }
 
+        CanvasGroup _propGroup;
+
         public void ShowPurposeProp(bool show, bool instant)
         {
-            var label = PropBacking.GetComponentInChildren<Text>();
-            float a0 = PropBacking.color.a, a1 = show ? 0.85f : 0f;
-            if (instant || ReducedMotion)
-            {
-                SetPropAlpha(a1, label);
-                return;
-            }
-            StartCoroutine(UIKit.Tween(0.35f, t => SetPropAlpha(Mathf.Lerp(a0, a1, t), label)));
+            float a0 = _propGroup.alpha, a1 = show ? 1f : 0f;
+            if (instant || ReducedMotion) { _propGroup.alpha = a1; return; }
+            StartCoroutine(UIKit.Tween(0.35f, t => _propGroup.alpha = Mathf.Lerp(a0, a1, t)));
         }
 
-        void SetPropAlpha(float a, Text label)
+        /// <summary>
+        /// Kitchen room behind the board: wooden counter under the clutter and an open shelf unit holding the
+        /// containers. Extends past the 360-unit board for wide screens. Never receives raycasts.
+        /// </summary>
+        void BuildRoom()
         {
-            var c = PropBacking.color; PropBacking.color = new Color(c.r, c.g, c.b, a);
-            var lc = label.color; label.color = new Color(lc.r, lc.g, lc.b, a);
+            const float bleed = 400f;
+            var room = UIKit.Rect(Root, "Room");
+            room.TopLeft(-bleed, 0, Width + bleed * 2, TargetTop + TargetHeight + 40);
+
+            // Backsplash shadow + counter top + front lip.
+            float counterTop = SourceTop - 12, counterBottom = SourceTop + SourceHeight + 4;
+            var shadow = UIKit.Panel(room, "CounterShadow", new Color(0.35f, 0.25f, 0.18f, 0.18f), 0);
+            shadow.rectTransform.TopLeft(0, counterTop - 4, Width + bleed * 2, 6);
+            var counter = KitchenArt.Tiled(room, "Counter", KitchenArt.Wood(), Color.white);
+            counter.rectTransform.TopLeft(0, counterTop, Width + bleed * 2, counterBottom - counterTop);
+            var lip = UIKit.Panel(room, "CounterLip", SpriteFactory.Hex("#A87444"), 0);
+            lip.rectTransform.TopLeft(0, counterBottom, Width + bleed * 2, 8);
+            var lipShade = UIKit.Panel(room, "LipShade", new Color(0.3f, 0.2f, 0.12f, 0.25f), 0);
+            lipShade.rectTransform.TopLeft(0, counterBottom + 8, Width + bleed * 2, 5);
+
+            // Open shelf unit for the containers.
+            float shelfTop = TargetTop - 14, shelfBottom = TargetTop + TargetHeight + 10;
+            var back = KitchenArt.Tiled(room, "ShelfBack", KitchenArt.ShelfBack(), new Color(1, 1, 1, 0.9f));
+            back.rectTransform.TopLeft(0, shelfTop, Width + bleed * 2, shelfBottom - shelfTop);
+            var topRail = KitchenArt.Tiled(room, "ShelfTop", KitchenArt.Wood(), SpriteFactory.Hex("#E0C29C"));
+            topRail.rectTransform.TopLeft(0, shelfTop - 6, Width + bleed * 2, 10);
+            var bottomRail = KitchenArt.Tiled(room, "ShelfBottom", KitchenArt.Wood(), SpriteFactory.Hex("#E0C29C"));
+            bottomRail.rectTransform.TopLeft(0, shelfBottom - 4, Width + bleed * 2, 12);
+            var bottomShade = UIKit.Panel(room, "ShelfShade", new Color(0.3f, 0.2f, 0.12f, 0.3f), 0);
+            bottomShade.rectTransform.TopLeft(0, shelfBottom + 8, Width + bleed * 2, 6);
         }
 
         // ---------- Geometry ----------
@@ -350,13 +384,41 @@ namespace SortEverything.Presentation
         void Build(BoardDef board)
         {
             bool shared = Def.Accepts.Count > 1;
-            _frame.color = shared ? UIKit.CategoryColor("shared") : UIKit.CategoryColor(Def.Accepts[0]);
-            var outline = _frame.gameObject.AddComponent<Outline>();
-            outline.effectColor = new Color(0.23f, 0.18f, 0.16f, 0.35f);
-            outline.effectDistance = new Vector2(1.5f, -1.5f);
+            string styleKey = shared ? "shared" : Def.Accepts[0];
+            var style = KitchenArt.ContainerStyle(styleKey);
+            _frame.sprite = KitchenArt.Frame(style.key, style.rim, style.inner);
+            _frame.type = Image.Type.Sliced;
+            _frame.color = Color.white;
+            var drop = _frame.gameObject.AddComponent<Shadow>();
+            drop.effectColor = new Color(0.25f, 0.16f, 0.1f, 0.35f);
+            drop.effectDistance = new Vector2(0, -3);
+            if (style.pattern != null)
+                KitchenArt.Tiled(Rt, "Pattern", style.pattern, style.patternTint).rectTransform.Stretch(7, BoardView.Header, 7, 7);
+            if (styleKey == "kitchenware")
+            {
+                // Drawer front with a metal pull, below the slots so contents stay visible.
+                var pull = UIKit.Panel(Rt, "DrawerPull", SpriteFactory.Hex("#9AA3AE"), 4);
+                pull.rectTransform.anchorMin = pull.rectTransform.anchorMax = new Vector2(0.5f, 0);
+                pull.rectTransform.anchoredPosition = new Vector2(0, 5);
+                pull.rectTransform.sizeDelta = new Vector2(Mathf.Min(48, LocalRect.width * 0.4f), 5);
+            }
+            if (shared)
+            {
+                // Tray handles on both sides.
+                foreach (var side in new[] { 0f, 1f })
+                {
+                    var h = UIKit.Panel(Rt, "Handle", style.rim, 4);
+                    h.rectTransform.anchorMin = h.rectTransform.anchorMax = new Vector2(side, 0.5f);
+                    h.rectTransform.anchoredPosition = new Vector2(side == 0 ? -3 : 3, 0);
+                    h.rectTransform.sizeDelta = new Vector2(8, 26);
+                    h.transform.SetAsFirstSibling();
+                }
+            }
 
-            // Header: category symbols + short label + usage.
-            var header = UIKit.Rect(Rt, "Header").TopLeft(6, 3, LocalRect.width - 12, BoardView.Header - 4);
+            // Header: a paper label tag carrying category symbols, short label and usage (readable over any pattern).
+            var labelTag = UIKit.Panel(Rt, "LabelTag", new Color(1f, 0.985f, 0.95f, 0.95f), 9);
+            labelTag.rectTransform.TopLeft(5, 4, LocalRect.width - 10, BoardView.Header - 6);
+            var header = UIKit.Rect(Rt, "Header").TopLeft(9, 3, LocalRect.width - 18, BoardView.Header - 4);
             float x = 0;
             float iconSize = Def.Accepts.Count >= 4 ? 18 : 22;
             foreach (var cat in Def.Accepts)
@@ -369,19 +431,33 @@ namespace SortEverything.Presentation
                 ? (Def.Accepts.Count == 2 && Def.TargetId.Length == 2 ? "" : Strings.Get("target.shared"))
                 : Strings.Get("category." + Def.Accepts[0]);
             bool limited = !Def.IsUnlimited;
+            // Narrow limited cards carry their count in a corner pill so the label keeps one readable line.
+            bool pill = limited && Def.RectProfile == "narrow";
+            float headerW = LocalRect.width - 18;
             var title = UIKit.Label(header, "Label", label, 13, UIKit.Ink, TextAnchor.MiddleLeft, FontStyle.Bold);
-            title.rectTransform.TopLeft(x + 3, 0, LocalRect.width - 12 - x - 3 - (limited ? 34 : 0), BoardView.Header - 4);
-            if (limited)
+            title.resizeTextMinSize = 9;
+            title.rectTransform.TopLeft(x + 3, (BoardView.Header - 4 - 18) / 2, headerW - x - 3 - (limited && !pill ? 34 : 0), 18);
+            if (limited && !pill)
             {
                 _usage = UIKit.Label(header, "Usage", "", 13, UIKit.Ink, TextAnchor.MiddleRight, FontStyle.Bold);
-                _usage.rectTransform.TopLeft(LocalRect.width - 12 - 40, 0, 40, BoardView.Header - 4);
+                _usage.rectTransform.TopLeft(headerW - 40, 0, 40, BoardView.Header - 4);
+            }
+            else if (pill)
+            {
+                var chip = UIKit.Panel(Rt, "UsagePill", UIKit.Ink, 9);
+                chip.rectTransform.anchorMin = chip.rectTransform.anchorMax = new Vector2(1, 1);
+                chip.rectTransform.pivot = new Vector2(1, 0.5f);
+                chip.rectTransform.anchoredPosition = new Vector2(-6, 0);
+                chip.rectTransform.sizeDelta = new Vector2(38, 18);
+                _usage = UIKit.Label(chip.transform, "Usage", "", 12, Color.white, TextAnchor.MiddleCenter, FontStyle.Bold);
+                _usage.rectTransform.Stretch();
             }
 
             // Faint slot guides.
             for (int i = 0; i < Mathf.Max(1, Def.SlotCount); i++)
             {
                 var c = SlotCenter(i);
-                var g = UIKit.Panel(Rt, "Slot" + i, new Color(1, 1, 1, 0.35f), 10);
+                var g = UIKit.Panel(Rt, "Slot" + i, new Color(1, 1, 1, 0.42f), 10);
                 g.rectTransform.Center(c.x - LocalRect.x, c.y - LocalRect.y, 46, 46);
             }
 

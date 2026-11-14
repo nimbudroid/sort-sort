@@ -14,9 +14,16 @@ namespace SortEverything.Presentation
         const int N = 128;
         static readonly Dictionary<string, Sprite> Cache = new Dictionary<string, Sprite>();
 
+        /// <summary>
+        /// Runtime-created textures are destroyed when Play mode stops. With domain reload disabled the static
+        /// cache would keep those dead references (rendering as flat rectangles), so clear it on every Play.
+        /// </summary>
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        static void ResetCache() => Cache.Clear();
+
         public static Sprite Object(string assetId)
         {
-            if (Cache.TryGetValue(assetId, out var s)) return s;
+            if (Cache.TryGetValue(assetId, out var s) && s != null && s.texture != null) return s;
             var art = Resources.Load<Sprite>("SortEverything/Art/" + assetId);
             if (art == null)
             {
@@ -42,7 +49,7 @@ namespace SortEverything.Presentation
         public static Sprite RoundedRect(int radius = 18)
         {
             string key = "rr" + radius;
-            if (Cache.TryGetValue(key, out var s)) return s;
+            if (Cache.TryGetValue(key, out var s) && s != null && s.texture != null) return s;
             int size = radius * 2 + 8;
             var r = new Raster(size) { Outline = 0, Shade = false };
             r.RoundRect(size / 2f, size / 2f, size / 2f - 1, size / 2f - 1, radius, 0, Color.white);
@@ -53,7 +60,7 @@ namespace SortEverything.Presentation
 
         public static Sprite Circle()
         {
-            if (Cache.TryGetValue("circle", out var s)) return s;
+            if (Cache.TryGetValue("circle", out var s) && s != null && s.texture != null) return s;
             var r = new Raster(64) { Outline = 0, Shade = false };
             r.Circle(32, 32, 31, Color.white);
             s = r.ToSprite("circle");
@@ -63,7 +70,7 @@ namespace SortEverything.Presentation
 
         public static Sprite Ring()
         {
-            if (Cache.TryGetValue("ring", out var s)) return s;
+            if (Cache.TryGetValue("ring", out var s) && s != null && s.texture != null) return s;
             var r = new Raster(64) { Outline = 0, Shade = false };
             r.Ring(32, 32, 28, 3.5f, Color.white);
             s = r.ToSprite("ring");
@@ -73,7 +80,7 @@ namespace SortEverything.Presentation
 
         public static Sprite Shadow()
         {
-            if (Cache.TryGetValue("shadow", out var s)) return s;
+            if (Cache.TryGetValue("shadow", out var s) && s != null && s.texture != null) return s;
             var tex = new Texture2D(64, 32, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp };
             for (int y = 0; y < 32; y++)
                 for (int x = 0; x < 64; x++)
@@ -92,7 +99,7 @@ namespace SortEverything.Presentation
         /// <summary>Simple pointing hand used for the noninteractive drag illustration.</summary>
         public static Sprite Hand()
         {
-            if (Cache.TryGetValue("hand", out var s)) return s;
+            if (Cache.TryGetValue("hand", out var s) && s != null && s.texture != null) return s;
             var r = new Raster(N);
             var skin = Hex("#F4C9A8");
             r.Capsule(64, 30, 64, 70, 11, skin);           // index finger
@@ -118,16 +125,31 @@ namespace SortEverything.Presentation
                     c.Ellipse(48, 58, 7, 12, 25, new Color(1, 1, 1, 0.35f), outline: false);
                     break;
                 case "banana":
-                    for (int i = 0; i <= 24; i++)
+                {
+                    // One crescent band (a single outlined shape, not a chain of circles).
+                    var pts = new System.Collections.Generic.List<Vector2>();
+                    const int steps = 24;
+                    for (int i = 0; i <= steps; i++)
                     {
-                        float t = i / 24f;
-                        float ang = Mathf.Lerp(200, 340, t) * Mathf.Deg2Rad;
-                        float x = 64 + Mathf.Cos(ang) * 44, y = 44 - Mathf.Sin(ang) * 44;
-                        c.Circle(x, y, 9 + 9 * Mathf.Sin(t * Mathf.PI), Hex("#F6D33C"));
+                        float t = i / (float)steps, ang = Mathf.Lerp(200, 340, t) * Mathf.Deg2Rad;
+                        pts.Add(new Vector2(64 + Mathf.Cos(ang) * 50, 34 - Mathf.Sin(ang) * 50));
                     }
-                    c.Capsule(20, 56, 15, 48, 4, Hex("#6B4A26"));
-                    c.Circle(108, 56, 4, Hex("#6B4A26"));
+                    for (int i = steps; i >= 0; i--)
+                    {
+                        float t = i / (float)steps, ang = Mathf.Lerp(200, 340, t) * Mathf.Deg2Rad;
+                        float r = 50 - (6 + 20 * Mathf.Sin(t * Mathf.PI));
+                        pts.Add(new Vector2(64 + Mathf.Cos(ang) * r, 34 - Mathf.Sin(ang) * r));
+                    }
+                    c.Polygon(pts.ToArray(), Hex("#F6D33C"));
+                    for (int i = 4; i <= 20; i++)
+                    {
+                        float t = i / 24f, ang = Mathf.Lerp(200, 340, t) * Mathf.Deg2Rad;
+                        c.Circle(64 + Mathf.Cos(ang) * 40, 34 - Mathf.Sin(ang) * 40, 2.2f, new Color(1f, 0.96f, 0.7f, 0.8f), outline: false);
+                    }
+                    c.Capsule(17, 54, 11, 46, 4, Hex("#6B4A26"));
+                    c.Circle(110, 52, 4, Hex("#6B4A26"));
                     break;
+                }
                 case "orange":
                     c.Circle(64, 70, 42, Hex("#F58A22"));
                     for (int i = 0; i < 9; i++) c.Circle(40 + (i * 23) % 52, 52 + (i * 17) % 40, 2.2f, Hex("#E57510"), outline: false);
@@ -233,7 +255,7 @@ namespace SortEverything.Presentation
         }
 
         /// <summary>Tiny SDF rasterizer with outlines and soft top-light shading.</summary>
-        sealed class Raster
+        internal sealed class Raster
         {
             readonly int _n;
             readonly Color[] _px;

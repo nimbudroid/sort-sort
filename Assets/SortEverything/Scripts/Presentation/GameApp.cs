@@ -37,6 +37,7 @@ namespace SortEverything.Presentation
         public Canvas Canvas;
         public RectTransform SafeArea;
 
+        public const string DevStartLevelKey = "SortEverything.DevStartLevel";
         public GameSession Session { get; private set; }
         public AudioFeedback Audio { get; private set; }
         RectTransform _screenLayer, _modalLayer, _toastLayer;
@@ -70,6 +71,8 @@ namespace SortEverything.Presentation
                 UiCamera.backgroundColor = UIKit.Wall;
                 UiCamera.transform.position = new Vector3(0, 0, -10);
             }
+            // Sound needs exactly one listener; the UI camera carries it.
+            if (FindAnyObjectByType<AudioListener>() == null) UiCamera.gameObject.AddComponent<AudioListener>();
             if (Canvas == null)
             {
                 var go = new GameObject("Canvas", typeof(RectTransform));
@@ -94,8 +97,9 @@ namespace SortEverything.Presentation
                 var module = es.AddComponent<InputSystemUIInputModule>();
                 module.AssignDefaultActions();
             }
-            var bg = UIKit.Panel(SafeArea, "Background", UIKit.Wall, 0);
-            bg.rectTransform.Stretch(0, -200, 0, -200);
+            // Kitchen wall behind menu screens, softened so text stays readable.
+            KitchenArt.Tiled(SafeArea, "Background", KitchenArt.WallTile(), Color.white).rectTransform.Stretch(0, -200, 0, -200);
+            UIKit.Panel(SafeArea, "BackgroundSoften", new Color(1f, 0.975f, 0.94f, 0.45f), 0).rectTransform.Stretch(0, -200, 0, -200);
             _screenLayer = UIKit.Rect(SafeArea, "Screens").Stretch();
             _modalLayer = UIKit.Rect(SafeArea, "Modals").Stretch();
             _toastLayer = UIKit.Rect(SafeArea, "Toasts").Stretch();
@@ -122,6 +126,19 @@ namespace SortEverything.Presentation
             telemetry.ParticipantId = Save.participantId;
             telemetry.Emit("session_start", "\"entry\":\"" + outcome + "\"");
             Audio.Init(Save.settings);
+#if UNITY_EDITOR
+            // Editor-only: Scene Browser "Play" jumps straight into a chosen scene (development use).
+            var devLevel = PlayerPrefs.GetString(DevStartLevelKey, "");
+            if (!string.IsNullOrEmpty(devLevel))
+            {
+                PlayerPrefs.DeleteKey(DevStartLevelKey);
+                if (Catalogue.Level(devLevel) != null)
+                {
+                    if (!Catalogue.IsInstalled(devLevel)) Debug.LogWarning($"{devLevel} is outside build profile {Catalogue.Profile.ProfileId}");
+                    else { OpenFromList(Catalogue.Level(devLevel)); yield break; }
+                }
+            }
+#endif
             if (outcome == SaveLoadOutcome.NewSave) OpenLevel(KitchenCatalogue.LevelId(1), BoardScreen.EntryMode.Default);
             else ShowHome();
         }
