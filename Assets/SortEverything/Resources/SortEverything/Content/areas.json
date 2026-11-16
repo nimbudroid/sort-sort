@@ -1,0 +1,19 @@
+{
+  "areas": [
+    {
+      "id": "house_kitchen",
+      "name": "Kitchen",
+      "surface": "butcher_block",
+      "surfaceColor": "#A87653",
+      "surfaceTint": "#FFFFFF",
+      "wall": "subway_tile",
+      "cabinet": "#9FB9AA",
+      "cabinetShade": "#7F9C8C",
+      "lip": "#7E5333",
+      "mess": { "enabled": true, "density": 1.0, "decals": ["crumbs", "drip", "ring"] },
+      "levelMess": [
+        { "levelId": "kitchen_001", "density": 0.8, "decals": ["crumbs", "drip"] }
+      ]
+    }
+  ]
+}

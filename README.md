@@ -36,11 +36,24 @@ A brand-new save opens Kitchen 1 directly. Later launches open Home, which has R
 
 ## Editor menu (Sort Everything ▸ …)
 
+- **Validate Content**: checks objects, containers, areas, levels, glyph coverage and color contrast.
+
 - **Validate Catalogue**: expands, validates and solves every board, then writes `Docs/ValidationReport.txt`.
 - **Generate Catalogue**: writes the expanded runtime JSON to `Assets/SortEverything/Data/catalogue_expanded.json`.
 - **Create Bootstrap Scene**: rebuilds the scene and sets portrait orientation and `com.sorteverything.prototype`.
 - **Reset Development Save**: deletes the editor save files after a confirmation dialog.
 - **Build Android Development**: writes `Builds/Android/SortEverything-dev.apk`.
+
+## Board layout and content data
+
+- **Board proportions:** `Resources/SortEverything/BoardLayout.json` controls the zone shares (header 8%, instruction 5%, countertop 55%, containers 32% of the safe area), item sizes (pile items at least 56 units, touch area at least 48), pile rotation (±12°) and overlap (at most 20%), how much of the width the bins span (90%), bins per row (3), the drag lift and whether the mess is shown. Changing these needs no code.
+- **Content:**
+  - `Resources/SortEverything/Content/objects.json`: object metadata (category, color, relativeSize, material, tags).
+  - `containers.json`: container archetypes. Fruit uses a woven basket, Vegetables a crisper drawer, Drinks a fridge-door shelf, Kitchenware a cutlery drawer, and shared bins a serving tray. A dish rack archetype is also available.
+  - `areas.json`: counter surface and color, wall, cabinet, mess density and decal set.
+  - `Levels/*.json`: data levels.
+- **Checking content:** **Sort Everything ▸ Validate Content** checks all of the above, and the EditMode tests run the same checks. See `Docs/ContentAuthoring.md`.
+- **Font:** the UI font is Lato (SIL OFL, bundled). The built-in font drew the em dash as a gap on WebGL.
 
 ## Command line
 

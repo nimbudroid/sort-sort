@@ -1,0 +1,17 @@
+{
+  "archetypes": [
+    { "id": "fruit_basket",      "label": "Fruit basket",     "style": "basket",  "body": "#B9834B", "inner": "#E7C08B", "accent": "#8E5F33", "light": "#FFF3D6", "pattern": "weave",  "fillLayout": "grid", "sound": "wicker",  "lipShare": 0.2,  "backSprite": "", "frontSprite": "" },
+    { "id": "fridge_door_shelf", "label": "Fridge door",      "style": "fridge",  "body": "#E9EEF2", "inner": "#CFE3F1", "accent": "#7FB2D6", "light": "#F2FBFF", "pattern": "",       "fillLayout": "grid", "sound": "plastic", "lipShare": 0.26, "backSprite": "", "frontSprite": "" },
+    { "id": "crisper_drawer",    "label": "Crisper drawer",   "style": "crisper", "body": "#DCE8D2", "inner": "#C3DDB0", "accent": "#7FA868", "light": "#F4FFF0", "pattern": "",       "fillLayout": "grid", "sound": "plastic", "lipShare": 0.3,  "backSprite": "", "frontSprite": "" },
+    { "id": "cutlery_drawer",    "label": "Cutlery drawer",   "style": "drawer",  "body": "#A8754A", "inner": "#E3C9A4", "accent": "#C9A57C", "light": "#FFF2DE", "pattern": "",       "fillLayout": "grid", "sound": "wood",    "lipShare": 0.18, "backSprite": "", "frontSprite": "" },
+    { "id": "dish_rack",         "label": "Dish rack",        "style": "rack",    "body": "#C9D1D8", "inner": "#EEF2F5", "accent": "#97A3AE", "light": "#FFFFFF", "pattern": "",       "fillLayout": "grid", "sound": "metal",   "lipShare": 0.16, "backSprite": "", "frontSprite": "" },
+    { "id": "serving_tray",      "label": "Shared tray",      "style": "tray",    "body": "#C7955F", "inner": "#F3E3C6", "accent": "#9C6B3E", "light": "#FFF6E6", "pattern": "",       "fillLayout": "grid", "sound": "wood",    "lipShare": 0.14, "backSprite": "", "frontSprite": "" }
+  ],
+  "categoryArchetypes": [
+    { "category": "fruit",       "archetype": "fruit_basket" },
+    { "category": "vegetables",  "archetype": "crisper_drawer" },
+    { "category": "drinks",      "archetype": "fridge_door_shelf" },
+    { "category": "kitchenware", "archetype": "cutlery_drawer" }
+  ],
+  "sharedArchetype": "serving_tray"
+}

@@ -31,7 +31,15 @@ namespace SortEverything.Presentation
             _clips["place_soft"] = Tone(new[] { 180f, 260f }, 0.12f, 0.45f, 0.9f, noise: 0.25f);
             _clips["place_light"] = Tone(new[] { 420f, 640f }, 0.09f, 0.4f, 0.8f, noise: 0.15f);
             _clips["place_hard"] = Tone(new[] { 1200f, 1850f, 2600f }, 0.25f, 0.3f, 0.15f);
-            _clips["reject"] = Sweep(380f, 250f, 0.18f, 0.3f);
+            _clips["reject"] = Sweep(300f, 240f, 0.16f, 0.16f); // a soft, low "nope", never a buzz
+            // Placement by material (object metadata): fruit, plastic, carton, metal, ceramic, glass, wood.
+            _clips["mat_fruit"] = Tone(new[] { 170f, 240f }, 0.12f, 0.42f, 0.8f, noise: 0.3f);
+            _clips["mat_plastic"] = Tone(new[] { 520f, 780f }, 0.08f, 0.32f, 0.6f, noise: 0.12f);
+            _clips["mat_carton"] = Tone(new[] { 300f, 420f }, 0.09f, 0.36f, 0.55f, noise: 0.35f);
+            _clips["mat_metal"] = Tone(new[] { 1320f, 2010f, 2870f }, 0.3f, 0.22f, 0.22f);
+            _clips["mat_ceramic"] = Tone(new[] { 980f, 1460f }, 0.22f, 0.26f, 0.2f, noise: 0.04f);
+            _clips["mat_glass"] = Tone(new[] { 1760f, 2640f, 3520f }, 0.35f, 0.18f, 0.25f);
+            _clips["mat_wood"] = Tone(new[] { 210f, 330f }, 0.1f, 0.34f, 0.45f, noise: 0.2f);
             _clips["streak"] = Tone(new[] { 880f, 1320f }, 0.12f, 0.2f, 0.4f);
             _clips["category"] = Arp(new[] { 523f, 659f }, 0.08f, 0.25f);
             _clips["complete"] = Arp(new[] { 523f, 659f, 784f, 1046f, 1318f, 1568f }, 0.08f, 0.32f);
@@ -48,6 +56,17 @@ namespace SortEverything.Presentation
             if (_music == null) return;
             if (s.music && !_music.isPlaying) _music.Play();
             if (!s.music && _music.isPlaying) _music.Stop();
+        }
+
+        /// <summary>Placement cue for an object's material (falls back to the category family).</summary>
+        public static string ForMaterial(string material, string categoryId)
+        {
+            switch (material)
+            {
+                case "fruit": case "plastic": case "carton": case "metal": case "ceramic": case "glass": case "wood": return "mat_" + material;
+                case "paper": return "mat_carton";
+                default: return FamilyFor(categoryId);
+            }
         }
 
         public static string FamilyFor(string categoryId) =>

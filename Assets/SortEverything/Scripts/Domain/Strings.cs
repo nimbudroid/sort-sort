@@ -70,6 +70,15 @@ namespace SortEverything.Domain
             ["asset.mug"] = "Mug", ["asset.spatula"] = "Spatula", ["asset.pan"] = "Pan",
         };
 
+        /// <summary>Adds strings from data content (level purposes, instructions). Existing keys are kept.</summary>
+        public static void Register(string key, string value)
+        {
+            if (!string.IsNullOrEmpty(key) && value != null && !En.ContainsKey(key)) En[key] = value;
+        }
+
+        /// <summary>Every English string the game can show from tables (for glyph validation).</summary>
+        public static IEnumerable<string> AllValues => En.Values;
+
         public static string Get(string key)
         {
             if (key == null) return "";

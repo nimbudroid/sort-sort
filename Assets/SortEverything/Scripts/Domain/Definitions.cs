@@ -158,6 +158,8 @@ namespace SortEverything.Domain
         public string PurposeProp;
         public string BeforeProfile;
         public string AfterProfile;
+        /// <summary>Optional one-line instruction from data; empty = derived from the board's rule shape.</summary>
+        public string InstructionOverride = "";
 
         public BoardDef Board(string boardId) => Boards.First(b => b.BoardId == boardId);
         public BoardDef RequiredBoard => Boards.First(b => b.Required);

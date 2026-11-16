@@ -273,6 +273,17 @@ namespace SortEverything.Domain
 
         static string[] Split(string s) => s == "-" ? Array.Empty<string>() : s.Split(' ');
 
+        /// <summary>Source grid for any item count: the GDD grids where defined, otherwise an even generic grid.</summary>
+        public static List<(float x, float y)> SourceGridFor(int count)
+        {
+            if (count == 3 || count == 5 || count == 6 || count == 8 || count == 9 || count == 12) return SourceGrid("grid" + count);
+            int cols = Math.Max(1, (int)Math.Ceiling(Math.Sqrt(count * 1.3))), rows = (count + cols - 1) / cols;
+            var r = new List<(float, float)>();
+            for (int i = 0; i < count; i++)
+                r.Add(((i % cols + 0.5f) / cols, (i / cols + 0.5f) / rows));
+            return r;
+        }
+
         public static List<(float x, float y)> SourceGrid(string grid)
         {
             float[] x4 = { 0.14f, 0.38f, 0.62f, 0.86f };
@@ -323,12 +334,24 @@ namespace SortEverything.Domain
             _byId = levels.ToDictionary(l => l.LevelId);
         }
 
-        public static Catalogue CreateKitchen(string profileId)
+        public static Catalogue CreateKitchen(string profileId) => CreateKitchen(profileId, null);
+
+        /// <summary>The GDD Kitchen plus optional data levels (installed in the full profile only, after Level 20).</summary>
+        public static Catalogue CreateKitchen(string profileId, IReadOnlyList<LevelDef> dataLevels)
         {
             var levels = KitchenCatalogue.BuildLevels();
             int count = profileId == "kitchen_gate_08" ? 8 : 20;
-            var profile = new BuildProfile(profileId, levels.Take(count).Select(l => l.LevelId));
-            return new Catalogue(levels, profile);
+            var installed = levels.Take(count).Select(l => l.LevelId).ToList();
+            if (dataLevels != null && dataLevels.Count > 0)
+            {
+                foreach (var d in dataLevels)
+                {
+                    if (levels.Any(l => l.LevelId == d.LevelId)) continue; // never shadow an authored level
+                    levels.Add(d);
+                    if (count == 20) installed.Add(d.LevelId);
+                }
+            }
+            return new Catalogue(levels, new BuildProfile(profileId, installed));
         }
 
         public LevelDef Level(string id) => _byId.TryGetValue(id, out var l) ? l : null;

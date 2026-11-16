@@ -113,6 +113,53 @@ namespace SortEverything.Presentation
         public static Sprite MatGrid() => Get("mat", () => Tile("mat", 24, 24, 100, (x, y) =>
             x % 12 == 0 || y % 12 == 0 ? new Color(1, 1, 1, 0.55f) : new Color(1, 1, 1, 0f)));
 
+        /// <summary>
+        /// Surface/wall material by data ID (area data): a sprite at Resources/SortEverything/Art/Surfaces/&lt;id&gt;
+        /// wins; otherwise one of the procedural tiles.
+        /// </summary>
+        public static Sprite Surface(string id, string baseHex = "#A87653")
+        {
+            if (!string.IsNullOrEmpty(id))
+            {
+                var art = Resources.Load<Sprite>("SortEverything/Art/Surfaces/" + id);
+                if (art != null) return art;
+            }
+            switch (id)
+            {
+                case "subway_tile": return WallTile();
+                case "light_stone": return Stone();
+                case "pantry_shelf": return ShelfBack();
+                case "floor_check": return Floor();
+                case "honey_wood": return Wood();
+                default: return ButcherBlock(baseHex);
+            }
+        }
+
+        /// <summary>
+        /// Countertop: broad butcher-block planks running one way, low-contrast seams and soft grain, so items read
+        /// clearly on top. Mid-tone teak by default (best worst-case contrast with every kitchen item).
+        /// </summary>
+        public static Sprite ButcherBlock(string baseHex) => Get("butcher_" + baseHex, () => Tile("butcher_" + baseHex, 192, 96, 60, (x, y) =>
+        {
+            var baseC = H(baseHex);
+            int plank = y / 24;
+            int seamX = (int)(Hash(plank, 5) * 192);
+            if (y % 24 == 0) return Shade(baseC, 0.86f);
+            if ((x + 192 - seamX) % 192 == 0) return Shade(baseC, 0.9f);
+            float grain = Mathf.Sin((x + plank * 53) * 0.05f + Mathf.Sin(x * 0.013f + plank * 1.7f) * 2.6f) * 0.03f;
+            float tone = 0.96f + Hash(plank, 13) * 0.07f;
+            float edge = (y % 24) < 2 ? 0.05f : 0f; // soft bevel highlight on each plank (light from above)
+            return Shade(baseC, tone + grain + edge);
+        }));
+
+        /// <summary>Pale warm stone with soft speckles (alternative counter).</summary>
+        public static Sprite Stone() => Get("stone", () => Tile("stone", 64, 64, 200, (x, y) =>
+        {
+            float n = Hash(x / 3, y / 3) * 0.5f + Hash(x / 9 + 11, y / 9 + 5) * 0.5f;
+            float speck = Hash(x, y) > 0.985f ? -0.18f : 0f;
+            return Shade(H("#EADFCF"), 0.95f + n * 0.08f + speck);
+        }));
+
         // ---------- Frames ----------
 
         /// <summary>Rounded frame with a darker rim and lighter inner floor, 9-sliced.</summary>

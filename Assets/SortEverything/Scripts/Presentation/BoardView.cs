@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using SortEverything.Domain;
+using SortEverything.Runtime;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -10,29 +11,28 @@ using UnityEngine.UI;
 namespace SortEverything.Presentation
 {
     /// <summary>
-    /// Renders one board from committed state. Coordinates are board-local, top-left origin, y downward.
-    /// Never reads animation positions as assignments; <see cref="SnapAll"/> reconstructs from the model.
+    /// Renders one board from committed state as a kitchen moment: a countertop (play surface) with the item
+    /// pile, and real containers sitting on the cabinet below it. Geometry comes from <see cref="BoardLayout"/>;
+    /// coordinates are board-local, top-left origin, y downward. Never reads animation positions as assignments;
+    /// <see cref="SnapAll"/> reconstructs everything from the model.
     /// </summary>
     public sealed class BoardView : MonoBehaviour
     {
+        /// <summary>Design width of the 360-unit reference phone (editor previews, ghost demos).</summary>
         public const float Width = 360f;
-        public const float SourceHeight = 156f; // minimum; the live board grows it to fill tall screens (SourceH)
-        public const float TargetHeight = 322f;
-        public const float SlotPitch = 52f;
-        public const float Header = 36f;
         public const float Forgiveness = 6f;
 
         public RectTransform Root { get; private set; }
         public RectTransform SourceRegion { get; private set; }
-        public RectTransform TargetRegion { get; private set; }
         public RectTransform ObjectLayer { get; private set; }
+        public RectTransform FrontLayer { get; private set; }
         public RectTransform DragLayer { get; private set; }
         public RectTransform OverlayLayer { get; private set; }
-        public float SourceTop { get; private set; }
-        public float SourceH { get; private set; } = SourceHeight;
         public RectTransform FxLayer { get; private set; }
-        MessLayer _mess;
-        public float TargetTop { get; private set; }
+        public RectTransform ShineMask { get; private set; }
+        public BoardLayout Layout { get; private set; }
+        public float W => Layout.Width;
+        public AreaData Area { get; private set; }
 
         public BoardDef Def { get; private set; }
         public readonly Dictionary<string, ObjectView> Objects = new Dictionary<string, ObjectView>();
@@ -44,87 +44,76 @@ namespace SortEverything.Presentation
         public Action<ObjectView, PointerEventData> PointerDrag;
         public Action<ObjectView, PointerEventData> PointerUp;
         public bool ReducedMotion;
+        MessLayer _mess;
+        CanvasGroup _propGroup;
 
-        public static BoardView Create(Transform parent, BoardDef def, float sourceTop, float targetTop, Camera cam, string purposeProp, float sourceHeight = SourceHeight)
+        public static BoardView Create(Transform parent, BoardDef def, BoardLayout layout, Camera cam, string purposeProp, AreaData area, MessData mess)
         {
             var rt = UIKit.Rect(parent, "Board_" + def.BoardId);
             rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 1);
             rt.pivot = new Vector2(0, 1);
-            rt.anchoredPosition = new Vector2(-Width / 2, 0);
-            rt.sizeDelta = new Vector2(Width, targetTop + TargetHeight);
+            rt.anchoredPosition = new Vector2(-layout.Width / 2, 0);
+            rt.sizeDelta = new Vector2(layout.Width, layout.PlayH + layout.ContainersH);
             var v = rt.gameObject.AddComponent<BoardView>();
-            v.Root = rt; v.Def = def; v.UiCamera = cam; v.SourceTop = sourceTop; v.TargetTop = targetTop; v.SourceH = Mathf.Max(SourceHeight, sourceHeight);
-            v.Build(purposeProp);
+            v.Root = rt; v.Def = def; v.UiCamera = cam; v.Layout = layout; v.Area = area;
+            v.Build(purposeProp, mess);
             return v;
         }
 
-        void Build(string purposeProp)
+        void Build(string purposeProp, MessData mess)
         {
             BuildRoom();
-            var hazeHolder = UIKit.Rect(Root, "HazeHolder").Stretch(); // dims the room until the board is sorted
 
-            // Source region: the cluttered counter, with a return-area guide on planning boards.
-            var src = UIKit.Panel(Root, "SourceRegion", new Color(1f, 0.97f, 0.9f, 0.16f), 18);
-            SourceRegion = src.rectTransform.TopLeft(6, SourceTop, Width - 12, SourceH);
-            ReturnArea = UIKit.Panel(SourceRegion, "ReturnArea", new Color(1, 1, 1, 0), 18);
-            ReturnArea.rectTransform.Stretch();
-            var returnLabel = UIKit.Label(ReturnArea.transform, "Label", "Return to counter", 12, UIKit.InkSoft, TextAnchor.LowerCenter);
-            returnLabel.rectTransform.Stretch(4, 4, 4, 4);
+            // Play surface: the counter itself (no panel over it). Used for "put back" drops on planning boards.
+            SourceRegion = UIKit.Rect(Root, "SourceRegion").TopLeft(Layout.PlayRect.x, Layout.PlayRect.y, Layout.PlayRect.width, Layout.PlayRect.height);
+            ReturnArea = KitchenArt.Sliced(SourceRegion, "ReturnArea", KitchenArt.Frame("return", new Color(1, 1, 1, 0.9f), new Color(1, 1, 1, 0f), 3, 18), new Color(1, 1, 1, 0.8f));
+            ReturnArea.rectTransform.Stretch(4, 4, 4, 4);
+            var returnLabel = UIKit.Label(ReturnArea.transform, "Label", "Drop on the counter to put it back", 12, UIKit.Ink, TextAnchor.LowerCenter, FontStyle.Bold);
+            returnLabel.rectTransform.Stretch(4, 4, 4, 8);
             ReturnArea.gameObject.SetActive(false);
 
-            TargetRegion = UIKit.Rect(Root, "TargetRegion").TopLeft(0, TargetTop, Width, TargetHeight);
-            PropBacking = UIKit.Panel(TargetRegion, "PurposeProp", PropColor(purposeProp), 22);
-            var (bt, bb) = TargetBounds(Def);
-            PropBacking.rectTransform.TopLeft(2, bt - 6, Width - 4, bb - bt + 12);
+            var messHolder = UIKit.Rect(Root, "MessHolder").Stretch();
+
+            // Purpose prop: appears behind the containers when the scene is finished (GDD Section 25 backings).
+            var back = Layout.Bins.Values;
+            float bTop = back.Min(b => b.Rect.yMin) - 6, bBottom = back.Max(b => b.Rect.yMax) + 6;
+            PropBacking = UIKit.Panel(Root, "PurposeProp", PropColor(purposeProp), 18);
+            PropBacking.rectTransform.TopLeft(4, bTop, W - 8, bBottom - bTop);
             var (pattern, patternTint) = KitchenArt.PropPattern(purposeProp);
             KitchenArt.Tiled(PropBacking.transform, "Pattern", pattern, patternTint).rectTransform.Stretch(6, 6, 6, 6);
             var tag = UIKit.Panel(PropBacking.transform, "Tag", new Color(1, 0.98f, 0.94f, 0.95f), 8);
             tag.rectTransform.anchorMin = tag.rectTransform.anchorMax = new Vector2(1, 0);
             tag.rectTransform.pivot = new Vector2(1, 0);
-            tag.rectTransform.anchoredPosition = new Vector2(-8, 4);
-            tag.rectTransform.sizeDelta = new Vector2(140, 18);
+            tag.rectTransform.anchoredPosition = new Vector2(-8, -16);
+            tag.rectTransform.sizeDelta = new Vector2(150, 18);
             var propLabel = UIKit.Label(tag.transform, "Label", PropName(purposeProp), 11, UIKit.Ink, TextAnchor.MiddleCenter, FontStyle.Bold);
             propLabel.rectTransform.Stretch(4, 0, 4, 0);
             _propGroup = PropBacking.gameObject.AddComponent<CanvasGroup>();
             _propGroup.alpha = 0f;
             _propGroup.blocksRaycasts = false;
 
-            foreach (var t in Def.Targets)
-            {
-                var tv = TargetView.Create(TargetRegion, Def, t);
-                Targets[t.TargetId] = tv;
-            }
-
-            var messHolder = UIKit.Rect(Root, "MessHolder").Stretch();
+            var binLayer = UIKit.Rect(Root, "Containers").Stretch();
             ObjectLayer = UIKit.Rect(Root, "Objects").Stretch();
+            FrontLayer = UIKit.Rect(Root, "ContainerFronts").Stretch();
             OverlayLayer = UIKit.Rect(Root, "Overlay").Stretch();
+            ShineMask = UIKit.Rect(Root, "ShineMask").TopLeft(-400, 0, W + 800, Layout.PlayH - 10);
+            ShineMask.gameObject.AddComponent<RectMask2D>();
             FxLayer = UIKit.Rect(Root, "Fx").Stretch();
             DragLayer = UIKit.Rect(Root, "Drag").Stretch();
-            _mess = MessLayer.Create(messHolder, hazeHolder, this, FxLayer, Def.BoardId,
-                new Rect(22, SourceTop + 14, Width - 44, SourceH - 26), Mathf.Clamp(Def.Objects.Count + 3, 7, 15));
 
-            // Foreground priority: later siblings receive raycasts first; keep authored order stable.
-            foreach (var o in Def.Objects)
-            {
-                var ov = ObjectView.Create(ObjectLayer, this, o, Def.IsPlanning);
-                Objects[o.InstanceId] = ov;
-            }
+            foreach (var t in Def.Targets)
+                Targets[t.TargetId] = TargetView.Create(binLayer, FrontLayer, Def, t, Layout.Bins[t.TargetId], ContentDb.Containers.ForAccepts(t.Accepts) ?? Fallback);
+
+            // Draw order: big items underneath, small ones on top (raycasts hit the visible top item first).
+            foreach (var o in Def.Objects.OrderBy(o => Layout.Pile[o.InstanceId].Layer))
+                Objects[o.InstanceId] = ObjectView.Create(ObjectLayer, this, o);
+
+            var messCfg = mess ?? new MessData();
+            bool messOn = BoardLayoutConfig.Current.messEnabled && messCfg.enabled;
+            _mess = MessLayer.Create(messHolder, this, FxLayer, Def, Layout, messOn ? messCfg : new MessData { enabled = false, density = 0 });
         }
 
-        /// <summary>Vertical extent (top, bottom) the target cards actually use inside the 322-unit target region.</summary>
-        public static (float top, float bottom) TargetBounds(BoardDef def)
-        {
-            float top = float.MaxValue, bottom = float.MinValue;
-            foreach (var t in def.Targets)
-            {
-                var (_, h, _, _) = TargetView.Size(def, t);
-                float cy = t.Y * TargetHeight;
-                top = Mathf.Min(top, cy - h / 2);
-                bottom = Mathf.Max(bottom, cy + h / 2);
-            }
-            if (top > bottom) return (0, TargetHeight);
-            return (Mathf.Max(0, top - 10), Mathf.Min(TargetHeight, bottom + 10));
-        }
+        static readonly ContainerArchetypeData Fallback = new ContainerArchetypeData { id = "fallback", style = "tray" };
 
         static Color PropColor(string prop)
         {
@@ -156,8 +145,6 @@ namespace SortEverything.Presentation
             }
         }
 
-        CanvasGroup _propGroup;
-
         public void ShowPurposeProp(bool show, bool instant)
         {
             float a0 = _propGroup.alpha, a1 = show ? 1f : 0f;
@@ -166,79 +153,64 @@ namespace SortEverything.Presentation
         }
 
         /// <summary>
-        /// Kitchen room behind the board: wooden counter under the clutter and an open shelf unit holding the
-        /// containers. Extends past the 360-unit board for wide screens. Never receives raycasts.
+        /// The room in one consistent view: a countertop seen slightly from above (planks run one way), a rounded
+        /// front lip with its shadow, then the painted cabinet the containers sit on. Materials come from area data.
+        /// Bleeds past the board for wide screens. Never receives raycasts.
         /// </summary>
         void BuildRoom()
         {
-            const float bleed = 400f;
+            const float bleed = 600f;
             var room = UIKit.Rect(Root, "Room");
-            room.TopLeft(-bleed, 0, Width + bleed * 2, TargetTop + TargetBounds(Def).bottom + 40);
+            float total = Layout.PlayH + Layout.ContainersH;
+            room.TopLeft(-bleed, 0, W + bleed * 2, total + 400);
+            float fullW = W + bleed * 2;
+            float lipTop = Layout.PlayH - 10;
 
-            // Backsplash shadow + counter top + front lip.
-            float counterTop = SourceTop - 12, counterBottom = SourceTop + SourceH + 4;
-            var shadow = UIKit.Panel(room, "CounterShadow", new Color(0.35f, 0.25f, 0.18f, 0.18f), 0);
-            shadow.rectTransform.TopLeft(0, counterTop - 4, Width + bleed * 2, 6);
-            var counter = KitchenArt.Tiled(room, "Counter", KitchenArt.Wood(), Color.white);
-            counter.rectTransform.TopLeft(0, counterTop, Width + bleed * 2, counterBottom - counterTop);
-            var lip = UIKit.Panel(room, "CounterLip", SpriteFactory.Hex("#A87444"), 0);
-            lip.rectTransform.TopLeft(0, counterBottom, Width + bleed * 2, 8);
-            var lipShade = UIKit.Panel(room, "LipShade", new Color(0.3f, 0.2f, 0.12f, 0.25f), 0);
-            lipShade.rectTransform.TopLeft(0, counterBottom + 8, Width + bleed * 2, 5);
+            var counter = KitchenArt.Tiled(room, "Countertop", KitchenArt.Surface(Area.surface, Area.surfaceColor), SpriteFactory.Hex(Area.surfaceTint));
+            counter.rectTransform.TopLeft(0, 0, fullW, lipTop);
+            // A faint darker band where the backsplash meets the counter (depth cue from the top-left light).
+            var backShade = UIKit.Panel(room, "BacksplashShade", new Color(0.3f, 0.18f, 0.1f, 0.16f), 0);
+            backShade.rectTransform.TopLeft(0, 0, fullW, 5);
+            var lip = UIKit.Panel(room, "CounterLip", SpriteFactory.Hex(Area.lip), 0);
+            lip.rectTransform.TopLeft(0, lipTop, fullW, 10);
+            var lipHi = UIKit.Panel(room, "LipHighlight", new Color(1, 1, 1, 0.28f), 0);
+            lipHi.rectTransform.TopLeft(0, lipTop, fullW, 2);
 
-            // Open shelf unit for the containers.
-            var (usedTop, usedBottom) = TargetBounds(Def);
-            float shelfTop = TargetTop + usedTop - 14, shelfBottom = TargetTop + usedBottom + 10;
-            var back = KitchenArt.Tiled(room, "ShelfBack", KitchenArt.ShelfBack(), new Color(1, 1, 1, 0.9f));
-            back.rectTransform.TopLeft(0, shelfTop, Width + bleed * 2, shelfBottom - shelfTop);
-            var topRail = KitchenArt.Tiled(room, "ShelfTop", KitchenArt.Wood(), SpriteFactory.Hex("#E0C29C"));
-            topRail.rectTransform.TopLeft(0, shelfTop - 6, Width + bleed * 2, 10);
-            var bottomRail = KitchenArt.Tiled(room, "ShelfBottom", KitchenArt.Wood(), SpriteFactory.Hex("#E0C29C"));
-            bottomRail.rectTransform.TopLeft(0, shelfBottom - 4, Width + bleed * 2, 12);
-            var bottomShade = UIKit.Panel(room, "ShelfShade", new Color(0.3f, 0.2f, 0.12f, 0.3f), 0);
-            bottomShade.rectTransform.TopLeft(0, shelfBottom + 8, Width + bleed * 2, 6);
+            var cabinet = UIKit.Panel(room, "Cabinet", SpriteFactory.Hex(Area.cabinet), 0);
+            cabinet.rectTransform.TopLeft(0, Layout.PlayH, fullW, Layout.ContainersH + 400);
+            var shadow = UIKit.Panel(room, "LipShadow", new Color(0.2f, 0.12f, 0.08f, 0.28f), 0);
+            shadow.rectTransform.TopLeft(0, Layout.PlayH, fullW, 7);
+            // Door seams so the cabinet reads as furniture, not a flat panel.
+            var seam = SpriteFactory.Hex(Area.cabinetShade);
+            float step = W / 2f;
+            for (float x = bleed - Mathf.Ceil(bleed / step) * step; x < fullW; x += step)
+            {
+                var s = UIKit.Panel(room, "DoorSeam", seam, 0);
+                s.rectTransform.TopLeft(x - 1, Layout.PlayH + 7, 2, Layout.ContainersH + 400);
+            }
+            var edge = UIKit.Panel(room, "ShelfEdge", new Color(1, 1, 1, 0.2f), 0);
+            edge.rectTransform.TopLeft(0, Layout.PlayH + 7, fullW, 2);
         }
 
         // ---------- Geometry ----------
 
-        /// <summary>
-        /// Where an unsorted item lies on the counter: its authored grid spot plus a stable per-item nudge, so the
-        /// counter looks like a real mess (overlaps, odd angles) but never hides an item completely.
-        /// </summary>
-        public Vector2 SourcePosition(ObjectDef o)
+        public Vector2 SourcePosition(ObjectDef o) => Layout.Pile[o.InstanceId].Center;
+        public float SourceRotation(ObjectDef o) => Layout.Pile[o.InstanceId].Rotation;
+        public Vector2 SlotPosition(string targetId, int slot) => Layout.SlotPosition(targetId, slot, Def.Target(targetId).SlotCount);
+
+        /// <summary>Sets an item's resting look (size, tilt, touch area) for where it now belongs.</summary>
+        public void RestOn(ObjectView v, string targetId, bool instant = false)
         {
-            var grid = new Vector2(6 + o.SourceX * (Width - 12), SourceTop + o.SourceY * SourceH);
-            var center = new Vector2(Width / 2, SourceTop + SourceH / 2);
-            // Pull everything toward a loose pile in the middle, then nudge each item off its grid spot.
-            var p = center + (grid - center) * 0.8f;
-            p += new Vector2((Noise(o, 1) - 0.5f) * 48f, (Noise(o, 2) - 0.5f) * 30f * Mathf.Min(1.6f, SourceH / SourceHeight));
-            p.x = Mathf.Clamp(p.x, 32, Width - 32);
-            p.y = Mathf.Clamp(p.y, SourceTop + 30, SourceTop + SourceH - 26);
-            return p;
-        }
-
-        /// <summary>Stable messy tilt for an unsorted item.</summary>
-        public static float SourceRotation(ObjectDef o) => (Noise(o, 3) - 0.5f) * 44f;
-
-        /// <summary>Unsorted items vary a little in size; sorted ones sit uniformly in their slots.</summary>
-        public static float SourceScale(ObjectDef o) => 1.0f + Noise(o, 4) * 0.12f;
-        public const float SlotScale = 0.9f;
-
-        static float Noise(ObjectDef o, int salt)
-        {
-            unchecked
+            if (targetId == null)
             {
-                uint h = 2166136261u ^ (uint)(salt * 16777619);
-                foreach (char c in o.InstanceId) { h ^= c; h *= 16777619u; }
-                h ^= h >> 13; h *= 0x5bd1e995; h ^= h >> 15;
-                return (h & 0xFFFFFF) / (float)0x1000000;
+                var p = Layout.Pile[v.Def.InstanceId];
+                v.SetRest(p.Visible, p.Rotation, p.Hit, false, instant);
             }
-        }
-
-        public Vector2 SlotPosition(string targetId, int slot)
-        {
-            var tv = Targets[targetId];
-            return new Vector2(0, TargetTop) + tv.SlotCenter(slot);
+            else
+            {
+                float size = Layout.BinItemSize(targetId, v.Def.AssetId);
+                v.SetRest(size, 0f, Mathf.Max(BoardLayoutConfig.Current.itemHitMin, size), true, instant);
+            }
         }
 
         public Vector2 ToBoard(Vector2 screen)
@@ -247,12 +219,8 @@ namespace SortEverything.Presentation
             return new Vector2(local.x, -local.y);
         }
 
-        public Rect TargetRectBoard(string targetId)
-        {
-            var tv = Targets[targetId];
-            var r = tv.LocalRect;
-            return new Rect(r.x, r.y + TargetTop, r.width, r.height);
-        }
+        public Rect TargetRectBoard(string targetId) => Layout.Bins[targetId].Rect;
+        public Vector2 TargetCenter(string targetId) => TargetRectBoard(targetId).center;
 
         /// <summary>Target under the projected center within forgiving bounds; overlaps resolve by closest center then ID.</summary>
         public string TargetAt(Vector2 p)
@@ -269,7 +237,7 @@ namespace SortEverything.Presentation
             return best;
         }
 
-        public bool OverSource(Vector2 p) => new Rect(6, SourceTop, Width - 12, SourceH).Contains(p);
+        public bool OverSource(Vector2 p) => new Rect(0, 0, W, Layout.PlayH).Contains(p);
 
         // ---------- State sync ----------
 
@@ -279,22 +247,22 @@ namespace SortEverything.Presentation
             {
                 var view = Objects[o.InstanceId];
                 view.transform.SetParent(ObjectLayer, false);
-                view.SetDragging(false, Def.IsPlanning);
+                view.SetDragging(false);
                 var target = s.TargetOf(o.InstanceId);
                 view.Place(target == null ? SourcePosition(o) : SlotPosition(target, s.SlotOf(o.InstanceId)));
-                view.SetAssigned(target != null, Def.IsPlanning);
-                view.SetRotation(target == null && beforeProfile ? SourceRotation(o) : 0f, instant: true);
+                RestOn(view, target, instant: true);
                 view.SnapMotion();
             }
+            // Keep the pile's draw order after re-parenting.
+            foreach (var o in Def.Objects.OrderBy(o => Layout.Pile[o.InstanceId].Layer)) Objects[o.InstanceId].transform.SetAsLastSibling();
             foreach (var t in Def.Targets) Targets[t.TargetId].SetUsage(s.UnitsIn(t.TargetId));
             RefreshProgress(s, animate: false);
         }
 
-        /// <summary>Mess clears and containers get their done badge as the board is sorted.</summary>
+        /// <summary>Mess under sorted items clears and containers get their done stamp.</summary>
         public void RefreshProgress(BoardState s, bool animate)
         {
-            float fraction = s.ObjectCount == 0 ? 1f : s.SortedCount / (float)s.ObjectCount;
-            _mess.SetProgress(fraction, animate, ReducedMotion);
+            _mess.Refresh(s, animate && !ReducedMotion);
             foreach (var t in Def.Targets)
             {
                 bool any = s.UnitsIn(t.TargetId) > 0;
@@ -303,9 +271,7 @@ namespace SortEverything.Presentation
             }
         }
 
-        /// <summary>Board-space center of a target card.</summary>
-        public Vector2 TargetCenter(string targetId) => TargetRectBoard(targetId).center;
-
+        /// <summary>GDD before-profile rotations (kept for the overview's clutter miniatures).</summary>
         public static float BeforeRotation(int index)
         {
             float[] r = { -10, 7, -4, 9 };
@@ -314,14 +280,10 @@ namespace SortEverything.Presentation
 
         public void SetHover(string targetId)
         {
-            foreach (var kv in Targets) kv.Value.SetHover(kv.Key == targetId);
+            foreach (var kv in Targets) kv.Value.SetHover(kv.Key == targetId, ReducedMotion);
         }
 
-        public void ShowReturnArea(bool show)
-        {
-            ReturnArea.gameObject.SetActive(show);
-            ReturnArea.color = new Color(1, 1, 1, show ? 0.25f : 0f);
-        }
+        public void ShowReturnArea(bool show) => ReturnArea.gameObject.SetActive(show);
 
         public IEnumerator Move(ObjectView v, Vector2 to, float duration, bool overshoot)
         {
@@ -339,18 +301,15 @@ namespace SortEverything.Presentation
             StartCoroutine(UIKit.Tween(duration, t =>
             {
                 float s = 1 + Mathf.Sin(t * Mathf.PI) * amount;
-                tv.transform.localScale = new Vector3(s, 2 - s, 1); // a little squash: wider and shorter
-            }));
+                tv.SetBounce(new Vector3(s, 2 - s, 1)); // a little squash: wider and shorter
+            }, () => tv.SetBounce(Vector3.one)));
         }
 
+        /// <summary>A soft wobble for a refused drop (no red, no harsh motion).</summary>
         public void Shake(TargetView tv)
         {
             if (ReducedMotion) return;
-            var basePos = tv.Rt.anchoredPosition;
-            StartCoroutine(UIKit.Tween(0.2f, t =>
-            {
-                tv.Rt.anchoredPosition = basePos + new Vector2(Mathf.Sin(t * Mathf.PI * 6) * 4 * (1 - t), 0);
-            }));
+            StartCoroutine(UIKit.Tween(0.32f, t => tv.SetTilt(Mathf.Sin(t * Mathf.PI * 4) * 2.2f * (1 - t)), () => tv.SetTilt(0)));
         }
 
         /// <summary>Final micro-action (300–700 ms). Never hides targets; contents stay visible.</summary>
@@ -362,215 +321,215 @@ namespace SortEverything.Presentation
                 case "basket_alignment":
                     yield return UIKit.Tween(0.45f, t =>
                     {
-                        foreach (var tv in Targets.Values)
-                        {
-                            tv.transform.localRotation = Quaternion.Euler(0, 0, Mathf.Sin(t * Mathf.PI * 2) * 2.5f * (1 - t));
-                            tv.ShowFinished(kind, t);
-                        }
+                        foreach (var tv in Targets.Values) { tv.SetTilt(Mathf.Sin(t * Mathf.PI * 2) * 2.5f * (1 - t)); tv.ShowFinished(kind, t); }
                     });
+                    foreach (var tv in Targets.Values) tv.SetTilt(0);
                     break;
                 case "tray_settle":
                     yield return UIKit.Tween(0.4f, t =>
                     {
-                        foreach (var tv in Targets.Values)
-                        {
-                            tv.transform.localPosition = tv.BaseLocal + new Vector3(0, -Mathf.Sin(t * Mathf.PI) * 5, 0);
-                            tv.ShowFinished(kind, t);
-                        }
+                        foreach (var tv in Targets.Values) { tv.SetBounce(new Vector3(1, 1 - Mathf.Sin(t * Mathf.PI) * 0.04f, 1)); tv.ShowFinished(kind, t); }
                     });
+                    foreach (var tv in Targets.Values) tv.SetBounce(Vector3.one);
                     break;
                 default:
                     yield return UIKit.Tween(0.5f, t => { foreach (var tv in Targets.Values) tv.ShowFinished(kind, UIKit.EaseOut(t)); });
                     break;
             }
         }
+
+        /// <summary>The "clean shine": a bright band sweeping across the counter before the result screen.</summary>
+        public IEnumerator CleanShine()
+        {
+            if (ReducedMotion) yield break;
+            var band = UIKit.Icon(ShineMask, "Shine", Fx.ShineBand(), 10, new Color(1f, 0.98f, 0.9f, 0f));
+            band.preserveAspect = false;
+            var rt = band.rectTransform;
+            rt.anchorMin = rt.anchorMax = new Vector2(0, 1);
+            rt.sizeDelta = new Vector2(Layout.PlayH * 0.5f, Layout.PlayH * 1.8f);
+            rt.localRotation = Quaternion.Euler(0, 0, -24f);
+            float from = 400 - Layout.PlayH * 0.6f, to = 400 + W + Layout.PlayH * 0.6f;
+            yield return UIKit.Tween(0.7f, t =>
+            {
+                if (band == null) return;
+                rt.anchoredPosition = new Vector2(Mathf.Lerp(from, to, UIKit.EaseOut(t)), -Layout.PlayH * 0.45f);
+                band.color = new Color(1f, 0.98f, 0.9f, 0.9f * Mathf.Sin(Mathf.PI * Mathf.Clamp01(t * 1.05f)));
+            });
+            if (band != null) Destroy(band.gameObject);
+        }
     }
 
+    /// <summary>
+    /// A real kitchen container (archetype from data): ground shadow, body and interior behind the items, a front
+    /// lip drawn over them, and a small sticker tag with icon, name and (for limited bins) spaces used.
+    /// States: idle, hover-valid (warm glow, the lip dips as if the container opens), accept bounce, soft reject.
+    /// </summary>
     public sealed class TargetView : MonoBehaviour
     {
         public TargetDef Def;
         public RectTransform Rt;
-        public Rect LocalRect; // within TargetRegion, top-left origin
+        public Rect LocalRect;
         public Vector3 BaseLocal;
-        Image _frame;
-        Image _hover;
-        Image _hint;
-        Image _finish;
-        Text _usage;
-        Text _status;
-        Image _done;
-        bool _isDone;
-        int _cols, _rows;
+        public ContainerArchetypeData Archetype;
+        RectTransform _front;
+        Vector2 _frontBase;
+        Image _glow, _rimGlow, _hint, _finish, _done;
+        Text _usage, _status;
+        RectTransform _statusTag;
+        bool _isDone, _hover;
+        float _open, _openVel;
+        Vector3 _bounce = Vector3.one;
+        float _tilt;
         Coroutine _statusRoutine;
 
-        public static TargetView Create(RectTransform region, BoardDef board, TargetDef t)
+        public static TargetView Create(RectTransform layer, RectTransform frontLayer, BoardDef board, TargetDef t, BinPlacement place, ContainerArchetypeData arch)
         {
-            var (w, h, cols, rows) = Size(board, t);
-            float cx = t.X * BoardView.Width, cy = t.Y * BoardView.TargetHeight;
-            if (t.RectProfile == "full_width") cy = t.Y * BoardView.TargetHeight;
-            var frame = UIKit.Panel(region, "Target_" + t.TargetId, Color.white, 16);
-            var rt = frame.rectTransform.Center(cx, cy, w, h);
-            var v = frame.gameObject.AddComponent<TargetView>();
-            v.Def = t; v.Rt = rt; v._frame = frame; v._cols = cols; v._rows = rows;
-            v.LocalRect = new Rect(cx - w / 2, cy - h / 2, w, h);
-            v.Build(board);
+            var r = place.Rect;
+            var rt = UIKit.Rect(layer, "Target_" + t.TargetId);
+            rt.anchorMin = rt.anchorMax = new Vector2(0, 1);
+            rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.anchoredPosition = new Vector2(r.center.x, -r.center.y);
+            rt.sizeDelta = r.size;
+            var v = rt.gameObject.AddComponent<TargetView>();
+            v.Def = t; v.Rt = rt; v.LocalRect = r; v.Archetype = arch;
+            v.Build(frontLayer, place);
             v.BaseLocal = rt.localPosition;
             return v;
         }
 
-        /// <summary>Card size and slot grid by profile (Section 25 target geometry).</summary>
-        public static (float w, float h, int cols, int rows) Size(BoardDef board, TargetDef t)
-        {
-            int cols, rows;
-            bool uNarrow = board.TemplateId == TemplateIds.Unlimited && t.RectProfile == "narrow";
-            switch (t.SlotProfile)
-            {
-                case "one": cols = 1; rows = 1; break;
-                case "two": cols = uNarrow ? 1 : 2; rows = uNarrow ? 2 : 1; break;
-                case "three_vertical": cols = 1; rows = 3; break;
-                case "four_vertical": cols = 1; rows = 4; break;
-                case "four_square": cols = 2; rows = 2; break;
-                case "six": cols = 3; rows = 2; break;
-                case "nine": cols = 3; rows = 3; break;
-                default: cols = 2; rows = 2; break;
-            }
-            float w;
-            switch (t.RectProfile)
-            {
-                case "wide": case "quad": w = 0.46f * BoardView.Width; break;
-                case "narrow": w = 0.31f * BoardView.Width; break;
-                default: w = 0.96f * BoardView.Width; break;
-            }
-            float h;
-            if (board.TemplateId == TemplateIds.P2 || board.TemplateId == TemplateIds.P3)
-                h = t.RectProfile == "full_width" ? (board.TemplateId == TemplateIds.P3 ? 204f : 152f) : 100f;
-            else if (board.TemplateId == TemplateIds.P4) h = 100f;
-            else if (t.RectProfile == "quad") h = Mathf.Min(0.46f * BoardView.TargetHeight, BoardView.Header + rows * BoardView.SlotPitch + 8);
-            else h = Mathf.Max(100f, BoardView.Header + rows * BoardView.SlotPitch + 12);
-            if (board.TemplateId == TemplateIds.Unlimited && t.RectProfile == "wide")
-            {
-                // Uniform height across the pair so the layout reads calmly.
-                int maxRows = 1;
-                foreach (var other in board.Targets) maxRows = Mathf.Max(maxRows, other.SlotCount > 2 ? 2 : 1);
-                h = Mathf.Max(h, BoardView.Header + maxRows * BoardView.SlotPitch + 12);
-            }
-            return (w, h, cols, rows);
-        }
+        static Color H(string hex) => SpriteFactory.Hex(hex);
 
-        void Build(BoardDef board)
+        void Build(RectTransform frontLayer, BinPlacement place)
         {
-            bool shared = Def.Accepts.Count > 1;
-            string styleKey = shared ? "shared" : Def.Accepts[0];
-            var style = KitchenArt.ContainerStyle(styleKey);
-            _frame.sprite = KitchenArt.Frame(style.key, style.rim, style.inner);
-            _frame.type = Image.Type.Sliced;
-            _frame.color = Color.white;
-            var drop = _frame.gameObject.AddComponent<Shadow>();
-            drop.effectColor = new Color(0.25f, 0.16f, 0.1f, 0.35f);
-            drop.effectDistance = new Vector2(0, -3);
-            if (style.pattern != null)
-                KitchenArt.Tiled(Rt, "Pattern", style.pattern, style.patternTint).rectTransform.Stretch(7, BoardView.Header, 7, 7);
-            if (styleKey == "kitchenware")
+            var a = Archetype;
+            float w = LocalRect.width, h = LocalRect.height;
+            var ground = KitchenArt.Sliced(Rt, "GroundShadow", ContainerArt.GroundShadow(), Color.white);
+            ground.rectTransform.Stretch(-4, 10, -10, -9); // offset down-right: light from the top-left
+            _glow = UIKit.Icon(Rt, "HoverGlow", Fx.Glow(), 10, new Color(1f, 0.92f, 0.62f, 0f));
+            _glow.preserveAspect = false;
+            _glow.rectTransform.Stretch(-26, -26, -26, -26);
+            _rimGlow = KitchenArt.Sliced(Rt, "RimGlow", KitchenArt.Frame("rimglow", new Color(1f, 0.86f, 0.42f, 1f), new Color(1, 1, 1, 0), 5, 20), new Color(1, 1, 1, 0));
+            _rimGlow.rectTransform.Stretch(-4, -4, -4, -4);
+            _hint = KitchenArt.Sliced(Rt, "Hint", KitchenArt.Frame("hint", new Color(1f, 0.82f, 0.3f, 1f), new Color(1, 1, 1, 0), 4, 18), new Color(1, 1, 1, 0));
+            _hint.rectTransform.Stretch(-5, -5, -5, -5);
+
+            var back = KitchenArt.Sliced(Rt, "Body", ContainerArt.Back(a), Color.white);
+            back.type = back.sprite.border == Vector4.zero ? Image.Type.Simple : Image.Type.Sliced;
+            back.rectTransform.Stretch();
+            var (pattern, tint) = ContainerArt.Pattern(a);
+            if (pattern != null) KitchenArt.Tiled(Rt, "Pattern", pattern, tint).rectTransform.Stretch(9, 10, 9, 9);
+            if (a.style == "drawer" && place.Cols > 1)
             {
-                // Drawer front with a metal pull, below the slots so contents stay visible.
-                var pull = UIKit.Panel(Rt, "DrawerPull", SpriteFactory.Hex("#9AA3AE"), 4);
-                pull.rectTransform.anchorMin = pull.rectTransform.anchorMax = new Vector2(0.5f, 0);
-                pull.rectTransform.anchoredPosition = new Vector2(0, 5);
-                pull.rectTransform.sizeDelta = new Vector2(Mathf.Min(48, LocalRect.width * 0.4f), 5);
-            }
-            if (shared)
-            {
-                // Tray handles on both sides.
-                foreach (var side in new[] { 0f, 1f })
+                // Cutlery tray dividers between the columns.
+                for (int c = 1; c < place.Cols; c++)
                 {
-                    var h = UIKit.Panel(Rt, "Handle", style.rim, 4);
-                    h.rectTransform.anchorMin = h.rectTransform.anchorMax = new Vector2(side, 0.5f);
-                    h.rectTransform.anchoredPosition = new Vector2(side == 0 ? -3 : 3, 0);
-                    h.rectTransform.sizeDelta = new Vector2(8, 26);
-                    h.transform.SetAsFirstSibling();
+                    float x = place.Interior.x - LocalRect.x + place.Interior.width * c / place.Cols;
+                    var d = UIKit.Panel(Rt, "Divider", H(a.accent), 2);
+                    d.rectTransform.TopLeft(x - 2, place.Interior.y - LocalRect.y - 2, 4, place.Interior.height + 4);
                 }
             }
+            if (a.style == "fridge")
+            {
+                var light = UIKit.Icon(Rt, "InteriorLight", Fx.Glow(), 10, new Color(0.85f, 0.95f, 1f, 0.55f));
+                light.preserveAspect = false;
+                light.rectTransform.TopLeft(w * 0.1f, 4, w * 0.8f, h * 0.45f);
+            }
 
-            // Header: a paper label tag carrying category symbols, short label and usage (readable over any pattern).
-            var labelTag = UIKit.Panel(Rt, "LabelTag", new Color(1f, 0.985f, 0.95f, 0.95f), 9);
-            labelTag.rectTransform.TopLeft(5, 4, LocalRect.width - 10, BoardView.Header - 6);
-            var header = UIKit.Rect(Rt, "Header").TopLeft(9, 3, LocalRect.width - 18, BoardView.Header - 4);
-            float x = 0;
-            float iconSize = Def.Accepts.Count >= 4 ? 18 : 22;
+            // Sticker tag: icon + short name; limited bins add a small "used/capacity" pill.
+            bool shared = Def.Accepts.Count > 1;
+            string label = shared ? (Def.Accepts.Count == 2 && Def.TargetId.Length == 2 ? "" : Strings.Get("target.shared")) : Strings.Get("category." + Def.Accepts[0]);
+            const float iconSize = 16;
+            float iconsW = Def.Accepts.Count * (iconSize + 1);
+            float textW = label.Length > 0 ? Mathf.Min(w - 22 - iconsW, 7.4f * label.Length + 6) : 0;
+            float tagW = 10 + iconsW + (textW > 0 ? textW + 4 : 0);
+            var tag = UIKit.Panel(Rt, "Tag", new Color(1f, 0.985f, 0.95f, 1f), 7);
+            tag.rectTransform.TopLeft(6, 4, tagW, 20);
+            var tagShadow = tag.gameObject.AddComponent<Shadow>();
+            tagShadow.effectColor = new Color(0.3f, 0.18f, 0.1f, 0.3f);
+            tagShadow.effectDistance = new Vector2(1, -1);
+            float x0 = 5;
             foreach (var cat in Def.Accepts)
             {
-                var ic = UIKit.Icon(header, "Icon_" + cat, SpriteFactory.CategoryIcon(cat), iconSize);
-                ic.rectTransform.TopLeft(x, (BoardView.Header - 4 - iconSize) / 2, iconSize, iconSize);
-                x += iconSize + 1;
+                var ic = UIKit.Icon(tag.transform, "Icon_" + cat, SpriteFactory.CategoryIcon(cat), iconSize);
+                ic.rectTransform.TopLeft(x0, 2, iconSize, iconSize);
+                x0 += iconSize + 1;
             }
-            string label = shared
-                ? (Def.Accepts.Count == 2 && Def.TargetId.Length == 2 ? "" : Strings.Get("target.shared"))
-                : Strings.Get("category." + Def.Accepts[0]);
-            bool limited = !Def.IsUnlimited;
-            // Narrow limited cards carry their count in a corner pill so the label keeps one readable line.
-            bool pill = limited && Def.RectProfile == "narrow";
-            float headerW = LocalRect.width - 18;
-            var title = UIKit.Label(header, "Label", label, 13, UIKit.Ink, TextAnchor.MiddleLeft, FontStyle.Bold);
-            title.resizeTextMinSize = 9;
-            title.rectTransform.TopLeft(x + 3, (BoardView.Header - 4 - 18) / 2, headerW - x - 3 - (limited && !pill ? 34 : 0), 18);
-            if (limited && !pill)
+            if (textW > 0)
             {
-                _usage = UIKit.Label(header, "Usage", "", 13, UIKit.Ink, TextAnchor.MiddleRight, FontStyle.Bold);
-                _usage.rectTransform.TopLeft(headerW - 40, 0, 40, BoardView.Header - 4);
+                var title = UIKit.Label(tag.transform, "Label", label, 12, UIKit.Ink, TextAnchor.MiddleLeft, FontStyle.Bold);
+                title.resizeTextMinSize = 8;
+                title.rectTransform.TopLeft(x0 + 2, 1, textW + 2, 18);
             }
-            else if (pill)
+
+            _finish = UIKit.Panel(Rt, "Finish", new Color(1, 1, 1, 0), 16);
+            _finish.rectTransform.Stretch();
+
+            // Front lip (drawn above the items, in the board's front layer).
+            float lipH = Mathf.Min(Mathf.Max(12, h * a.lipShare), place.LipHeight);
+            _front = UIKit.Rect(frontLayer, "Front_" + Def.TargetId);
+            _front.anchorMin = _front.anchorMax = new Vector2(0, 1);
+            _front.pivot = new Vector2(0.5f, 0f);
+            _frontBase = new Vector2(LocalRect.center.x, -LocalRect.yMax);
+            _front.anchoredPosition = _frontBase;
+            _front.sizeDelta = new Vector2(w, lipH);
+            var front = _front.gameObject.AddComponent<Image>();
+            front.sprite = ContainerArt.Front(a);
+            front.type = front.sprite.border == Vector4.zero ? Image.Type.Simple : Image.Type.Sliced;
+            front.raycastTarget = false;
+
+            // Limited containers show "used/capacity" on a small pill on the front lip (keeps the tag readable).
+            if (!Def.IsUnlimited)
             {
-                var chip = UIKit.Panel(Rt, "UsagePill", UIKit.Ink, 9);
-                chip.rectTransform.anchorMin = chip.rectTransform.anchorMax = new Vector2(1, 1);
-                chip.rectTransform.pivot = new Vector2(1, 0.5f);
-                chip.rectTransform.anchoredPosition = new Vector2(-6, 0);
-                chip.rectTransform.sizeDelta = new Vector2(38, 18);
+                var chip = UIKit.Panel(_front, "UsagePill", UIKit.Ink, 9);
+                chip.rectTransform.anchorMin = chip.rectTransform.anchorMax = new Vector2(0, 0.5f);
+                chip.rectTransform.pivot = new Vector2(0, 0.5f);
+                chip.rectTransform.anchoredPosition = new Vector2(8, 0);
+                chip.rectTransform.sizeDelta = new Vector2(36, Mathf.Min(18, lipH - 2));
                 _usage = UIKit.Label(chip.transform, "Usage", "", 12, Color.white, TextAnchor.MiddleCenter, FontStyle.Bold);
                 _usage.rectTransform.Stretch();
             }
 
-            // Soft slot guides: a hint of where things go, quieter than the items themselves.
-            for (int i = 0; i < Mathf.Max(1, Def.SlotCount); i++)
-            {
-                var c = SlotCenter(i);
-                var g = UIKit.Icon(Rt, "Slot" + i, Fx.Glow(), 50, new Color(1, 1, 1, 0.38f));
-                g.preserveAspect = false;
-                g.rectTransform.Center(c.x - LocalRect.x, c.y - LocalRect.y, 50, 42);
-            }
-
-            // "Done" stamp: a green check that pops onto the label when everything of its kind is home.
-            _done = UIKit.Icon(Rt, "Done", SpriteFactory.Circle(), 24, UIKit.Primary);
+            // "Done" stamp: a green check that pops onto the container when everything of its kind is home.
+            _done = UIKit.Icon(_front, "Done", SpriteFactory.Circle(), 22, UIKit.Primary);
             _done.rectTransform.anchorMin = _done.rectTransform.anchorMax = new Vector2(1, 1);
-            _done.rectTransform.anchoredPosition = new Vector2(-4, -2);
-            var check = UIKit.Label(_done.transform, "Check", "✓", 16, Color.white, TextAnchor.MiddleCenter, FontStyle.Bold);
-            check.rectTransform.Stretch(0, -1, 0, 1);
+            _done.rectTransform.anchoredPosition = new Vector2(-14, 4);
+            UIKit.Icon(_done.transform, "Check", ContainerArt.Check(), 18, Color.white).rectTransform.anchoredPosition = Vector2.zero;
             _done.gameObject.AddComponent<Outline>().effectColor = new Color(1, 1, 1, 0.9f);
             _done.gameObject.SetActive(false);
 
-            _finish = UIKit.Panel(Rt, "Finish", new Color(1, 1, 1, 0), 16);
-            _finish.rectTransform.Stretch();
-            _hover = UIKit.Panel(Rt, "Hover", new Color(1, 1, 1, 0), 16);
-            _hover.rectTransform.Stretch(-3, -3, -3, -3);
-            _hint = UIKit.Panel(Rt, "Hint", new Color(0, 0, 0, 0), 16);
-            _hint.rectTransform.Stretch(-5, -5, -5, -5);
-            _status = UIKit.Label(Rt, "Status", "", 15, Color.white, TextAnchor.MiddleCenter, FontStyle.Bold);
-            var sbg = _status.gameObject.AddComponent<Shadow>();
-            sbg.effectColor = new Color(0, 0, 0, 0.6f);
-            _status.rectTransform.Center(LocalRect.width / 2, LocalRect.height / 2, LocalRect.width, 30);
-            _status.gameObject.SetActive(false);
+            // Neutral status note for a refused drop ("Fruit only", "Full"): never red.
+            _statusTag = UIKit.Panel(Rt, "Status", new Color(1f, 0.985f, 0.95f, 0.97f), 9).rectTransform;
+            _statusTag.anchorMin = _statusTag.anchorMax = new Vector2(0.5f, 0.5f);
+            _statusTag.pivot = new Vector2(0.5f, 0.5f);
+            _statusTag.anchoredPosition = new Vector2(0, -4);
+            _statusTag.sizeDelta = new Vector2(Mathf.Min(w - 8, 120), 24);
+            _status = UIKit.Label(_statusTag, "Text", "", 12, UIKit.Ink, TextAnchor.MiddleCenter, FontStyle.Bold);
+            _status.rectTransform.Stretch(4, 0, 4, 0);
+            _statusTag.gameObject.SetActive(false);
         }
 
-        /// <summary>Slot center relative to TargetRegion top-left.</summary>
-        public Vector2 SlotCenter(int slot)
+        void Update()
         {
-            int col = slot % _cols, row = slot / _cols;
-            int count = Mathf.Max(1, Def.SlotCount);
-            int rowCount = Mathf.Min(_cols, count - row * _cols); // center incomplete rows
-            float gridW = rowCount * BoardView.SlotPitch - 4;
-            float x0 = LocalRect.x + (LocalRect.width - gridW) / 2 + 24;
-            float y0 = LocalRect.y + BoardView.Header + 4 + 24;
-            return new Vector2(x0 + col * BoardView.SlotPitch, y0 + row * BoardView.SlotPitch);
+            float dt = Mathf.Min(Time.unscaledDeltaTime, 0.05f);
+            float target = _hover ? 1f : 0f;
+            _openVel += (180f * (target - _open) - 16f * _openVel) * dt;
+            _open += _openVel * dt;
+            ApplyVisual();
         }
+
+        void ApplyVisual()
+        {
+            if (_front != null) _front.anchoredPosition = _frontBase + new Vector2(0, -5f * _open);
+            if (_glow != null) _glow.color = new Color(1f, 0.92f, 0.62f, 0.9f * Mathf.Clamp01(_open));
+            if (_rimGlow != null) _rimGlow.color = new Color(1, 1, 1, 0.95f * Mathf.Clamp01(_open));
+            float s = 1f + 0.025f * Mathf.Clamp01(_open);
+            Rt.localScale = new Vector3(s * _bounce.x, s * _bounce.y, 1);
+            Rt.localRotation = Quaternion.Euler(0, 0, _tilt);
+            if (_front != null) { _front.localScale = Rt.localScale; _front.localRotation = Rt.localRotation; }
+        }
+
+        public void SetBounce(Vector3 scale) { _bounce = scale; ApplyVisual(); }
+        public void SetTilt(float deg) { _tilt = deg; ApplyVisual(); }
 
         public void SetDone(bool on, bool animate)
         {
@@ -580,7 +539,7 @@ namespace SortEverything.Presentation
             if (!on) return;
             var rt = _done.rectTransform;
             if (!animate || !isActiveAndEnabled) { rt.localScale = Vector3.one; return; }
-            StartCoroutine(UIKit.Tween(0.35f, t => rt.localScale = Vector3.one * Mathf.Max(0.01f, UIKit.EaseOutBack(t) * 1f)));
+            StartCoroutine(UIKit.Tween(0.35f, t => rt.localScale = Vector3.one * Mathf.Max(0.01f, UIKit.EaseOutBack(t))));
         }
 
         public void SetUsage(int units)
@@ -588,9 +547,13 @@ namespace SortEverything.Presentation
             if (_usage != null) _usage.text = $"{units}/{Def.Capacity}";
         }
 
-        public void SetHover(bool on) => _hover.color = on ? new Color(1, 1, 1, 0.35f) : new Color(1, 1, 1, 0);
+        public void SetHover(bool on, bool reduced)
+        {
+            _hover = on;
+            if (reduced) { _open = on ? 1 : 0; _openVel = 0; ApplyVisual(); }
+        }
 
-        public void SetHint(bool on) => _hint.color = on ? new Color(1f, 0.85f, 0.3f, 0.55f) : new Color(0, 0, 0, 0);
+        public void SetHint(bool on) => _hint.color = on ? new Color(1, 1, 1, 0.95f) : new Color(1, 1, 1, 0);
 
         public void ShowStatus(string text, MonoBehaviour host)
         {
@@ -601,60 +564,47 @@ namespace SortEverything.Presentation
         IEnumerator StatusRoutine(string text)
         {
             _status.text = text;
-            _status.gameObject.SetActive(true);
-            var bg = _hover;
-            bg.color = new Color(UIKit.Warn.r, UIKit.Warn.g, UIKit.Warn.b, 0.75f);
-            yield return new WaitForSecondsRealtime(0.9f);
-            _status.gameObject.SetActive(false);
-            bg.color = new Color(1, 1, 1, 0);
+            _statusTag.gameObject.SetActive(true);
+            yield return new WaitForSecondsRealtime(1.0f);
+            if (_statusTag != null) _statusTag.gameObject.SetActive(false);
         }
 
-        /// <summary>Finished presentation: a soft glow and, for drawers, an opened drawer front that keeps contents visible.</summary>
-        public void ShowFinished(string kind, float t)
-        {
-            _finish.color = new Color(1f, 0.97f, 0.85f, 0.18f * t);
-            if (kind == "drawer_close" && _finish.transform.childCount == 0 && t > 0)
-            {
-                var front = UIKit.Panel(_finish.transform, "DrawerFront", UIKit.CategoryColor("kitchenware"), 8);
-                front.rectTransform.Bottom(12, -6);
-            }
-            if (kind == "drawer_close" && _finish.transform.childCount > 0)
-                ((RectTransform)_finish.transform.GetChild(0)).anchoredPosition = new Vector2(0, -6 + 4 * t);
-        }
+        /// <summary>Finished presentation: a soft warm glow; contents stay visible.</summary>
+        public void ShowFinished(string kind, float t) => _finish.color = new Color(1f, 0.97f, 0.85f, 0.16f * t);
     }
 
     /// <summary>
-    /// One draggable item. Visual motion (lift, tilt while dragging, squash on landing, hops) runs on small
-    /// springs in Update so it feels physical; positions still come only from committed state.
+    /// One draggable item. It rests at a size from its metadata (relativeSize) with a contact shadow and a soft
+    /// drop shadow, both cast from the top-left light. Lift, tilt while dragging, squash on landing and hops run
+    /// on small springs; positions still come only from committed state.
     /// </summary>
     public sealed class ObjectView : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, IDragHandler, IBeginDragHandler, IEndDragHandler, IInitializePotentialDragHandler
     {
-        public const float ArtSize = 50f;
         public ObjectDef Def;
         public RectTransform Rt;
         BoardView _board;
         RectTransform _art;
-        Image _sprite;
-        Image _shadow;
+        Image _sprite, _contact, _drop, _hint;
         GameObject _badge;
-        Image _hint;
         public Vector2 Position { get; private set; }
+        public float VisibleSize => _sizeTarget;
+        public float HitSize => Rt.sizeDelta.x;
 
-        // Springs
-        float _scale = 1, _scaleVel, _scaleTarget = 1, _restScale = 1;
+        float _size = 56, _sizeVel, _sizeTarget = 56;
+        float _lift = 1, _liftVel;
         float _rot, _rotVel, _restRot;
         Vector2 _squash = Vector2.one, _squashVel;
-        bool _dragging;
+        bool _dragging, _inBin;
         Vector2 _lastPos;
         float _tilt;
         float _hopT = -1, _hopDelay, _hopOffset;
 
-        public static ObjectView Create(RectTransform layer, BoardView board, ObjectDef def, bool planning)
+        public static ObjectView Create(RectTransform layer, BoardView board, ObjectDef def)
         {
             var rt = UIKit.Rect(layer, "Obj_" + def.InstanceId);
             rt.anchorMin = rt.anchorMax = new Vector2(0, 1);
             rt.pivot = new Vector2(0.5f, 0.5f);
-            rt.sizeDelta = new Vector2(54, 54); // invisible hit region ≥ 48 units
+            rt.sizeDelta = new Vector2(56, 56);
             var hit = rt.gameObject.AddComponent<Image>();
             hit.color = new Color(0, 0, 0, 0);
             hit.raycastTarget = true;
@@ -662,20 +612,18 @@ namespace SortEverything.Presentation
             v.Def = def; v.Rt = rt; v._board = board;
 
             v._hint = UIKit.Icon(rt, "Hint", SpriteFactory.Ring(), 62, new Color(1f, 0.8f, 0.2f, 0f));
-            v._shadow = UIKit.Icon(rt, "Shadow", SpriteFactory.Shadow(), 40);
-            v._shadow.rectTransform.sizeDelta = new Vector2(40, 14);
-            v._shadow.rectTransform.anchoredPosition = new Vector2(0, -20);
-            v._shadow.preserveAspect = false;
+            v._drop = UIKit.Icon(rt, "DropShadow", SpriteFactory.Shadow(), 40, new Color(1, 1, 1, 0.5f));
+            v._drop.preserveAspect = false;
+            v._contact = UIKit.Icon(rt, "ContactShadow", SpriteFactory.Shadow(), 40, new Color(0.3f, 0.2f, 0.14f, 0.85f));
+            v._contact.preserveAspect = false;
             v._art = UIKit.Rect(rt, "Art");
-            v._art.sizeDelta = new Vector2(ArtSize, ArtSize) * (def.Large ? 1.08f : 1f);
             v._sprite = v._art.gameObject.AddComponent<Image>();
             v._sprite.sprite = SpriteFactory.Object(def.AssetId);
             v._sprite.preserveAspect = true;
             v._sprite.raycastTarget = false;
 
-            // Unit badge: always visible for 2-unit objects, shown on pickup for 1-unit planning objects.
-            var badge = UIKit.Icon(rt, "Badge", SpriteFactory.Circle(), 18, def.Large ? UIKit.Ink : UIKit.InkSoft);
-            badge.rectTransform.anchoredPosition = new Vector2(19, 19);
+            // Unit badge: always visible for 2-unit objects (rules stay visible without a lesson).
+            var badge = UIKit.Icon(rt, "Badge", SpriteFactory.Circle(), 18, UIKit.Ink);
             var bt = UIKit.Label(badge.transform, "Units", def.Units.ToString(), 13, Color.white, TextAnchor.MiddleCenter, FontStyle.Bold);
             bt.rectTransform.Stretch();
             v._badge = badge.gameObject;
@@ -689,82 +637,62 @@ namespace SortEverything.Presentation
             Rt.anchoredPosition = new Vector2(boardPos.x, -boardPos.y);
         }
 
-        /// <summary>Resting tilt (messy on the counter, straight in a container).</summary>
-        public void SetRotation(float deg, bool instant = false)
+        /// <summary>Resting look: drawn size, tilt and touch square for the counter or a container.</summary>
+        public void SetRest(float visible, float rotation, float hit, bool inBin, bool instant)
         {
-            _restRot = deg;
-            if (instant || _board.ReducedMotion) { _rot = deg; _rotVel = 0; ApplyVisual(); }
+            _sizeTarget = visible; _restRot = rotation; _inBin = inBin;
+            Rt.sizeDelta = new Vector2(hit, hit);
+            if (instant || _board.ReducedMotion) { _size = visible; _sizeVel = 0; _rot = rotation; _rotVel = 0; }
+            ApplyVisual();
         }
 
-        /// <summary>Resting size: varied on the counter, uniform in a container.</summary>
-        public void SetAssigned(bool assigned, bool planning)
-        {
-            _restScale = assigned ? BoardView.SlotScale : BoardView.SourceScale(Def);
-            if (!_dragging) _scaleTarget = _restScale;
-        }
-
-        /// <summary>Jumps every spring to rest (used after a full re-sync).</summary>
         public void SnapMotion()
         {
-            _scale = _scaleTarget = _dragging ? 1.18f : _restScale; _scaleVel = 0;
+            _size = _sizeTarget; _sizeVel = 0; _lift = _dragging ? BoardLayoutConfig.Current.dragLiftScale : 1; _liftVel = 0;
             _rot = _restRot; _rotVel = 0; _squash = Vector2.one; _squashVel = Vector2.zero; _hopT = -1; _hopOffset = 0; _tilt = 0;
             _lastPos = Position;
             ApplyVisual();
         }
 
-        public void SetDragging(bool on, bool planning)
+        public void SetDragging(bool on)
         {
+            if (_dragging == on) return;
             _dragging = on;
-            _scaleTarget = on ? 1.18f : _restScale;
-            if (on && !_board.ReducedMotion) { _scaleVel += 6f; _squash = new Vector2(0.86f, 1.14f); } // pop up off the counter
-            _shadow.rectTransform.sizeDelta = on ? new Vector2(44, 16) : new Vector2(40, 14);
-            _shadow.rectTransform.anchoredPosition = on ? new Vector2(0, -32) : new Vector2(0, -20);
-            _shadow.color = new Color(1, 1, 1, on ? 0.55f : 1f);
-            _badge.SetActive(Def.Large || (on && planning));
+            if (on && !_board.ReducedMotion) { _liftVel += 3f; _squash = new Vector2(0.92f, 1.08f); }
             _lastPos = Position;
             if (_board.ReducedMotion) SnapMotion();
         }
 
-        /// <summary>Squash-and-stretch as the item lands in place.</summary>
         public void Land(float strength = 1f)
         {
             if (_board.ReducedMotion) return;
-            _squash = new Vector2(1f + 0.3f * strength, 1f - 0.3f * strength);
+            _squash = new Vector2(1f + 0.22f * strength, 1f - 0.22f * strength);
             _squashVel = Vector2.zero;
         }
 
-        /// <summary>A wobble for a refused drop.</summary>
-        public void Wobble()
-        {
-            if (_board.ReducedMotion) return;
-            _rotVel += 900f;
-        }
+        public void Wobble() { if (!_board.ReducedMotion) _rotVel += 700f; }
 
-        /// <summary>A little celebratory hop after a delay (completion wave).</summary>
-        public void Hop(float delay)
-        {
-            if (_board.ReducedMotion) return;
-            _hopDelay = delay; _hopT = 0;
-        }
+        public void Hop(float delay) { if (!_board.ReducedMotion) { _hopDelay = delay; _hopT = 0; } }
 
         void Update()
         {
             float dt = Mathf.Min(Time.unscaledDeltaTime, 0.05f);
             if (dt <= 0) return;
-            if (_board.ReducedMotion) { ApplyVisual(); return; }
+            if (_board.ReducedMotion) { SnapMotion(); return; }
 
-            // Tilt into the direction of travel while dragging, like something held loosely.
             if (_dragging)
             {
                 float vx = (Position.x - _lastPos.x) / dt;
-                _tilt = Mathf.Lerp(_tilt, Mathf.Clamp(-vx * 0.035f, -20f, 20f), 1 - Mathf.Exp(-12f * dt));
+                _tilt = Mathf.Lerp(_tilt, Mathf.Clamp(-vx * 0.03f, -16f, 16f), 1 - Mathf.Exp(-12f * dt));
             }
             else _tilt = Mathf.Lerp(_tilt, 0, 1 - Mathf.Exp(-12f * dt));
             _lastPos = Position;
 
-            // Springs: scale, rotation, squash.
-            _scaleVel += (220f * (_scaleTarget - _scale) - 16f * _scaleVel) * dt;
-            _scale += _scaleVel * dt;
+            float liftTarget = _dragging ? BoardLayoutConfig.Current.dragLiftScale : 1f;
+            _liftVel += (240f * (liftTarget - _lift) - 18f * _liftVel) * dt;
+            _lift += _liftVel * dt;
+            _sizeVel += (200f * (_sizeTarget - _size) - 20f * _sizeVel) * dt;
+            _size += _sizeVel * dt;
             float rotTarget = _dragging ? _tilt : _restRot;
             _rotVel += (160f * (rotTarget - _rot) - 11f * _rotVel) * dt;
             _rot += _rotVel * dt;
@@ -777,18 +705,31 @@ namespace SortEverything.Presentation
                 _hopT += dt;
                 float t = _hopT - _hopDelay;
                 if (t >= 0.4f) { _hopT = -1; Land(0.6f); }
-                else if (t > 0) _hopOffset = Mathf.Sin(t / 0.4f * Mathf.PI) * 16f;
+                else if (t > 0) _hopOffset = Mathf.Sin(t / 0.4f * Mathf.PI) * _size * 0.25f;
             }
             ApplyVisual();
         }
 
         void ApplyVisual()
         {
-            if (_board.ReducedMotion) { _scale = _scaleTarget; _rot = _dragging ? 0 : _restRot; _squash = Vector2.one; }
-            Rt.localScale = new Vector3(_scale, _scale, 1);
+            float size = Mathf.Max(8f, _size);
+            Rt.localScale = new Vector3(_lift, _lift, 1);
+            _art.sizeDelta = new Vector2(size, size);
             _art.localScale = new Vector3(_squash.x, _squash.y, 1);
             _art.localRotation = Quaternion.Euler(0, 0, _rot);
-            _art.anchoredPosition = new Vector2(0, _hopOffset + (_dragging ? 4f : 0f));
+            float lift01 = Mathf.Clamp01((_lift - 1f) / 0.08f) + Mathf.Clamp01(_hopOffset / (size * 0.25f + 0.01f));
+            lift01 = Mathf.Clamp01(lift01);
+            _art.anchoredPosition = new Vector2(0, _hopOffset + lift01 * size * 0.08f);
+            // Contact shadow: tight and dark right under the item; fades as it lifts.
+            _contact.rectTransform.sizeDelta = new Vector2(size * 0.62f, size * 0.15f);
+            _contact.rectTransform.anchoredPosition = new Vector2(size * 0.04f, -size * 0.38f);
+            _contact.color = new Color(0.3f, 0.2f, 0.14f, (_inBin ? 0.55f : 0.85f) * (1f - 0.8f * lift01));
+            // Drop shadow: soft, offset down-right (light from the top-left); moves out and softens when lifted.
+            float off = 0.08f + 0.14f * lift01;
+            _drop.rectTransform.sizeDelta = new Vector2(size * (0.86f + 0.12f * lift01), size * (0.34f + 0.06f * lift01));
+            _drop.rectTransform.anchoredPosition = new Vector2(size * off, -size * (0.3f + off));
+            _drop.color = new Color(1, 1, 1, _inBin ? 0.25f : 0.5f - 0.18f * lift01);
+            _badge.transform.localPosition = new Vector3(size * 0.36f, size * 0.36f, 0);
         }
 
         public void SetHint(bool on) => _hint.color = new Color(1f, 0.8f, 0.2f, on ? 0.95f : 0f);

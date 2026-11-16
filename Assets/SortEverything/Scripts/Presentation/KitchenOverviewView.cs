@@ -101,7 +101,7 @@ namespace SortEverything.Presentation
 
                 var tag = UIKit.Panel(card.transform, "TitleTag", new Color(1f, 0.985f, 0.95f, 0.93f), 7);
                 tag.rectTransform.TopLeft(4, 4, Mathf.Min(cw - 8, 112), 17);
-                var title = UIKit.Label(tag.transform, "Title", (restored ? "✓ " : "") + Titles[r], 10, restored ? UIKit.Primary : UIKit.Ink, TextAnchor.MiddleLeft, FontStyle.Bold);
+                var title = UIKit.Label(tag.transform, "Title", (restored ? "Restored · " : "") + Titles[r], 10, restored ? UIKit.Primary : UIKit.Ink, TextAnchor.MiddleLeft, FontStyle.Bold);
                 title.rectTransform.Stretch(5, 0, 4, 0);
             }
             return rt;

@@ -22,7 +22,7 @@ namespace SortEverything.Editor
         [MenuItem("Sort Everything/Scene Browser")]
         public static void Open() => GetWindow<SceneBrowser>("Kitchen Scenes").minSize = new Vector2(640, 560);
 
-        void OnEnable() => _cat = Catalogue.CreateKitchen("kitchen_20");
+        void OnEnable() => _cat = Catalogue.CreateKitchen("kitchen_20", SortEverything.Runtime.ContentDb.DataLevels);
 
         void OnGUI()
         {
@@ -74,67 +74,60 @@ namespace SortEverything.Editor
             EditorGUILayout.EndHorizontal();
         }
 
+        /// <summary>Preview drawn from the same BoardLayout the game uses (360×800 reference phone).</summary>
         void DrawBoard(BoardDef board)
         {
-            const float w = BoardView.Width, srcH = BoardView.SourceHeight, gap = 16, tgtH = BoardView.TargetHeight;
+            var L = BoardLayout.Compute(board, 360f, 800f);
+            float w = L.Width, h = L.PlayH + L.ContainersH;
             float avail = Mathf.Max(200, position.width - 260);
             float scale = Mathf.Min(1.3f, avail / w);
-            var area = GUILayoutUtility.GetRect(w * scale, (srcH + gap + tgtH) * scale, GUILayout.ExpandWidth(false));
-            EditorGUI.DrawRect(area, new Color(0.965f, 0.922f, 0.867f));
+            var area = GUILayoutUtility.GetRect(w * scale, h * scale, GUILayout.ExpandWidth(false));
             Rect R(float x, float y, float rw, float rh) => new Rect(area.x + x * scale, area.y + y * scale, rw * scale, rh * scale);
 
-            // Source region
-            EditorGUI.DrawRect(R(6, 0, w - 12, srcH), new Color(0.85f, 0.75f, 0.63f));
-            float targetTop = srcH + gap;
+            EditorGUI.DrawRect(R(0, 0, w, L.PlayH), new Color(0.83f, 0.63f, 0.42f));          // countertop
+            EditorGUI.DrawRect(R(0, L.PlayH - 10, w, 10), new Color(0.66f, 0.47f, 0.29f));     // lip
+            EditorGUI.DrawRect(R(0, L.PlayH, w, L.ContainersH), new Color(0.62f, 0.73f, 0.67f)); // cabinet
 
-            // Targets and their slot guides
-            var slotPos = new System.Collections.Generic.Dictionary<(string, int), Vector2>();
             foreach (var t in board.Targets)
             {
-                var (tw, th, cols, rows) = TargetView.Size(board, t);
-                float cx = t.X * w, cy = targetTop + t.Y * tgtH;
-                var rect = new Rect(cx - tw / 2, cy - th / 2, tw, th);
+                var b = L.Bins[t.TargetId];
                 var col = t.Accepts.Count > 1 ? UIKit.CategoryColor("shared") : UIKit.CategoryColor(t.Accepts[0]);
-                EditorGUI.DrawRect(R(rect.x, rect.y, rect.width, rect.height), col);
-                float ix = rect.x + 4;
+                EditorGUI.DrawRect(R(b.Rect.x, b.Rect.y, b.Rect.width, b.Rect.height), col);
+                float ix = b.Rect.x + 4;
                 foreach (var c in t.Accepts)
                 {
-                    var icon = SpriteFactory.CategoryIcon(c);
-                    GUI.DrawTexture(R(ix, rect.y + 6, 20, 20), icon.texture, ScaleMode.ScaleToFit);
-                    ix += 21;
+                    GUI.DrawTexture(R(ix, b.Rect.y + 4, 18, 18), SpriteFactory.CategoryIcon(c).texture, ScaleMode.ScaleToFit);
+                    ix += 19;
                 }
-                GUI.Label(R(ix + 2, rect.y + 6, rect.width - (ix - rect.x) - 4, 20),
+                GUI.Label(R(ix + 2, b.Rect.y + 4, b.Rect.width - (ix - b.Rect.x) - 4, 18),
                     t.IsUnlimited ? (t.Accepts.Count > 1 ? "Shared" : Strings.Get("category." + t.Accepts[0])) : $"0/{t.Capacity}", EditorStyles.miniBoldLabel);
-                int count = Mathf.Max(1, t.SlotCount);
-                for (int s = 0; s < count; s++)
+                for (int s = 0; s < Mathf.Max(1, t.SlotCount); s++)
                 {
-                    int cI = s % cols, rI = s / cols;
-                    int rowCount = Mathf.Min(cols, count - rI * cols);
-                    float gridW = rowCount * BoardView.SlotPitch - 4;
-                    var p = new Vector2(rect.x + (rect.width - gridW) / 2 + 24 + cI * BoardView.SlotPitch, rect.y + BoardView.Header + 4 + 24 + rI * BoardView.SlotPitch);
-                    slotPos[(t.TargetId, s)] = p;
-                    EditorGUI.DrawRect(R(p.x - 23, p.y - 23, 46, 46), new Color(1, 1, 1, 0.35f));
+                    var p = b.Cell(s, t.SlotCount);
+                    float cs = b.ItemSize;
+                    EditorGUI.DrawRect(R(p.x - cs / 2, p.y - cs / 2, cs, cs), new Color(1, 1, 1, 0.3f));
                 }
             }
 
-            // Objects: start positions, or a solver solution in the finished view.
+            // Objects: the seeded counter pile, or a solver solution in the finished view.
             var solution = _after ? Solver.Solve(board).Allocation : null;
             var used = new System.Collections.Generic.Dictionary<string, int>();
-            foreach (var o in board.Objects)
+            foreach (var o in board.Objects.OrderBy(o => L.Pile[o.InstanceId].Layer))
             {
-                Vector2 p;
+                Vector2 p; float size;
                 if (solution != null)
                 {
                     var t = solution[o.InstanceId];
                     used.TryGetValue(t, out int n);
                     used[t] = n + 1;
-                    p = slotPos[(t, n)];
+                    p = L.SlotPosition(t, n, board.Target(t).SlotCount);
+                    size = L.BinItemSize(t, o.AssetId);
                 }
-                else p = new Vector2(6 + o.SourceX * (w - 12), o.SourceY * srcH);
-                float size = o.Large ? 48 : 44;
+                else { p = L.Pile[o.InstanceId].Center; size = L.Pile[o.InstanceId].Visible; }
                 GUI.DrawTexture(R(p.x - size / 2, p.y - size / 2, size, size), SpriteFactory.Object(o.AssetId).texture, ScaleMode.ScaleToFit);
-                if (o.Units == 2) GUI.Label(R(p.x + 10, p.y - 26, 18, 18), "2", EditorStyles.whiteBoldLabel);
+                if (o.Units == 2) GUI.Label(R(p.x + size * 0.25f, p.y - size * 0.5f, 18, 18), "2", EditorStyles.whiteBoldLabel);
             }
+            EditorGUILayout.LabelField($"Layout: base item {L.BaseItem:0} units · bins {L.BinRule} · max pile cover {L.MaxPileCover():P0}", EditorStyles.miniLabel);
         }
 
         static void PlayLevel(string levelId)

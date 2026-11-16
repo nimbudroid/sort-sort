@@ -30,9 +30,12 @@ namespace SortEverything.Presentation
         BoardView _view;
         Phase _phase = Phase.Loading;
         RectTransform _root, _hud, _boardHolder, _overlay, _resultSheet;
-        Text _taskText, _countText, _timeText;
+        Text _taskText, _countText, _timeText, _progressText;
         Button _deferButton, _hintChip;
-        float _sourceTop, _targetTop, _sourceH = BoardView.SourceHeight, _targetsUsedTop, _targetsUsedBottom = BoardView.TargetHeight;
+        BoardLayout _layout;
+        Text _instruction;
+        Image _progressFill;
+        string _instructionDefault = "";
         int _combo;
         float _lastAcceptTime = -10f;
 
@@ -57,6 +60,7 @@ namespace SortEverything.Presentation
         BoardRunData Run => _def == null ? null : Attempt?.boards.FirstOrDefault(b => b.boardId == _def.BoardId);
         bool Mastery => Save.settings.preference == "mastery";
         bool Reduced => Save.settings.reducedMotion;
+        AreaData _area => ContentDb.Area(_level.AreaId);
 
         public void Init(GameApp app, LevelDef level, EntryMode mode)
         {
@@ -122,28 +126,19 @@ namespace SortEverything.Presentation
             _idleSeconds = _readySeconds = 0;
             _inspecting = false;
 
-            float h = _app.ScreenHeight;
-            const float hudH = 56f;
-            // Containers only use part of the 322-unit target region; give the rest (and any spare screen height)
-            // to the cluttered counter so the board fills the phone instead of leaving an empty band.
-            (_targetsUsedTop, _targetsUsedBottom) = BoardView.TargetBounds(_def);
-            float targetsH = _targetsUsedBottom - _targetsUsedTop;
-            float spare = Mathf.Max(0, h - (hudH + BoardView.SourceHeight + targetsH + 40));
-            _sourceH = BoardView.SourceHeight + Mathf.Min(spare * 0.75f, 190f);
-            spare -= _sourceH - BoardView.SourceHeight;
-            _sourceTop = 8 + spare * 0.2f;
-            _targetTop = _sourceTop + _sourceH + 20 + spare * 0.25f - _targetsUsedTop;
+            // One layout system: zones are shares of the safe area (Resources/SortEverything/BoardLayout.json).
+            var safe = _app.SafeArea.rect;
+            float sw = safe.width > 1 ? safe.width : 360f, sh = _app.ScreenHeight;
+            _layout = BoardLayout.Compute(_def, sw, sh);
+            float hudH = _layout.HeaderH, instrH = _layout.InstructionH;
             _combo = 0;
 
-            // Kitchen wall and floor behind everything (decorative, no raycasts).
-            KitchenArt.Tiled(_root, "Wall", KitchenArt.WallTile(), Color.white).rectTransform.Stretch(0, -200, 0, -200);
-            float floorTop = hudH + _targetTop + _targetsUsedBottom + 24;
-            var floor = KitchenArt.Tiled(_root, "Floor", KitchenArt.Floor(), Color.white);
-            floor.rectTransform.anchorMin = new Vector2(0, 0); floor.rectTransform.anchorMax = new Vector2(1, 1);
-            floor.rectTransform.offsetMin = new Vector2(0, -200); floor.rectTransform.offsetMax = new Vector2(0, -floorTop);
+            // Backsplash: the kitchen wall behind the header and the instruction line (decorative, no raycasts).
+            KitchenArt.Tiled(_root, "Wall", KitchenArt.Surface(_area.wall), Color.white).rectTransform.Stretch(0, -200, 0, -200);
             BuildHud(hudH);
-            _boardHolder = UIKit.Rect(_root, "BoardHolder").Stretch(0, hudH, 0, 0);
-            _view = BoardView.Create(_boardHolder, _def, _sourceTop, _targetTop, _app.UiCamera, _level.PurposeProp, _sourceH);
+            BuildInstruction(hudH, instrH);
+            _boardHolder = UIKit.Rect(_root, "BoardHolder").Stretch(0, hudH + instrH, 0, 0);
+            _view = BoardView.Create(_boardHolder, _def, _layout, _app.UiCamera, _level.PurposeProp, _area, _area.MessFor(_level.LevelId));
             _view.ReducedMotion = Reduced;
             _view.PointerDown = OnPointerDown;
             _view.PointerDrag = OnPointerDrag;
@@ -159,49 +154,98 @@ namespace SortEverything.Presentation
             _hud = UIKit.Rect(_root, "HUD").TopLeft(0, 0, 0, hudH);
             _hud.anchorMax = new Vector2(1, 1);
             _hud.sizeDelta = new Vector2(0, hudH);
-            var strip = UIKit.Panel(_hud, "Strip", new Color(1f, 0.975f, 0.94f, 0.92f), 0);
+            var strip = UIKit.Panel(_hud, "Strip", SpriteFactory.Hex("#FFF8EE"), 0);
             strip.rectTransform.Stretch(0, -200, 0, 0);
-            var stripEdge = UIKit.Panel(_hud, "StripEdge", new Color(0.55f, 0.4f, 0.28f, 0.25f), 0);
+            var stripEdge = UIKit.Panel(_hud, "StripEdge", new Color(0.55f, 0.4f, 0.28f, 0.3f), 0);
             stripEdge.rectTransform.Bottom(2, -2);
+            float bs = Mathf.Clamp(hudH - 12, 40, 48);
             var pause = UIKit.Button(_hud, "Pause", "II", OpenPause, fontSize: 16);
-            ((RectTransform)pause.transform).TopLeft(8, 4, 48, 48);
-            _taskText = UIKit.Label(_hud, "Task", Strings.Get(_level.PurposeKey), 16, UIKit.Ink, TextAnchor.UpperLeft, FontStyle.Bold);
-            _taskText.rectTransform.TopLeft(64, 6, 170, 22);
-            _countText = UIKit.Label(_hud, "Count", "", 12, UIKit.InkSoft, TextAnchor.UpperLeft);
-            _countText.rectTransform.TopLeft(64, 30, 170, 20);
-            _timeText = UIKit.Label(_hud, "Time", "", 12, UIKit.InkSoft, TextAnchor.UpperRight);
-            _timeText.rectTransform.TopLeft(64, 30, 120, 20);
+            ((RectTransform)pause.transform).TopLeft(8, (hudH - bs) / 2, bs, bs);
+            float x = 8 + bs + 8;
 
             bool optional = !_def.Required;
             bool canDefer = optional || (_level.CanDeferLevel && !Save.HasSeal(_level.LevelId) && !S.Config.forcedPlanningResearch);
+            float right = 8;
             if (canDefer)
             {
                 string label = optional ? Strings.Get(Save.HasSeal(_level.LevelId) ? "action.leave_puzzle_for_later" : "action.finish_kitchen") : Strings.Get("action.leave_for_later");
                 _deferButton = UIKit.Button(_hud, "Defer", label, OnDefer, fontSize: 12);
-                ((RectTransform)_deferButton.transform).anchorMin = ((RectTransform)_deferButton.transform).anchorMax = new Vector2(1, 1);
                 var drt = (RectTransform)_deferButton.transform;
-                drt.pivot = new Vector2(1, 1);
-                drt.anchoredPosition = new Vector2(-8, -4);
-                drt.sizeDelta = new Vector2(112, 48);
+                drt.anchorMin = drt.anchorMax = new Vector2(1, 0.5f);
+                drt.pivot = new Vector2(1, 0.5f);
+                drt.anchoredPosition = new Vector2(-8, 0);
+                drt.sizeDelta = new Vector2(100, bs);
+                right += 108;
             }
             if (_def.IsPlanning)
             {
                 _hintChip = UIKit.Button(_hud, "HintChip", Strings.Get("action.hint"), RequestHint, fontSize: 12);
                 var hrt = (RectTransform)_hintChip.transform;
-                hrt.anchorMin = hrt.anchorMax = new Vector2(1, 1);
-                hrt.pivot = new Vector2(1, 1);
-                hrt.anchoredPosition = new Vector2(canDefer ? -124 : -8, -4);
-                hrt.sizeDelta = new Vector2(58, 48);
+                hrt.anchorMin = hrt.anchorMax = new Vector2(1, 0.5f);
+                hrt.pivot = new Vector2(1, 0.5f);
+                hrt.anchoredPosition = new Vector2(-right, 0);
+                hrt.sizeDelta = new Vector2(54, bs);
                 _hintChip.gameObject.SetActive(false);
             }
+
+            // Level name, then "Kitchen 1/20" and a small sorted-progress bar on one line.
+            var info = UIKit.Rect(_hud, "Info");
+            info.anchorMin = new Vector2(0, 0); info.anchorMax = new Vector2(1, 1);
+            info.offsetMin = new Vector2(x, 4); info.offsetMax = new Vector2(-right - 4, -4);
+            _taskText = UIKit.Label(info, "Task", Strings.Get(_level.PurposeKey), 16, UIKit.Ink, TextAnchor.LowerLeft, FontStyle.Bold);
+            _taskText.rectTransform.anchorMin = new Vector2(0, 0.5f); _taskText.rectTransform.anchorMax = new Vector2(1, 1);
+            _taskText.rectTransform.offsetMin = Vector2.zero; _taskText.rectTransform.offsetMax = Vector2.zero;
+            var line = UIKit.Rect(info, "ProgressLine");
+            line.anchorMin = new Vector2(0, 0); line.anchorMax = new Vector2(1, 0.5f);
+            line.offsetMin = new Vector2(0, 2); line.offsetMax = new Vector2(0, -2);
+            _countText = UIKit.Label(line, "Count", "", 12, UIKit.InkSoft, TextAnchor.MiddleLeft);
+            _countText.rectTransform.anchorMin = new Vector2(0, 0); _countText.rectTransform.anchorMax = new Vector2(0, 1);
+            _countText.rectTransform.pivot = new Vector2(0, 0.5f);
+            _countText.rectTransform.sizeDelta = new Vector2(78, 0);
+            _countText.rectTransform.anchoredPosition = Vector2.zero;
+            var track = UIKit.Panel(line, "Track", new Color(0.55f, 0.4f, 0.28f, 0.18f), 4);
+            track.rectTransform.anchorMin = new Vector2(0, 0.5f); track.rectTransform.anchorMax = new Vector2(1, 0.5f);
+            track.rectTransform.offsetMin = new Vector2(80, -4); track.rectTransform.offsetMax = new Vector2(-34, 4);
+            _progressFill = UIKit.Panel(track.transform, "Fill", UIKit.Primary, 4);
+            _progressFill.rectTransform.anchorMin = new Vector2(0, 0); _progressFill.rectTransform.anchorMax = new Vector2(0, 1);
+            _progressFill.rectTransform.offsetMin = Vector2.zero; _progressFill.rectTransform.offsetMax = Vector2.zero;
+            _progressText = UIKit.Label(line, "Sorted", "", 11, UIKit.InkSoft, TextAnchor.MiddleRight, FontStyle.Bold);
+            _progressText.rectTransform.anchorMin = new Vector2(1, 0); _progressText.rectTransform.anchorMax = new Vector2(1, 1);
+            _progressText.rectTransform.pivot = new Vector2(1, 0.5f);
+            _progressText.rectTransform.sizeDelta = new Vector2(32, 0);
+            _progressText.rectTransform.anchoredPosition = Vector2.zero;
+            _timeText = UIKit.Label(_hud, "Time", "", 11, UIKit.InkSoft, TextAnchor.UpperRight);
+            _timeText.rectTransform.TopLeft(x, 2, 140, 14);
         }
+
+        /// <summary>The single instruction line (level instruction, or tutorial text in its place).</summary>
+        void BuildInstruction(float top, float h)
+        {
+            var bar = UIKit.Rect(_root, "Instruction").TopLeft(0, top, 0, h);
+            bar.anchorMax = new Vector2(1, 1);
+            bar.sizeDelta = new Vector2(0, h);
+            var paper = UIKit.Panel(bar, "Paper", new Color(1f, 0.985f, 0.95f, 0.96f), 10);
+            paper.rectTransform.anchorMin = paper.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
+            paper.rectTransform.sizeDelta = new Vector2(Mathf.Min(_layout.Width - 24, 340), Mathf.Max(22, h - 10));
+            var sh = paper.gameObject.AddComponent<Shadow>();
+            sh.effectColor = new Color(0.3f, 0.18f, 0.1f, 0.25f);
+            sh.effectDistance = new Vector2(1, -1.5f);
+            _instruction = UIKit.Label(paper.transform, "Text", "", 13, UIKit.Ink, TextAnchor.MiddleCenter, FontStyle.Bold);
+            _instruction.resizeTextMinSize = 10;
+            _instruction.rectTransform.Stretch(10, 0, 10, 0);
+        }
+
+        void SetInstruction(string text) { if (_instruction != null) _instruction.text = text; }
 
         void RefreshHud()
         {
             if (_countText == null) return;
             int n = _level.OrdinalInArea, total = _app.Catalogue.InstalledInArea(_level.AreaId).Count;
-            string board = _level.Boards.Count > 1 ? (_def.Required ? " · final placements" : " · optional puzzle") : "";
-            _countText.text = $"Kitchen {n}/{total}{board} · {_state.SortedCount}/{_state.ObjectCount} sorted";
+            _countText.text = $"{Strings.Get("area.house_kitchen")} {n}/{total}";
+            float f = _state.ObjectCount == 0 ? 0 : _state.SortedCount / (float)_state.ObjectCount;
+            _progressFill.rectTransform.anchorMax = new Vector2(f, 1);
+            _progressFill.gameObject.SetActive(f > 0);
+            _progressText.text = $"{_state.SortedCount}/{_state.ObjectCount}";
             bool showTime = Mastery && _level.OrdinalInArea > 1;
             _timeText.gameObject.SetActive(showTime);
             if (showTime) _timeText.text = UIKit.FormatMs((Run?.activeMs ?? 0) + (long)_unsavedMs);
@@ -220,14 +264,11 @@ namespace SortEverything.Presentation
             _phase = Phase.Ready;
             UIKit.Clear(_overlay);
 
-            // Ready banner: destination/area label + rule summary. Does not block the board.
-            var banner = UIKit.Panel(_overlay, "ReadyBanner", new Color(1, 1, 1, 0.94f), 14);
-            banner.rectTransform.TopLeft(12, 56 + _sourceTop + _sourceH - 2, 336, 22);
-            banner.rectTransform.anchoredPosition = new Vector2(12, -(56 + _sourceTop + _sourceH + 1));
-            banner.rectTransform.sizeDelta = new Vector2(336, 18);
-            var t = UIKit.Label(banner.transform, "Text", $"{Strings.Get("destination.house")} · {Strings.Get("area.house_kitchen")} — {RuleSummary()}", 11, UIKit.InkSoft);
-            t.rectTransform.Stretch(6, 0, 6, 0);
-            banner.gameObject.AddComponent<ReadyBannerTag>();
+            // One instruction line: the level's instruction (data) or its rule summary. Tutorials replace it.
+            _instructionDefault = !string.IsNullOrEmpty(_level.InstructionOverride) ? _level.InstructionOverride : RuleSummary();
+            if (!_def.Required) _instructionDefault = "Optional puzzle · " + _instructionDefault;
+            else if (_level.Boards.Count > 1) _instructionDefault = "Final placements · " + _instructionDefault;
+            SetInstruction(_instructionDefault);
 
             // Level 20 optional board: Begin Puzzle / Finish Kitchen.
             if (!_def.Required && !Save.HasSeal(_level.LevelId) && _state.SortedCount == 0)
@@ -311,15 +352,7 @@ namespace SortEverything.Presentation
             _guided = false;
         }
 
-        void ShowDragCue()
-        {
-            var cue = UIKit.Panel(_overlay, "DragCue", new Color(1, 1, 1, 0.94f), 14);
-            cue.rectTransform.TopLeft(40, 56 + _sourceTop - 30, 280, 26);
-            cue.rectTransform.anchoredPosition = new Vector2(40, -(56 + Mathf.Max(0, _sourceTop - 30)));
-            var t = UIKit.Label(cue.transform, "Text", Strings.Get("tutorial.drag"), 13, UIKit.Ink, TextAnchor.MiddleCenter, FontStyle.Bold);
-            t.rectTransform.Stretch(4, 0, 4, 0);
-            cue.gameObject.AddComponent<ReadyBannerTag>();
-        }
+        void ShowDragCue() => SetInstruction(Strings.Get("tutorial.drag"));
 
         void Update()
         {
@@ -371,7 +404,7 @@ namespace SortEverything.Presentation
             rt.SetParent(_view.OverlayLayer, false);
             rt.anchorMin = rt.anchorMax = new Vector2(0, 1);
             rt.sizeDelta = new Vector2(44, 44);
-            var ghost = UIKit.Icon(rt, "GhostObject", SpriteFactory.Object(first.AssetId), 44, new Color(1, 1, 1, 0.5f));
+            var ghost = UIKit.Icon(rt, "GhostObject", SpriteFactory.Object(first.AssetId), _layout.Pile[first.InstanceId].Visible, new Color(1, 1, 1, 0.5f));
             var hand = UIKit.Icon(rt, "Hand", SpriteFactory.Hand(), 46);
             hand.rectTransform.anchoredPosition = new Vector2(10, -18);
             Vector2 from = _view.SourcePosition(first), to = _view.SlotPosition(target.TargetId, 0);
@@ -415,7 +448,7 @@ namespace SortEverything.Presentation
             {
                 _phase = Phase.Playing;
                 StopHand();
-                foreach (var tag in _overlay.GetComponentsInChildren<ReadyBannerTag>()) Destroy(tag.gameObject);
+                SetInstruction(_instructionDefault); // the tutorial line gives way to the level instruction
                 foreach (Transform child in _overlay)
                     if (child.name == "LessonOffer" || child.name == "OptionalReady") Destroy(child.gameObject);
                 S.Telemetry.Emit("level_start", Fields("\"replay\":" + Save.HasSeal(_level.LevelId).ToString().ToLowerInvariant()));
@@ -428,10 +461,10 @@ namespace SortEverything.Presentation
             var p = _view.ToBoard(e.position);
             _dragOffset = v.Position - p + new Vector2(0, -12); // stable offset, slightly above the fingertip
             v.transform.SetParent(_view.DragLayer, true);
-            v.SetDragging(true, _def.IsPlanning);
+            v.SetDragging(true);
             v.Place(p + _dragOffset);
             if (_def.IsPlanning && _state.IsAssigned(v.Def.InstanceId)) _view.ShowReturnArea(true);
-            if (!Reduced && !_state.IsAssigned(v.Def.InstanceId)) Fx.Burst(_view, _view.FxLayer, v.Position + new Vector2(0, 14), new Color(1f, 0.95f, 0.85f), 4, 0.45f);
+            if (!Reduced && !_state.IsAssigned(v.Def.InstanceId)) Fx.Burst(_view, _view.FxLayer, v.Position + new Vector2(0, v.VisibleSize * 0.3f), new Color(1f, 0.95f, 0.85f), 4, 0.45f);
             _app.Audio.Play("pickup");
             return true;
         }
@@ -440,8 +473,8 @@ namespace SortEverything.Presentation
         {
             if (v != _drag || e.pointerId != _dragPointer) return;
             var p = _view.ToBoard(e.position) + _dragOffset;
-            p.x = Mathf.Clamp(p.x, 0, BoardView.Width);
-            p.y = Mathf.Clamp(p.y, 0, _targetTop + BoardView.TargetHeight);
+            p.x = Mathf.Clamp(p.x, 0, _view.W);
+            p.y = Mathf.Clamp(p.y, 0, _layout.PlayH + _layout.ContainersH);
             v.Place(p);
             _view.SetHover(_view.TargetAt(p));
         }
@@ -461,7 +494,7 @@ namespace SortEverything.Presentation
             _view.SetHover(null);
             _view.ShowReturnArea(false);
             _view.SnapAll(_state, beforeProfile: true);
-            v.SetDragging(false, _def.IsPlanning);
+            v.SetDragging(false);
         }
 
         void Release(ObjectView v)
@@ -471,7 +504,7 @@ namespace SortEverything.Presentation
             _dragPointer = int.MinValue;
             _view.SetHover(null);
             _view.ShowReturnArea(false);
-            v.SetDragging(false, _def.IsPlanning);
+            v.SetDragging(false);
             if (_phase != Phase.Playing) { _view.SnapAll(_state, true); return; } // drag ended after Completing
 
             var proposal = new DropProposal(v.Def.InstanceId, _view.TargetAt(pos), _view.OverSource(pos));
@@ -490,8 +523,7 @@ namespace SortEverything.Presentation
             v.transform.SetParent(_view.ObjectLayer, true);
             var target = _state.TargetOf(v.Def.InstanceId);
             var to = target == null ? _view.SourcePosition(v.Def) : _view.SlotPosition(target, _state.SlotOf(v.Def.InstanceId));
-            v.SetAssigned(target != null, _def.IsPlanning);
-            v.SetRotation(target == null ? BoardView.SourceRotation(v.Def) : 0f);
+            _view.RestOn(v, target);
             yield return _view.Move(v, to, duration, false);
         }
 
@@ -553,8 +585,7 @@ namespace SortEverything.Presentation
 
             v.transform.SetParent(_view.ObjectLayer, true);
             var dest = facts.Return ? _view.SourcePosition(v.Def) : _view.SlotPosition(facts.ToTarget, facts.Slot);
-            v.SetAssigned(!facts.Return, _def.IsPlanning);
-            v.SetRotation(facts.Return ? BoardView.SourceRotation(v.Def) : 0f);
+            _view.RestOn(v, facts.Return ? null : facts.ToTarget);
             foreach (var t in _def.Targets) _view.Targets[t.TargetId].SetUsage(_state.UnitsIn(t.TargetId));
 
             // Quick drops in a row build a gentle combo: rising pitch, bigger sparkles, a word of praise.
@@ -569,7 +600,7 @@ namespace SortEverything.Presentation
             _app.Audio.Haptic();
             if (sorted)
             {
-                _app.Audio.Play(AudioFeedback.FamilyFor(v.Def.CategoryId));
+                _app.Audio.Play(AudioFeedback.ForMaterial(ContentDb.Object(v.Def.AssetId).material, v.Def.CategoryId));
                 _app.Audio.Play("sparkle", 1f + Mathf.Min(combo - 1, 8) * 0.06f);
             }
             else _app.Audio.Play("pickup", 0.8f);
@@ -599,7 +630,7 @@ namespace SortEverything.Presentation
             {
                 Fx.Burst(_view, _view.FxLayer, dest, color, 8 + Mathf.Min(combo, 6) * 2, 0.8f + Mathf.Min(combo, 6) * 0.08f);
                 _view.Pulse(tv, 0.035f, 0.22f);
-                if (facts.FirstAssignment && (combo == 3 || combo == 5 || combo == 8 || combo > 8 && combo % 4 == 0))
+                if (facts.FirstAssignment && !facts.CategoryComplete && (combo == 3 || combo == 5 || combo == 8 || combo > 8 && combo % 4 == 0))
                     Fx.FloatText(_view, _view.FxLayer, dest + new Vector2(0, -36), Praise[Mathf.Min((combo - 3) / 2, Praise.Length - 1)], SpriteFactory.Hex("#FFE9A8"), 20);
             }
             _view.RefreshProgress(_state, animate: true);
@@ -664,8 +695,7 @@ namespace SortEverything.Presentation
             if (!Reduced)
             {
                 // Glow sweep across the counter, left to right.
-                for (int i = 0; i < 6; i++)
-                    Fx.Flash(_view, _view.FxLayer, new Vector2(30 + i * 60, _sourceTop + _sourceH * 0.5f), new Color(1f, 0.97f, 0.8f, 0.7f), 150f, 0.3f + i * 0.06f);
+                StartCoroutine(_view.CleanShine());
                 int k = 0;
                 foreach (var o in _def.Objects.OrderBy(o => _view.Objects[o.InstanceId].Position.x).ThenBy(o => _view.Objects[o.InstanceId].Position.y))
                     _view.Objects[o.InstanceId].Hop(0.05f * k++);
@@ -674,9 +704,9 @@ namespace SortEverything.Presentation
                     var c = _view.TargetCenter(t.TargetId);
                     Fx.Burst(_view, _view.FxLayer, c, UIKit.CategoryColor(t.Accepts[0]), 14, 1.4f);
                 }
-                Fx.Confetti(_view, _view.FxLayer, BoardView.Width, -20f, 80);
+                Fx.Confetti(_view, _view.FxLayer, _view.W, -20f, 80);
                 string cheer = _level.LevelId == KitchenCatalogue.LevelId(20) ? "Kitchen restored!" : "Sparkling clean!";
-                Fx.FloatText(_view, _view.FxLayer, new Vector2(BoardView.Width / 2, _sourceTop + _sourceH * 0.45f), cheer, SpriteFactory.Hex("#FFE9A8"), 30, 24f);
+                Fx.FloatText(_view, _view.FxLayer, new Vector2(_view.W / 2, _layout.PlayH * 0.45f), cheer, SpriteFactory.Hex("#FFE9A8"), 30, 24f);
                 yield return new WaitForSecondsRealtime(1.25f);
             }
             if (this == null || _phase != Phase.Completing) yield break;
@@ -692,13 +722,14 @@ namespace SortEverything.Presentation
             _hud.gameObject.SetActive(false);
 
             // Move the finished arrangement to the top; the result sheet uses the freed lower space.
-            float shift = 56 + _targetTop + _targetsUsedTop - 8;
+            float shift = _layout.HeaderH + _layout.InstructionH + _layout.ContainersTop - 8;
             var boardRt = _view.Root;
             var basePos = boardRt.anchoredPosition;
             StartCoroutine(UIKit.Tween(Reduced ? 0 : 0.25f, t => boardRt.anchoredPosition = basePos + new Vector2(0, shift * UIKit.EaseOut(t))));
             _view.SourceRegion.gameObject.SetActive(false);
 
-            float sheetTop = _targetsUsedBottom - _targetsUsedTop + 8;
+            float sheetTop = _layout.ContainersH + 8;
+            foreach (Transform child in _root) if (child.name == "Instruction") child.gameObject.SetActive(false);
             var sheet = UIKit.Panel(_overlay, "ResultSheet", UIKit.Paper, 22, raycast: true);
             _resultSheet = sheet.rectTransform;
             _resultSheet.anchorMin = new Vector2(0, 0); _resultSheet.anchorMax = new Vector2(1, 1);
@@ -735,7 +766,7 @@ namespace SortEverything.Presentation
             }
             if (Mastery)
             {
-                if (facts.NewBadges.Count > 0) UIKit.Label(list, "Badges", facts.NewBadges[0].StartsWith(RecordRules.CleanSort) ? "✓ Clean Sort" : "✓ Unassisted Planner", 13, UIKit.Primary, TextAnchor.MiddleCenter, FontStyle.Bold).Size(20);
+                if (facts.NewBadges.Count > 0) UIKit.Label(list, "Badges", facts.NewBadges[0].StartsWith(RecordRules.CleanSort) ? "Clean Sort badge" : "Unassisted Planner badge", 13, UIKit.Primary, TextAnchor.MiddleCenter, FontStyle.Bold).Size(20);
                 if (facts.NewBestTime) UIKit.Label(list, "Best", "New best time · " + UIKit.FormatMs(facts.ActiveMs), 13, UIKit.Primary).Size(20);
             }
             if (facts.NewRecognitions.Contains(Progression.KitchenMaster))
@@ -1031,6 +1062,90 @@ namespace SortEverything.Presentation
             }
         }
 
+        // ---------- Debug / capture hooks (used by the board-pass screenshot test and for manual QA) ----------
+
+        ObjectView _debugDrag;
+
+        /// <summary>Closes a lesson / optional-board offer if one is showing (returns false when there was none).</summary>
+        public bool DebugDismissOffers()
+        {
+            bool any = false;
+            foreach (Transform child in _overlay)
+                if (child.name == "LessonOffer" || child.name == "OptionalReady") { Destroy(child.gameObject); any = true; }
+            return any;
+        }
+
+        /// <summary>Starts play as a first pickup would: closes the lesson/optional offers and the tutorial line.</summary>
+        void DebugBegin()
+        {
+            foreach (Transform child in _overlay)
+                if (child.name == "LessonOffer" || child.name == "OptionalReady") Destroy(child.gameObject);
+            if (_phase == Phase.Ready) { _phase = Phase.Playing; StopHand(); SetInstruction(_instructionDefault); }
+        }
+
+        /// <summary>Lifts the first unsorted item over a container that accepts it (hover-valid state). Commits nothing.</summary>
+        public bool DebugHoverValid()
+        {
+            var o = _def.Objects.FirstOrDefault(x => !_state.IsAssigned(x.InstanceId));
+            var t = o == null ? null : _def.Targets.FirstOrDefault(x => x.AcceptsCategory(o.CategoryId));
+            if (t == null) return false;
+            DebugBegin();
+            var v = _view.Objects[o.InstanceId];
+            _debugDrag = v;
+            v.transform.SetParent(_view.DragLayer, true);
+            v.SetDragging(true);
+            v.Place(_view.TargetCenter(t.TargetId) + new Vector2(10, -6));
+            _view.SetHover(t.TargetId);
+            return true;
+        }
+
+        public bool DebugCancelDrag()
+        {
+            if (_debugDrag == null) return false;
+            _debugDrag = null;
+            _view.SetHover(null);
+            _view.SnapAll(_state, true);
+            return true;
+        }
+
+        /// <summary>Drops the first unsorted item on a container that refuses it (wrong kind or full): the real reject path.</summary>
+        public bool DebugReject()
+        {
+            DebugBegin();
+            foreach (var o in _def.Objects.Where(x => !_state.IsAssigned(x.InstanceId)))
+                foreach (var t in _def.Targets)
+                {
+                    var proposal = new DropProposal(o.InstanceId, t.TargetId, false);
+                    var result = RuleEvaluator.Evaluate(_state, proposal);
+                    if (result.Kind != DropKind.WrongCategory && result.Kind != DropKind.Full) continue;
+                    var v = _view.Objects[o.InstanceId];
+                    v.Place(_view.TargetCenter(t.TargetId));
+                    Reject(v, result);
+                    return true;
+                }
+            return false;
+        }
+
+        /// <summary>Sorts items through the real Accept path (solver order) until the fraction is reached.</summary>
+        public bool DebugSortFraction(float fraction)
+        {
+            DebugBegin();
+            if (_phase != Phase.Playing) return false;
+            var solution = Solver.Solve(_def).Allocation;
+            if (solution == null) return false;
+            int goal = Mathf.CeilToInt(_def.Objects.Count * Mathf.Clamp01(fraction));
+            foreach (var o in _def.Objects)
+            {
+                if (_state.SortedCount >= goal || _phase != Phase.Playing) break;
+                if (_state.IsAssigned(o.InstanceId)) continue;
+                var proposal = new DropProposal(o.InstanceId, solution[o.InstanceId], false);
+                var result = RuleEvaluator.Evaluate(_state, proposal);
+                if (result.Kind != DropKind.Accept) continue;
+                Accept(_view.Objects[o.InstanceId], proposal, result);
+            }
+            return true;
+        }
+
         public void Unload()
         {
             if (_phase == Phase.Unloading) return;
@@ -1041,7 +1156,6 @@ namespace SortEverything.Presentation
         }
     }
 
-    sealed class ReadyBannerTag : MonoBehaviour { }
     sealed class LessonBlocker : MonoBehaviour { }
 
     /// <summary>

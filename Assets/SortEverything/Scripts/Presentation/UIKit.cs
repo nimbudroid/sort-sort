@@ -23,7 +23,12 @@ namespace SortEverything.Presentation
         public static readonly Color Scrim = new Color(0.16f, 0.12f, 0.1f, 0.45f);
 
         static Font _font;
-        public static Font Font => _font ? _font : (_font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf"));
+        /// <summary>
+        /// Bundled Lato (OFL) so every glyph in the game's strings renders on device and in WebGL, where the built-in
+        /// LegacyRuntime font has no system fallback (it rendered the em dash as a gap). Falls back to the built-in font.
+        /// </summary>
+        public const string FontResource = "SortEverything/Fonts/Lato-Regular";
+        public static Font Font => _font ? _font : (_font = Resources.Load<Font>(FontResource) ?? Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf"));
 
         public static Color CategoryColor(string categoryId)
         {

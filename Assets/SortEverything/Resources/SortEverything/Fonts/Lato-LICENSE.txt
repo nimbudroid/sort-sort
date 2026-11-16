@@ -1,0 +1,6 @@
+Lato-Regular.ttf
+Copyright (c) 2010-2011 by tyPoland Lukasz Dziedzic (http://www.typoland.com/) with Reserved Font Name "Lato".
+Licensed under the SIL Open Font License, Version 1.1 (http://scripts.sil.org/OFL).
+The font is bundled unmodified as the game's UI font because it covers every character the game's strings use
+(including the em dash, middle dot, curly apostrophe and accented letters) on every platform, including WebGL,
+where Unity's built-in LegacyRuntime font has no system fallback.

@@ -108,6 +108,62 @@ namespace SortEverything.Presentation
             });
         });
 
+        /// <summary>Crisp toy-style mess decals with the shared warm outline: crumbs, a drip, a coffee ring.</summary>
+        public static Sprite Decal(string kind, int variant) => Get("decal_" + kind + variant, () =>
+        {
+            var r = new SpriteFactory.Raster(96) { Outline = 1.6f, Gloss = 0.35f, Bevel = 6f };
+            var rng = new System.Random(variant * 7919 + kind.Length);
+            switch (kind)
+            {
+                case "drip":
+                {
+                    // A small glossy juice puddle with a couple of droplets.
+                    var c = new Color(0.93f, 0.62f, 0.22f, 0.9f);
+                    float a0 = variant * 0.7f;
+                    r.Custom((x, y) =>
+                    {
+                        float dx = x - 46, dy = y - 50;
+                        float ang = Mathf.Atan2(dy, dx);
+                        float rr = 22f + 4f * Mathf.Sin(ang * 3 + a0) + 2.5f * Mathf.Sin(ang * 5 + a0 * 2);
+                        return Mathf.Sqrt(dx * dx + dy * dy) - rr;
+                    }, c, true, 16, 20, 76, 80);
+                    r.Ellipse(38, 42, 7, 4, -30, new Color(1, 1, 1, 0.6f), outline: false);
+                    r.Circle(76, 74, 5.5f, c);
+                    r.Circle(20 + variant * 4, 80, 3.5f, c);
+                    break;
+                }
+                case "ring":
+                {
+                    r.Shade = false;
+                    var c = new Color(0.42f, 0.24f, 0.12f, 0.55f); // coffee ring
+                    r.Ring(48, 48, 34, 3.2f, c, outline: false);
+                    r.Ring(48, 48, 32, 1.4f, new Color(0.35f, 0.2f, 0.1f, 0.45f), outline: false);
+                    r.Circle(48 + 30, 48 + 24, 4, c, outline: false);
+                    break;
+                }
+                default: // crumbs: chunky rounded bread/biscuit crumbs, toy style
+                {
+                    var c = new Color(0.97f, 0.82f, 0.55f, 1f);
+                    var dark = new Color(0.86f, 0.62f, 0.33f, 1f);
+                    for (int i = 0; i < 6; i++)
+                    {
+                        float x = 22 + (float)rng.NextDouble() * 52, y = 22 + (float)rng.NextDouble() * 52;
+                        float s = i == 0 ? 8.5f : 3.5f + (float)rng.NextDouble() * 4f;
+                        r.RoundRect(x, y, s, s * (0.7f + (float)rng.NextDouble() * 0.3f), s * 0.55f, (float)rng.NextDouble() * 90f, i % 3 == 0 ? dark : c);
+                    }
+                    break;
+                }
+            }
+            return r.ToSprite("decal_" + kind + variant).texture;
+        });
+
+        /// <summary>A soft vertical band of light (for the clean-shine sweep).</summary>
+        public static Sprite ShineBand() => Get("shine", () => Paint(64, (u, v) =>
+        {
+            float across = 1f - Mathf.Abs(u);
+            return Mathf.Pow(Mathf.Clamp01(across), 1.6f) * (1f - Mathf.Pow(Mathf.Abs(v), 6f));
+        }));
+
         // ---------- Effects ----------
 
         static readonly Color[] Palette =
@@ -256,91 +312,66 @@ namespace SortEverything.Presentation
     }
 
     /// <summary>
-    /// The mess on the counter: crumbs, stains and dust that disappear as items get sorted, plus a dusty
-    /// haze over the room that lifts with progress. Purely presentation; derived from the sorted fraction.
+    /// The mess on the counter: crisp toy-style crumbs, drips and coffee rings. Each decal belongs to one item and
+    /// sits next to it; when that item is sorted its mess fades out with a small sparkle. Density and decal set
+    /// come from area/level data. Purely presentation.
     /// </summary>
     public sealed class MessLayer : MonoBehaviour
     {
-        sealed class Decal { public Image Img; public float Threshold; public float BaseAlpha; public bool Gone; public Vector2 Pos; }
+        sealed class Decal { public Image Img; public string ObjectId; public float BaseAlpha; public bool Gone; public Vector2 Pos; }
         readonly List<Decal> _decals = new List<Decal>();
-        Image _haze;
-        float _hazeAlpha;
         MonoBehaviour _host;
         RectTransform _fxLayer;
 
-        public static MessLayer Create(RectTransform parent, RectTransform hazeParent, MonoBehaviour host, RectTransform fxLayer,
-            string seedKey, Rect area, int count)
+        public static MessLayer Create(RectTransform parent, MonoBehaviour host, RectTransform fxLayer, SortEverything.Domain.BoardDef def, BoardLayout layout, SortEverything.Domain.MessData mess)
         {
             var rt = UIKit.Rect(parent, "Mess").Stretch();
             var m = rt.gameObject.AddComponent<MessLayer>();
             m._host = host; m._fxLayer = fxLayer;
-            var rng = new System.Random(seedKey.GetHashCode() & 0x7fffffff);
-            var stain = SpriteFactory.Hex("#6E4224");
-            var dust = SpriteFactory.Hex("#8C8177");
-            var spill = SpriteFactory.Hex("#E39A3B");
-            for (int i = 0; i < count; i++)
+            if (mess == null || !mess.enabled || mess.density <= 0 || mess.decals == null || mess.decals.Length == 0) return m;
+            uint seed = 2166136261u;
+            foreach (char c in def.BoardId + def.Objects.Count) { seed ^= c; seed *= 16777619u; }
+            var rng = new System.Random((int)(seed & 0x7fffffff));
+            var area = layout.PlayRect;
+            int k = 0;
+            foreach (var o in def.Objects)
             {
-                int kind = i % 4;
-                var pos = new Vector2(area.x + (float)rng.NextDouble() * area.width, area.y + (float)rng.NextDouble() * area.height);
-                float size; Sprite sprite; Color color;
-                switch (kind)
+                var p = layout.Pile[o.InstanceId];
+                // density 1.0 = one decal per item; fractions are rounded by a seeded coin flip.
+                int count = (int)mess.density + (rng.NextDouble() < mess.density - (int)mess.density ? 1 : 0);
+                for (int j = 0; j < count; j++, k++)
                 {
-                    case 0: sprite = Fx.Crumbs(rng.Next(6)); size = 34 + (float)rng.NextDouble() * 14; color = SpriteFactory.Hex("#8E5E30"); color.a = 0.95f; break;
-                    case 1: sprite = Fx.Blob(rng.Next(8)); size = 40 + (float)rng.NextDouble() * 28; color = stain; color.a = 0.4f; break;
-                    case 2: sprite = Fx.Blob(10 + rng.Next(8)); size = 34 + (float)rng.NextDouble() * 22; color = dust; color.a = 0.42f; break;
-                    default: sprite = Fx.Blob(20 + rng.Next(8)); size = 32 + (float)rng.NextDouble() * 24; color = spill; color.a = 0.38f; break;
+                    string kind = mess.decals[(k + rng.Next(mess.decals.Length)) % mess.decals.Length];
+                    float ang = (float)rng.NextDouble() * Mathf.PI * 2f;
+                    float dist = p.Visible * (0.42f + (float)rng.NextDouble() * 0.25f);
+                    var pos = p.Center + new Vector2(Mathf.Cos(ang), Mathf.Sin(ang)) * dist;
+                    float size = kind == "ring" ? p.Visible * 0.62f : kind == "drip" ? p.Visible * 0.42f : p.Visible * 0.5f;
+                    pos.x = Mathf.Clamp(pos.x, area.xMin + size * 0.4f, area.xMax - size * 0.4f);
+                    pos.y = Mathf.Clamp(pos.y, area.yMin + size * 0.4f, area.yMax - size * 0.4f);
+                    var img = UIKit.Icon(rt, "Decal_" + o.InstanceId + "_" + j, Fx.Decal(kind, rng.Next(4)), size, Color.white);
+                    img.rectTransform.anchorMin = img.rectTransform.anchorMax = new Vector2(0, 1);
+                    img.rectTransform.anchoredPosition = new Vector2(pos.x, -pos.y);
+                    img.rectTransform.localRotation = Quaternion.Euler(0, 0, (float)rng.NextDouble() * 360f);
+                    m._decals.Add(new Decal { Img = img, ObjectId = o.InstanceId, BaseAlpha = 1f, Pos = pos });
                 }
-                var img = UIKit.Icon(rt, "Decal" + i, sprite, size, color);
-                img.preserveAspect = false;
-                img.rectTransform.anchorMin = img.rectTransform.anchorMax = new Vector2(0, 1);
-                img.rectTransform.anchoredPosition = new Vector2(pos.x, -pos.y);
-                img.rectTransform.sizeDelta = new Vector2(size, size * (0.65f + (float)rng.NextDouble() * 0.35f));
-                img.rectTransform.localRotation = Quaternion.Euler(0, 0, (float)rng.NextDouble() * 360f);
-                // Spread thresholds so something clears on most placements; the last bits go with the final item.
-                float threshold = (i + 1f) / (count + 1f) + ((float)rng.NextDouble() - 0.5f) * 0.08f;
-                m._decals.Add(new Decal { Img = img, Threshold = Mathf.Clamp(threshold, 0.05f, 1f), BaseAlpha = color.a, Pos = pos });
-            }
-            if (hazeParent != null)
-            {
-                m._haze = UIKit.Panel(hazeParent, "DustHaze", new Color(0.55f, 0.47f, 0.4f, 0f), 0);
-                m._haze.rectTransform.Stretch(-400, -200, -400, -200);
             }
             return m;
         }
 
-        /// <summary>Applies progress (0..1). With animate, cleared decals fade out with a little sparkle.</summary>
-        public void SetProgress(float fraction, bool animate, bool reduced)
+        /// <summary>A sorted item's mess is gone for good this visit (moving it back does not re-dirty the counter).</summary>
+        public void Refresh(SortEverything.Domain.BoardState s, bool animate)
         {
             foreach (var d in _decals)
             {
-                bool gone = fraction >= d.Threshold - 0.0001f;
-                if (gone == d.Gone) continue;
-                d.Gone = gone;
-                if (!animate || reduced || !isActiveAndEnabled)
-                {
-                    d.Img.color = WithAlpha(d.Img.color, gone ? 0 : d.BaseAlpha);
-                    continue;
-                }
-                if (gone)
-                {
-                    var img = d.Img; float a0 = img.color.a;
-                    StartCoroutine(UIKit.Tween(0.4f, t => { if (img != null) img.color = WithAlpha(img.color, a0 * (1 - t)); }));
-                    Fx.Burst(_host, _fxLayer, d.Pos, new Color(1f, 0.96f, 0.8f), 4, 0.55f);
-                }
-                else d.Img.color = WithAlpha(d.Img.color, d.BaseAlpha);
-            }
-            if (_haze != null)
-            {
-                float target = 0.16f * (1 - fraction);
-                if (!animate || reduced || !isActiveAndEnabled) _haze.color = WithAlpha(_haze.color, target);
-                else
-                {
-                    float a0 = _haze.color.a;
-                    StartCoroutine(UIKit.Tween(0.5f, t => { if (_haze != null) _haze.color = WithAlpha(_haze.color, Mathf.Lerp(a0, target, t)); }));
-                }
+                if (d.Gone || !s.IsAssigned(d.ObjectId)) continue;
+                d.Gone = true;
+                if (!animate || !isActiveAndEnabled) { d.Img.color = new Color(1, 1, 1, 0); continue; }
+                var img = d.Img;
+                StartCoroutine(UIKit.Tween(0.4f, t => { if (img != null) { img.color = new Color(1, 1, 1, 1 - t); img.rectTransform.localScale = Vector3.one * (1f - 0.25f * t); } }));
+                Fx.Burst(_host, _fxLayer, d.Pos, new Color(1f, 0.96f, 0.8f), 5, 0.5f);
             }
         }
 
-        static Color WithAlpha(Color c, float a) => new Color(c.r, c.g, c.b, a);
+        public int Count => _decals.Count;
     }
 }

@@ -37,10 +37,13 @@ namespace SortEverything.Editor
             }
             EditorGUILayout.LabelField("Kitchen environment", EditorStyles.boldLabel);
             Row(new[] { "window", "stove", "pantry_shelf", "plate_shelf", "table", "plant", "rail", "basket" }.Select(id => (id, KitchenArt.Prop(id))).ToArray());
-            Row(new (string, Sprite)[] { ("wall tile", KitchenArt.WallTile()), ("wood", KitchenArt.Wood()), ("shelf back", KitchenArt.ShelfBack()), ("floor", KitchenArt.Floor()),
+            Row(new (string, Sprite)[] { ("counter", KitchenArt.Surface("butcher_block")), ("wall tile", KitchenArt.WallTile()), ("wood", KitchenArt.Wood()), ("shelf back", KitchenArt.ShelfBack()), ("floor", KitchenArt.Floor()),
                 ("weave", KitchenArt.Weave()), ("crate slats", KitchenArt.Slats()), ("gingham", KitchenArt.Gingham()) });
             EditorGUILayout.LabelField("Containers", EditorStyles.boldLabel);
-            Row(new[] { "fruit", "vegetables", "drinks", "kitchenware", "shared" }.Select(k => { var st = KitchenArt.ContainerStyle(k); return (k, KitchenArt.Frame(st.key, st.rim, st.inner)); }).ToArray());
+            Row(Runtime.ContentDb.Containers.archetypes.Select(a => (a.id, ContainerArt.Back(a))).ToArray());
+            Row(Runtime.ContentDb.Containers.archetypes.Select(a => (a.id + " front", ContainerArt.Front(a))).ToArray());
+            EditorGUILayout.LabelField("Mess decals", EditorStyles.boldLabel);
+            Row(new[] { "crumbs", "drip", "ring" }.Select(k => (k, Fx.Decal(k, 0))).ToArray());
             EditorGUILayout.LabelField("Interface pieces", EditorStyles.boldLabel);
             Row(UiSprites.Select(id => (id, UiSprite(id))).ToArray());
             EditorGUILayout.EndScrollView();

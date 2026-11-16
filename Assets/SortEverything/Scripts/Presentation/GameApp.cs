@@ -112,7 +112,7 @@ namespace SortEverything.Presentation
         {
             yield return null; // let the safe area settle
             var config = GameConfig.LoadFromResources();
-            var catalogue = Catalogue.CreateKitchen(config.buildProfileId);
+            var catalogue = Catalogue.CreateKitchen(config.buildProfileId, ContentDb.DataLevels);
             var store = FileSaveStore.Default();
             var telemetry = new Telemetry(System.IO.Path.Combine(Application.persistentDataPath, "SortEverything", "telemetry.jsonl"), config.telemetryEnabled)
             {
@@ -297,7 +297,7 @@ namespace SortEverything.Presentation
                 string kind = l.Boards.Any(b => b.IsPlanning) ? (l.HasOptionalBoard ? "Optional puzzle + final placements" : "Planning puzzle · can be left for later") : "Sorting";
                 var sub = UIKit.Label(row.transform, "Kind", kind, 11, UIKit.InkSoft, TextAnchor.MiddleLeft);
                 sub.rectTransform.TopLeft(44, 32, 190, 20);
-                string chip = status == LevelStatus.Completed ? (laterOptional ? "Sorted · puzzle later" : "Sorted ✓")
+                string chip = status == LevelStatus.Completed ? (laterOptional ? "Sorted · puzzle later" : "Sorted")
                     : status == LevelStatus.Later ? Strings.Get("status.later")
                     : status == LevelStatus.InProgress ? Strings.Get("status.in_progress")
                     : status == LevelStatus.Locked ? "Locked" : "Ready";
@@ -367,7 +367,7 @@ namespace SortEverything.Presentation
                     var ic = UIKit.Icon(row.transform, "Obj" + i, SpriteFactory.Object(ids[i]), 26);
                     ic.rectTransform.TopLeft(40 + i * 25, 50, 26, 26);
                 }
-                string chip = status == LevelStatus.Completed ? "Sorted ✓" : status == LevelStatus.Locked ? "Locked" : status == LevelStatus.InProgress ? Strings.Get("status.in_progress") : "Ready";
+                string chip = status == LevelStatus.Completed ? "Sorted" : status == LevelStatus.Locked ? "Locked" : status == LevelStatus.InProgress ? Strings.Get("status.in_progress") : "Ready";
                 var c = UIKit.Label(row.transform, "Status", chip, 11, status == LevelStatus.Completed ? UIKit.Primary : UIKit.InkSoft, TextAnchor.MiddleRight, FontStyle.Bold);
                 c.rectTransform.TopLeft(240, 6, 88, 18);
                 var play = UIKit.Button(row.transform, "Play", "Play", null, primary: true, fontSize: 14);
@@ -387,13 +387,13 @@ namespace SortEverything.Presentation
                     .Select(a => (Strings.Get("asset." + a.AssetId), SpriteFactory.Object(a.AssetId))).ToList(), 4, 72);
             }
             Heading(list, "Containers");
-            Grid(list, new[] { "fruit", "vegetables", "drinks", "kitchenware", "shared" }
-                .Select(k => { var st = KitchenArt.ContainerStyle(k); return (k, KitchenArt.Frame(st.key, st.rim, st.inner)); }).ToList(), 3, 92);
+            Grid(list, ContentDb.Containers.archetypes.Select(a => (a.label, ContainerArt.Back(a))).ToList(), 3, 92);
+            Grid(list, ContentDb.Containers.archetypes.Select(a => (a.label + " front", ContainerArt.Front(a))).ToList(), 3, 40);
             Heading(list, "Kitchen furniture");
             Grid(list, new[] { "window", "stove", "pantry_shelf", "plate_shelf", "table", "plant", "rail", "basket" }
                 .Select(id => (id.Replace('_', ' '), KitchenArt.Prop(id))).ToList(), 3, 92);
             Heading(list, "Surfaces");
-            Grid(list, new (string, Sprite)[] { ("wall tile", KitchenArt.WallTile()), ("wood", KitchenArt.Wood()), ("shelf back", KitchenArt.ShelfBack()),
+            Grid(list, new (string, Sprite)[] { ("counter", KitchenArt.Surface(ContentDb.Area(KitchenCatalogue.AreaId).surface, ContentDb.Area(KitchenCatalogue.AreaId).surfaceColor)), ("wall tile", KitchenArt.WallTile()), ("wood", KitchenArt.Wood()), ("shelf back", KitchenArt.ShelfBack()),
                 ("floor", KitchenArt.Floor()), ("weave", KitchenArt.Weave()), ("crate slats", KitchenArt.Slats()), ("gingham", KitchenArt.Gingham()) }.ToList(), 4, 64, tiled: true);
             Heading(list, "Interface");
             Grid(list, CategoryIds.Ordered.Select(c => (Strings.Get("category." + c), SpriteFactory.CategoryIcon(c)))
@@ -475,9 +475,9 @@ namespace SortEverything.Presentation
                 var row = UIKit.Rect(card.transform, "Buttons").TopLeft(10, 56, 316, 46);
                 UIKit.HStack(row, 6);
                 var captured = a;
-                UIKit.Button(row, "Default", string.IsNullOrEmpty(equipped) ? "Default ✓" : "Use default", () => DoEquip(captured.AnchorId, ""));
+                UIKit.Button(row, "Default", string.IsNullOrEmpty(equipped) ? "Default · in use" : "Use default", () => DoEquip(captured.AnchorId, ""));
                 if (owned)
-                    UIKit.Button(row, "Variant", equipped == a.VariantId ? Strings.Get("variant." + a.VariantId) + " ✓" : "Use " + Strings.Get("variant." + a.VariantId), () => DoEquip(captured.AnchorId, captured.VariantId), fontSize: 12);
+                    UIKit.Button(row, "Variant", equipped == a.VariantId ? Strings.Get("variant." + a.VariantId) + " · in use" : "Use " + Strings.Get("variant." + a.VariantId), () => DoEquip(captured.AnchorId, captured.VariantId), fontSize: 12);
                 else
                 {
                     UIKit.Button(row, "Preview", "Preview", () =>
@@ -573,7 +573,7 @@ namespace SortEverything.Presentation
                     bool badge = Save.badges.Contains(Progression.BadgeId(b.RecordRule, l.LevelId, b.BoardId));
                     string boardLabel = l.Boards.Count > 1 ? (b.Required ? " (final)" : " (puzzle)") : "";
                     string line = $"{l.OrdinalInArea}. {Strings.Get(l.PurposeKey)}{boardLabel}   best {UIKit.FormatMs(r?.bestMs ?? -1)}   unassisted {UIKit.FormatMs(r?.bestUnassistedMs ?? -1)}"
-                        + (badge ? (b.RecordRule == RecordRules.CleanSort ? "   ✓ Clean Sort" : "   ✓ Unassisted Planner") : "");
+                        + (badge ? (b.RecordRule == RecordRules.CleanSort ? "   · Clean Sort badge" : "   · Unassisted Planner badge") : "");
                     UIKit.Label(list, "Rec_" + l.LevelId + b.BoardId, line, 12, UIKit.Ink, TextAnchor.MiddleLeft).Size(26);
                 }
         }
