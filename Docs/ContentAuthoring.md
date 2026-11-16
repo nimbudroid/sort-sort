@@ -82,6 +82,21 @@ Create `Content/Levels/<pack>.json`:
 - On sorting boards, any object that fits zero containers or more than one.
 - Any character the board font cannot render.
 
+## 3b. A scene profile (the Little Project Loop presentation)
+
+`Content/scenes.json` dresses a level without touching its rules (Level 1 is the reference):
+
+- `arrivalLine`: the greeting shown first in the single instruction line (DISCOVER).
+- `backsplashShare` and `wallProps`: a wall band behind the counter, with props such as `window_morning`, `wall_shelf` and `plant`. x/y are normalized in the band; `size` is relative to the band height.
+- `light: "morning"`: soft warm beams from the window across the counter.
+- `composition`: the finished arrangement (TRANSFORM/REMEMBER).
+  - A `tray` (a container archetype) with an optional `cloth`, placed by `x/y/w/h` in the counter area.
+  - `groups`: how each container's sorted items join it. `"container"` moves the whole filled container onto the tray (e.g. the fruit basket); `"items"` lines its items up on `spots` (e.g. drinks).
+  - `props`: supporting props on the tray (`toast_plate`, `jam_jar`, `flower_vase`, `napkin`, …).
+  - `title` and `subtitle`: shown on the result screen.
+
+The result screen shows the composed counter, and **Inspect Scene** shows the whole scene at play size. New prop art can be dropped in at `Art/Props/<id>.png`. Validate checks levels, containers, props, spots, coordinates, glyphs, and that the wall band leaves every item at full touch size.
+
 ## 4. An area or room
 
 What is data today, in `Content/areas.json`:

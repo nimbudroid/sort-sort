@@ -33,6 +33,9 @@ namespace SortEverything.Presentation
         Text _taskText, _countText, _timeText, _progressText;
         Button _deferButton, _hintChip;
         BoardLayout _layout;
+        SceneData _scene;
+        Vector2 _boardHomePos, _resultPos;
+        float _resultScale = 1f;
         Text _instruction;
         Image _progressFill;
         string _instructionDefault = "";
@@ -129,7 +132,9 @@ namespace SortEverything.Presentation
             // One layout system: zones are shares of the safe area (Resources/SortEverything/BoardLayout.json).
             var safe = _app.SafeArea.rect;
             float sw = safe.width > 1 ? safe.width : 360f, sh = _app.ScreenHeight;
-            _layout = BoardLayout.Compute(_def, sw, sh);
+            // The scene profile dresses the required board (the optional puzzle board stays generic).
+            _scene = _def.Required ? ContentDb.Scene(_level.LevelId) : null;
+            _layout = BoardLayout.Compute(_def, sw, sh, null, _scene?.backsplashShare ?? 0f);
             float hudH = _layout.HeaderH, instrH = _layout.InstructionH;
             _combo = 0;
 
@@ -138,7 +143,8 @@ namespace SortEverything.Presentation
             BuildHud(hudH);
             BuildInstruction(hudH, instrH);
             _boardHolder = UIKit.Rect(_root, "BoardHolder").Stretch(0, hudH + instrH, 0, 0);
-            _view = BoardView.Create(_boardHolder, _def, _layout, _app.UiCamera, _level.PurposeProp, _area, _area.MessFor(_level.LevelId));
+            _view = BoardView.Create(_boardHolder, _def, _layout, _app.UiCamera, _level.PurposeProp, _area, _area.MessFor(_level.LevelId), _scene);
+            _boardHomePos = _view.Root.anchoredPosition;
             _view.ReducedMotion = Reduced;
             _view.PointerDown = OnPointerDown;
             _view.PointerDrag = OnPointerDrag;
@@ -285,6 +291,19 @@ namespace SortEverything.Presentation
                 return;
             }
             OfferLessonsOrStart();
+            ShowArrivalLine();
+        }
+
+        /// <summary>DISCOVER: on a fresh board the scene greets first, then hands the line to the tutorial/rule.</summary>
+        void ShowArrivalLine()
+        {
+            if (_scene == null || string.IsNullOrEmpty(_scene.arrivalLine) || _state.SortedCount > 0 || _instruction == null) return;
+            string next = _instruction.text;
+            SetInstruction(_scene.arrivalLine);
+            StartCoroutine(AfterDelay(2.4f, () =>
+            {
+                if (this != null && _instruction != null && _instruction.text == _scene.arrivalLine) SetInstruction(_phase == Phase.Ready ? next : _instructionDefault);
+            }));
         }
 
         void OfferLessonsOrStart()
@@ -692,6 +711,16 @@ namespace SortEverything.Presentation
             if (!string.IsNullOrEmpty(facts.AnchorUnlocked)) _app.Audio.Play("restoration");
             else if (facts.NewDiscoveries.Count > 0) _app.Audio.Play("discovery");
 
+            if (_view.HasComposition)
+            {
+                // TRANSFORM: shine, then the finished composition assembles; restrained, no confetti.
+                if (!Reduced) yield return _view.CleanShine();
+                yield return _view.PlayComposition(_state);
+                yield return new WaitForSecondsRealtime(Reduced ? 0.1f : 0.7f);
+                if (this == null || _phase != Phase.Completing) yield break;
+                ShowResult(facts);
+                yield break;
+            }
             if (!Reduced)
             {
                 // Glow sweep across the counter, left to right.
@@ -721,14 +750,26 @@ namespace SortEverything.Presentation
             UIKit.Clear(_overlay);
             _hud.gameObject.SetActive(false);
 
-            // Move the finished arrangement to the top; the result sheet uses the freed lower space.
-            float shift = _layout.HeaderH + _layout.InstructionH + _layout.ContainersTop - 8;
+            // Frame the finished arrangement at the top; the result sheet uses the freed lower space.
+            // Scenes with a composition show the composed counter (scaled to fit); others show their containers.
             var boardRt = _view.Root;
-            var basePos = boardRt.anchoredPosition;
-            StartCoroutine(UIKit.Tween(Reduced ? 0 : 0.25f, t => boardRt.anchoredPosition = basePos + new Vector2(0, shift * UIKit.EaseOut(t))));
+            float sheetTop;
+            if (_view.HasComposition)
+            {
+                float region = _app.ScreenHeight * 0.44f;
+                _resultScale = Mathf.Min(1f, region / _layout.PlayH);
+                _resultPos = new Vector2(-_layout.Width * _resultScale / 2f, _layout.HeaderH + _layout.InstructionH - 4);
+                sheetTop = _layout.PlayH * _resultScale + 6;
+            }
+            else
+            {
+                _resultScale = 1f;
+                _resultPos = _boardHomePos + new Vector2(0, _layout.HeaderH + _layout.InstructionH + _layout.ContainersTop - 8);
+                sheetTop = _layout.ContainersH + 8;
+            }
+            MoveBoard(_resultPos, _resultScale, Reduced ? 0 : 0.3f);
             _view.SourceRegion.gameObject.SetActive(false);
 
-            float sheetTop = _layout.ContainersH + 8;
             foreach (Transform child in _root) if (child.name == "Instruction") child.gameObject.SetActive(false);
             var sheet = UIKit.Panel(_overlay, "ResultSheet", UIKit.Paper, 22, raycast: true);
             _resultSheet = sheet.rectTransform;
@@ -743,9 +784,13 @@ namespace SortEverything.Presentation
             string preview = _app.Catalogue.PreviewFor(_level);
             bool sampleEnd = string.IsNullOrEmpty(preview) && !isFinale && !optionalAfterFinale;
 
-            string title = optionalAfterFinale ? "Puzzle solved" : isFinale ? Strings.Get("result.kitchen_ready") : Strings.Get("result.sorted");
+            var comp = _view.HasComposition ? _scene.composition : null;
+            string title = optionalAfterFinale ? "Puzzle solved" : isFinale ? Strings.Get("result.kitchen_ready")
+                : comp != null && !string.IsNullOrEmpty(comp.title) ? comp.title : Strings.Get("result.sorted");
             UIKit.Label(list, "Title", title, 24, UIKit.Ink, TextAnchor.MiddleCenter, FontStyle.Bold).Size(34);
-            UIKit.Label(list, "Purpose", Strings.Get(_level.PurposeKey) + " — " + _view.PropBacking.GetComponentInChildren<Text>().text, 13, UIKit.InkSoft).Size(20);
+            string sub = comp != null && !string.IsNullOrEmpty(comp.subtitle) ? comp.subtitle
+                : Strings.Get(_level.PurposeKey) + " — " + _view.PropBacking.GetComponentInChildren<Text>().text;
+            UIKit.Label(list, "Purpose", sub, 13, UIKit.InkSoft).Size(comp != null ? 34 : 20);
             if (sampleEnd) UIKit.Label(list, "Sample", Strings.Get("result.sample_complete"), 14, UIKit.Primary, TextAnchor.MiddleCenter, FontStyle.Bold).Size(20);
 
             var gains = new List<string>();
@@ -878,6 +923,7 @@ namespace SortEverything.Presentation
             S.Telemetry.Emit("scene_inspect_start", $"\"levelId\":\"{_level.LevelId}\"");
             float start = Time.unscaledTime;
             _resultSheet.gameObject.SetActive(false);
+            MoveBoard(_boardHomePos, 1f, Reduced ? 0 : 0.3f); // the whole scene, at play size
             var back = UIKit.Button(_overlay, "InspectBack", "‹ " + Strings.Get("action.back"), null);
             var brt = (RectTransform)back.transform;
             brt.anchorMin = brt.anchorMax = new Vector2(0.5f, 0);
@@ -888,9 +934,24 @@ namespace SortEverything.Presentation
             {
                 S.Telemetry.Emit("scene_inspect_end", $"\"levelId\":\"{_level.LevelId}\",\"seconds\":{(Time.unscaledTime - start):0.0}");
                 Destroy(back.gameObject);
+                MoveBoard(_resultPos, _resultScale, Reduced ? 0 : 0.25f);
                 _resultSheet.gameObject.SetActive(true);
                 _inspecting = false;
             });
+        }
+
+        void MoveBoard(Vector2 pos, float scale, float duration)
+        {
+            var rt = _view.Root;
+            var p0 = rt.anchoredPosition; float s0 = rt.localScale.x;
+            if (duration <= 0) { rt.anchoredPosition = pos; rt.localScale = Vector3.one * scale; return; }
+            StartCoroutine(UIKit.Tween(duration, t =>
+            {
+                if (rt == null) return;
+                float e = UIKit.EaseOut(t);
+                rt.anchoredPosition = Vector2.Lerp(p0, pos, e);
+                rt.localScale = Vector3.one * Mathf.Lerp(s0, scale, e);
+            }));
         }
 
         void Replay()

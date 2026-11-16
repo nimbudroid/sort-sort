@@ -132,6 +132,43 @@ namespace SortEverything.Editor
                 foreach (var text in new[] { level.PurposeEnglish, level.InstructionOverride })
                     CheckGlyphs(text, $"{level.LevelId} text", fontChars, issues);
             }
+            // ---- Scene profiles (scenes.json) ----
+            bool In01(float v) => v >= 0f && v <= 1f;
+            foreach (var sc in ContentDb.Scenes.scenes)
+            {
+                string S = $"scene {sc.levelId}";
+                var level = catalogue.Level(sc.levelId);
+                if (level == null) { issues.Add($"{S}: no such level."); continue; }
+                if (sc.backsplashShare < 0 || sc.backsplashShare > 0.45f) issues.Add($"{S}: backsplashShare must be 0–0.45.");
+                foreach (var p in sc.wallProps)
+                {
+                    if (!SceneArt.Known.Contains(p.prop) && Resources.Load<Sprite>("SortEverything/Art/Props/" + p.prop) == null) issues.Add($"{S}: unknown wall prop '{p.prop}'.");
+                    if (!In01(p.x) || !In01(p.y)) issues.Add($"{S}: wall prop '{p.prop}' is outside its band.");
+                }
+                CheckGlyphs(sc.arrivalLine, S, fontChars, issues);
+                // The arrival must leave a comfortable counter: every item keeps its touch size on the reference phone.
+                var L = BoardLayout.Compute(level.RequiredBoard, 360, 800, null, sc.backsplashShare);
+                if (L.Pile.Values.Any(p => p.Hit < BoardLayoutConfig.Current.itemHitMin - 0.01f)) issues.Add($"{S}: the wall band leaves items below the touch minimum.");
+                if (!sc.HasComposition) continue;
+                var comp = sc.composition;
+                CheckGlyphs(comp.title, S, fontChars, issues);
+                CheckGlyphs(comp.subtitle, S, fontChars, issues);
+                if (containers.archetypes.All(a => a.id != comp.tray)) issues.Add($"{S}: tray archetype '{comp.tray}' is missing.");
+                if (!In01(comp.x) || !In01(comp.y) || comp.w <= 0 || comp.w > 1 || comp.h <= 0 || comp.h > 1) issues.Add($"{S}: composition tray rect is outside the counter.");
+                foreach (var p in comp.props)
+                    if (!SceneArt.Known.Contains(p.prop) && Resources.Load<Sprite>("SortEverything/Art/Props/" + p.prop) == null) issues.Add($"{S}: unknown prop '{p.prop}'.");
+                var board = level.RequiredBoard;
+                foreach (var g in comp.groups)
+                {
+                    var t = board.Targets.FirstOrDefault(x => x.TargetId == g.target);
+                    if (t == null) { issues.Add($"{S}: composition uses missing container '{g.target}'."); continue; }
+                    if (g.mode != "container" && g.mode != "items") issues.Add($"{S}/{g.target}: mode must be 'container' or 'items'.");
+                    int items = board.Objects.Count(o => t.AcceptsCategory(o.CategoryId));
+                    if (g.mode == "items" && g.spots.Length < items) issues.Add($"{S}/{g.target}: {items} items but only {g.spots.Length} spots.");
+                    if (g.spots.Any(sp => !In01(sp.x) || !In01(sp.y)) || !In01(g.x) || !In01(g.y)) issues.Add($"{S}/{g.target}: a spot is outside the tray.");
+                }
+            }
+
             foreach (var s in Strings.AllValues) CheckGlyphs(s, "string table", fontChars, issues);
             foreach (var a in ContentDb.Areas.areas) CheckGlyphs(a.name, $"area {a.id}", fontChars, issues);
             foreach (var a in containers.archetypes) CheckGlyphs(a.label, $"container {a.id}", fontChars, issues);

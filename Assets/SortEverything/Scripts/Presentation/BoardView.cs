@@ -46,8 +46,12 @@ namespace SortEverything.Presentation
         public bool ReducedMotion;
         MessLayer _mess;
         CanvasGroup _propGroup;
+        public SceneData Scene { get; private set; }
+        public bool HasComposition => Scene != null && Scene.HasComposition;
+        SceneComposition _composition;
+        CanvasGroup _binsGroup, _objectsGroup, _frontsGroup;
 
-        public static BoardView Create(Transform parent, BoardDef def, BoardLayout layout, Camera cam, string purposeProp, AreaData area, MessData mess)
+        public static BoardView Create(Transform parent, BoardDef def, BoardLayout layout, Camera cam, string purposeProp, AreaData area, MessData mess, SceneData scene = null)
         {
             var rt = UIKit.Rect(parent, "Board_" + def.BoardId);
             rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 1);
@@ -55,7 +59,7 @@ namespace SortEverything.Presentation
             rt.anchoredPosition = new Vector2(-layout.Width / 2, 0);
             rt.sizeDelta = new Vector2(layout.Width, layout.PlayH + layout.ContainersH);
             var v = rt.gameObject.AddComponent<BoardView>();
-            v.Root = rt; v.Def = def; v.UiCamera = cam; v.Layout = layout; v.Area = area;
+            v.Root = rt; v.Def = def; v.UiCamera = cam; v.Layout = layout; v.Area = area; v.Scene = scene;
             v.Build(purposeProp, mess);
             return v;
         }
@@ -95,6 +99,10 @@ namespace SortEverything.Presentation
             var binLayer = UIKit.Rect(Root, "Containers").Stretch();
             ObjectLayer = UIKit.Rect(Root, "Objects").Stretch();
             FrontLayer = UIKit.Rect(Root, "ContainerFronts").Stretch();
+            _binsGroup = binLayer.gameObject.AddComponent<CanvasGroup>();
+            _objectsGroup = ObjectLayer.gameObject.AddComponent<CanvasGroup>();
+            _frontsGroup = FrontLayer.gameObject.AddComponent<CanvasGroup>();
+            if (HasComposition) _composition = SceneComposition.Create(Root);
             OverlayLayer = UIKit.Rect(Root, "Overlay").Stretch();
             ShineMask = UIKit.Rect(Root, "ShineMask").TopLeft(-400, 0, W + 800, Layout.PlayH - 10);
             ShineMask.gameObject.AddComponent<RectMask2D>();
@@ -147,6 +155,7 @@ namespace SortEverything.Presentation
 
         public void ShowPurposeProp(bool show, bool instant)
         {
+            if (HasComposition) return; // the scene's own composition is the payoff
             float a0 = _propGroup.alpha, a1 = show ? 1f : 0f;
             if (instant || ReducedMotion) { _propGroup.alpha = a1; return; }
             StartCoroutine(UIKit.Tween(0.35f, t => _propGroup.alpha = Mathf.Lerp(a0, a1, t)));
@@ -165,12 +174,14 @@ namespace SortEverything.Presentation
             room.TopLeft(-bleed, 0, W + bleed * 2, total + 400);
             float fullW = W + bleed * 2;
             float lipTop = Layout.PlayH - 10;
+            float counterTop = Layout.BacksplashH > 0 ? Layout.BacksplashH + 10 : 0;
 
             var counter = KitchenArt.Tiled(room, "Countertop", KitchenArt.Surface(Area.surface, Area.surfaceColor), SpriteFactory.Hex(Area.surfaceTint));
-            counter.rectTransform.TopLeft(0, 0, fullW, lipTop);
+            counter.rectTransform.TopLeft(0, counterTop, fullW, lipTop - counterTop);
             // A faint darker band where the backsplash meets the counter (depth cue from the top-left light).
             var backShade = UIKit.Panel(room, "BacksplashShade", new Color(0.3f, 0.18f, 0.1f, 0.16f), 0);
-            backShade.rectTransform.TopLeft(0, 0, fullW, 5);
+            backShade.rectTransform.TopLeft(0, counterTop, fullW, 5);
+            if (Scene != null) SceneDressing.BuildArrival(room, this, Scene, bleed);
             var lip = UIKit.Panel(room, "CounterLip", SpriteFactory.Hex(Area.lip), 0);
             lip.rectTransform.TopLeft(0, lipTop, fullW, 10);
             var lipHi = UIKit.Panel(room, "LipHighlight", new Color(1, 1, 1, 0.28f), 0);
@@ -336,6 +347,22 @@ namespace SortEverything.Presentation
                     yield return UIKit.Tween(0.5f, t => { foreach (var tv in Targets.Values) tv.ShowFinished(kind, UIKit.EaseOut(t)); });
                     break;
             }
+        }
+
+        /// <summary>
+        /// The scene's finished composition: the tray arrives, the sorted things move onto it (the real containers fade
+        /// as their contents leave), then the supporting props. Board state is unchanged.
+        /// </summary>
+        public IEnumerator PlayComposition(BoardState s)
+        {
+            if (!HasComposition) yield break;
+            // The real containers' contents leave with the copies; the empty containers fade out behind them.
+            yield return _composition.Play(this, s, Scene.composition, ReducedMotion, () =>
+            {
+                _objectsGroup.alpha = 0;
+                if (ReducedMotion) { _binsGroup.alpha = _frontsGroup.alpha = 0; return; }
+                StartCoroutine(UIKit.Tween(0.15f, t => { _binsGroup.alpha = _frontsGroup.alpha = 1 - t; }));
+            });
         }
 
         /// <summary>The "clean shine": a bright band sweeping across the counter before the result screen.</summary>

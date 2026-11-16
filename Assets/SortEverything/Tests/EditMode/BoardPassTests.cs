@@ -147,6 +147,27 @@ namespace SortEverything.Tests
         }
 
         [Test]
+        public void Slice_Level1SceneProfile_KeepsTheCounterComfortable()
+        {
+            var scene = ContentDb.Scene("kitchen_001");
+            Assert.IsNotNull(scene, "Level 1 has a scene profile");
+            Assert.IsTrue(scene.HasComposition, "Level 1 ends in a composed breakfast");
+            var board = Catalogue.CreateKitchen("kitchen_20").Level("kitchen_001").RequiredBoard;
+            foreach (var (w, h) in Sizes)
+            {
+                var L = BoardLayout.Compute(board, w, h, null, scene.backsplashShare);
+                Assert.Greater(L.BacksplashH, 0);
+                Assert.GreaterOrEqual(L.PlayRect.yMin, L.BacksplashH, "the pile stays on the counter, below the wall band");
+                foreach (var p in L.Pile.Values)
+                {
+                    Assert.GreaterOrEqual(p.Hit, BoardLayoutConfig.Current.itemHitMin - 0.01f);
+                    if (w < h) Assert.GreaterOrEqual(p.Visible, BoardLayoutConfig.Current.itemMinVisible - 0.5f);
+                }
+                Assert.LessOrEqual(L.MaxPileCover(), BoardLayoutConfig.Current.maxOverlap + 0.02f);
+            }
+        }
+
+        [Test]
         public void A4_BoardFontCoversEveryLevelString()
         {
             var cover = ContentValidator.FontCoverage("Assets/SortEverything/Resources/SortEverything/Fonts/Lato-Regular.ttf", out var err);

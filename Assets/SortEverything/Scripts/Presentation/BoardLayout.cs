@@ -89,13 +89,14 @@ namespace SortEverything.Presentation
     {
         public float Width;            // board width (centered in the screen; the room bleeds past it)
         public float HeaderH, InstructionH, PlayTop, PlayH, ContainersTop, ContainersH, TotalH;
+        public float BacksplashH;      // wall/window band at the top of the counter zone (scene profile; 0 = none)
         public Rect PlayRect;          // counter surface, board units
         public readonly Dictionary<string, PilePlacement> Pile = new Dictionary<string, PilePlacement>();
         public readonly Dictionary<string, BinPlacement> Bins = new Dictionary<string, BinPlacement>();
         public string BinRule = "";     // which overflow rule applied (for the report/debug)
         public float BaseItem;          // pile base size before relativeSize
 
-        public static BoardLayout Compute(BoardDef def, float safeW, float safeH, BoardLayoutConfig cfg = null)
+        public static BoardLayout Compute(BoardDef def, float safeW, float safeH, BoardLayoutConfig cfg = null, float backsplashShare = 0f)
         {
             cfg = cfg ?? BoardLayoutConfig.Current;
             var L = new BoardLayout();
@@ -113,7 +114,9 @@ namespace SortEverything.Presentation
             L.PlayTop = 0;
             L.ContainersTop = L.PlayH;
             float pad = cfg.playPadding;
-            L.PlayRect = new Rect(pad, L.PlayTop + pad, L.Width - 2 * pad, L.PlayH - 2 * pad - 8); // 8 = counter lip
+            L.BacksplashH = Mathf.Clamp01(backsplashShare) * L.PlayH;
+            float top = L.PlayTop + L.BacksplashH + 10; // 10 = the counter's back edge in front of the wall
+            L.PlayRect = new Rect(pad, top + pad, L.Width - 2 * pad, L.PlayH - (top - L.PlayTop) - 2 * pad - 8); // 8 = counter lip
             L.LayoutBins(def, cfg);
             L.LayoutPile(def, cfg);
             return L;

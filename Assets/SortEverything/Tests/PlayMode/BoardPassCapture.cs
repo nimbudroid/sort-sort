@@ -1,5 +1,6 @@
 using System.Collections;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
 using SortEverything.Domain;
@@ -85,6 +86,33 @@ namespace SortEverything.Tests
                 if (m == null) return false;
                 var r = m.Invoke(b, args);
                 return !(r is bool ok) || ok;
+            }
+
+            if (set == "slice")
+            {
+                // Level 1 vertical slice: arrival → tutorial line → half sorted → transformation → result → inspect.
+                foreach (var size in Sizes.Where(x => x.name == "360x800" || x.name == "411x914"))
+                {
+                    SetSize(size.w, size.h);
+                    new Runtime.FileSaveStore(dir).DeleteAllForDevelopment();
+                    string p = $"slice_L01_{size.name}";
+                    app.OpenLevel(KitchenCatalogue.LevelId(1), BoardScreen.EntryMode.Default);
+                    yield return Shot(p + "_1arrival", 0.5f);
+                    yield return Shot(p + "_2tutorial_line", 2.4f);
+                    if (Hook("DebugHoverValid")) yield return Shot(p + "_3drag_over_basket", 0.4f);
+                    Hook("DebugCancelDrag");
+                    Hook("DebugSortFraction", 0.5f); yield return Shot(p + "_4half_sorted", 0.9f);
+                    Hook("DebugSortFraction", 1f);
+                    yield return Shot(p + "_5shine", 0.45f);
+                    yield return Shot(p + "_6transform", 0.75f);
+                    yield return Shot(p + "_7composed", 1.2f);
+                    yield return Shot(p + "_8result", 1.6f);
+                    var inspect = Object.FindObjectsByType<UnityEngine.UI.Button>(FindObjectsSortMode.None).FirstOrDefault(b => b.name == "Inspect");
+                    if (inspect != null) { inspect.onClick.Invoke(); yield return Shot(p + "_9inspect", 0.6f); }
+                }
+                if (rtex != null) { cam.targetTexture = null; rtex.Release(); }
+                new Runtime.FileSaveStore(dir).DeleteAllForDevelopment();
+                yield break;
             }
 
             int[] levels = set == "before" ? new[] { 1 } : new[] { 1, 11, 13 };

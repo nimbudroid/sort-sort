@@ -19,9 +19,10 @@ namespace SortEverything.Runtime
         static AreasFile _areas;
         static List<(string name, LevelsFile file)> _levelFiles;
         static List<LevelDef> _dataLevels;
+        static ScenesFile _scenes;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        public static void Reset() { _objects = null; _byId = null; _containers = null; _areas = null; _levelFiles = null; _dataLevels = null; }
+        public static void Reset() { _objects = null; _byId = null; _containers = null; _areas = null; _levelFiles = null; _dataLevels = null; _scenes = null; }
 
         static T Load<T>(string path) where T : new()
         {
@@ -53,6 +54,11 @@ namespace SortEverything.Runtime
 
         public static AreaData Area(string areaId) =>
             Areas.areas.FirstOrDefault(a => a.id == areaId) ?? Areas.areas.FirstOrDefault() ?? new AreaData { id = areaId };
+
+        public static ScenesFile Scenes => _scenes ?? (_scenes = Load<ScenesFile>("scenes"));
+
+        /// <summary>The scene profile for a level, or null (generic presentation).</summary>
+        public static SceneData Scene(string levelId) => Scenes.scenes.FirstOrDefault(s => s.levelId == levelId);
 
         /// <summary>Raw data-level files (for validation).</summary>
         public static IReadOnlyList<(string name, LevelsFile file)> LevelFiles

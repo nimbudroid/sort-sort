@@ -99,6 +99,56 @@ namespace SortEverything.Domain
 
     [Serializable] public sealed class AreasFile { public AreaData[] areas = Array.Empty<AreaData>(); }
 
+    // ---------- Scene profiles (the Little Project Loop presentation; gameplay rules are untouched) ----------
+
+    /// <summary>A decorative prop placed by data. x/y are normalized inside its zone; size is relative to the zone height.</summary>
+    [Serializable] public sealed class ScenePropData { public string prop; public float x = 0.5f, y = 0.5f, size = 0.5f; public float rotation; }
+
+    /// <summary>A normalized spot (0..1 inside the composition tray).</summary>
+    [Serializable] public sealed class SpotData { public float x = 0.5f, y = 0.5f; }
+
+    /// <summary>
+    /// How one container's sorted items join the finished composition: "container" moves the whole filled container
+    /// (e.g. the fruit basket) onto the tray; "items" lines its items up on authored spots (e.g. drinks).
+    /// </summary>
+    [Serializable]
+    public sealed class CompositionGroupData
+    {
+        public string target;
+        public string mode = "container";
+        public float x = 0.5f, y = 0.5f, scale = 0.6f;     // container mode
+        public SpotData[] spots = Array.Empty<SpotData>();  // items mode, one per item in slot order
+        public float itemScale = 0.8f;                      // items mode, relative to the item's counter size
+    }
+
+    [Serializable]
+    public sealed class CompositionData
+    {
+        public string title = "";
+        public string subtitle = "";
+        public string tray = "serving_tray";   // container archetype used as the tray
+        public string cloth = "gingham";       // gingham | "" (pattern inside the tray)
+        public float x = 0.5f, y = 0.55f, w = 0.86f, h = 0.6f; // tray rect, normalized in the counter area
+        public CompositionGroupData[] groups = Array.Empty<CompositionGroupData>();
+        public ScenePropData[] props = Array.Empty<ScenePropData>(); // normalized inside the tray
+    }
+
+    [Serializable]
+    public sealed class SceneData
+    {
+        public string levelId;
+        public string family = "PREPARE";       // PREPARE | ORGANIZE | ARRANGE | RESTORE | DISCOVER (content classification)
+        public string arrivalLine = "";         // shown first in the single instruction slot
+        public float backsplashShare;           // share of the counter zone given to the wall/window band (0 = none)
+        public string light = "";               // "" | morning
+        public ScenePropData[] wallProps = Array.Empty<ScenePropData>();
+        public CompositionData composition;     // null = keep the generic finish
+
+        public bool HasComposition => composition != null && composition.groups != null && composition.groups.Length > 0;
+    }
+
+    [Serializable] public sealed class ScenesFile { public SceneData[] scenes = Array.Empty<SceneData>(); }
+
     // ---------- Data levels (added after the GDD's code-generated Kitchen campaign) ----------
 
     [Serializable]
