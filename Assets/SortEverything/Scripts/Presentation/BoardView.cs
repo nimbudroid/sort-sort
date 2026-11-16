@@ -16,7 +16,7 @@ namespace SortEverything.Presentation
     public sealed class BoardView : MonoBehaviour
     {
         public const float Width = 360f;
-        public const float SourceHeight = 156f;
+        public const float SourceHeight = 156f; // minimum; the live board grows it to fill tall screens (SourceH)
         public const float TargetHeight = 322f;
         public const float SlotPitch = 52f;
         public const float Header = 36f;
@@ -29,6 +29,9 @@ namespace SortEverything.Presentation
         public RectTransform DragLayer { get; private set; }
         public RectTransform OverlayLayer { get; private set; }
         public float SourceTop { get; private set; }
+        public float SourceH { get; private set; } = SourceHeight;
+        public RectTransform FxLayer { get; private set; }
+        MessLayer _mess;
         public float TargetTop { get; private set; }
 
         public BoardDef Def { get; private set; }
@@ -42,7 +45,7 @@ namespace SortEverything.Presentation
         public Action<ObjectView, PointerEventData> PointerUp;
         public bool ReducedMotion;
 
-        public static BoardView Create(Transform parent, BoardDef def, float sourceTop, float targetTop, Camera cam, string purposeProp)
+        public static BoardView Create(Transform parent, BoardDef def, float sourceTop, float targetTop, Camera cam, string purposeProp, float sourceHeight = SourceHeight)
         {
             var rt = UIKit.Rect(parent, "Board_" + def.BoardId);
             rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 1);
@@ -50,7 +53,7 @@ namespace SortEverything.Presentation
             rt.anchoredPosition = new Vector2(-Width / 2, 0);
             rt.sizeDelta = new Vector2(Width, targetTop + TargetHeight);
             var v = rt.gameObject.AddComponent<BoardView>();
-            v.Root = rt; v.Def = def; v.UiCamera = cam; v.SourceTop = sourceTop; v.TargetTop = targetTop;
+            v.Root = rt; v.Def = def; v.UiCamera = cam; v.SourceTop = sourceTop; v.TargetTop = targetTop; v.SourceH = Mathf.Max(SourceHeight, sourceHeight);
             v.Build(purposeProp);
             return v;
         }
@@ -58,10 +61,11 @@ namespace SortEverything.Presentation
         void Build(string purposeProp)
         {
             BuildRoom();
+            var hazeHolder = UIKit.Rect(Root, "HazeHolder").Stretch(); // dims the room until the board is sorted
 
-            // Source region: a cutting mat on the counter, with a return-area guide on planning boards.
-            var src = UIKit.Panel(Root, "SourceRegion", new Color(1f, 0.97f, 0.9f, 0.28f), 18);
-            SourceRegion = src.rectTransform.TopLeft(6, SourceTop, Width - 12, SourceHeight);
+            // Source region: the cluttered counter, with a return-area guide on planning boards.
+            var src = UIKit.Panel(Root, "SourceRegion", new Color(1f, 0.97f, 0.9f, 0.16f), 18);
+            SourceRegion = src.rectTransform.TopLeft(6, SourceTop, Width - 12, SourceH);
             ReturnArea = UIKit.Panel(SourceRegion, "ReturnArea", new Color(1, 1, 1, 0), 18);
             ReturnArea.rectTransform.Stretch();
             var returnLabel = UIKit.Label(ReturnArea.transform, "Label", "Return to counter", 12, UIKit.InkSoft, TextAnchor.LowerCenter);
@@ -70,7 +74,8 @@ namespace SortEverything.Presentation
 
             TargetRegion = UIKit.Rect(Root, "TargetRegion").TopLeft(0, TargetTop, Width, TargetHeight);
             PropBacking = UIKit.Panel(TargetRegion, "PurposeProp", PropColor(purposeProp), 22);
-            PropBacking.rectTransform.Stretch(2, -6, 2, -6);
+            var (bt, bb) = TargetBounds(Def);
+            PropBacking.rectTransform.TopLeft(2, bt - 6, Width - 4, bb - bt + 12);
             var (pattern, patternTint) = KitchenArt.PropPattern(purposeProp);
             KitchenArt.Tiled(PropBacking.transform, "Pattern", pattern, patternTint).rectTransform.Stretch(6, 6, 6, 6);
             var tag = UIKit.Panel(PropBacking.transform, "Tag", new Color(1, 0.98f, 0.94f, 0.95f), 8);
@@ -90,9 +95,13 @@ namespace SortEverything.Presentation
                 Targets[t.TargetId] = tv;
             }
 
+            var messHolder = UIKit.Rect(Root, "MessHolder").Stretch();
             ObjectLayer = UIKit.Rect(Root, "Objects").Stretch();
             OverlayLayer = UIKit.Rect(Root, "Overlay").Stretch();
+            FxLayer = UIKit.Rect(Root, "Fx").Stretch();
             DragLayer = UIKit.Rect(Root, "Drag").Stretch();
+            _mess = MessLayer.Create(messHolder, hazeHolder, this, FxLayer, Def.BoardId,
+                new Rect(22, SourceTop + 14, Width - 44, SourceH - 26), Mathf.Clamp(Def.Objects.Count + 3, 7, 15));
 
             // Foreground priority: later siblings receive raycasts first; keep authored order stable.
             foreach (var o in Def.Objects)
@@ -100,6 +109,21 @@ namespace SortEverything.Presentation
                 var ov = ObjectView.Create(ObjectLayer, this, o, Def.IsPlanning);
                 Objects[o.InstanceId] = ov;
             }
+        }
+
+        /// <summary>Vertical extent (top, bottom) the target cards actually use inside the 322-unit target region.</summary>
+        public static (float top, float bottom) TargetBounds(BoardDef def)
+        {
+            float top = float.MaxValue, bottom = float.MinValue;
+            foreach (var t in def.Targets)
+            {
+                var (_, h, _, _) = TargetView.Size(def, t);
+                float cy = t.Y * TargetHeight;
+                top = Mathf.Min(top, cy - h / 2);
+                bottom = Mathf.Max(bottom, cy + h / 2);
+            }
+            if (top > bottom) return (0, TargetHeight);
+            return (Mathf.Max(0, top - 10), Mathf.Min(TargetHeight, bottom + 10));
         }
 
         static Color PropColor(string prop)
@@ -149,10 +173,10 @@ namespace SortEverything.Presentation
         {
             const float bleed = 400f;
             var room = UIKit.Rect(Root, "Room");
-            room.TopLeft(-bleed, 0, Width + bleed * 2, TargetTop + TargetHeight + 40);
+            room.TopLeft(-bleed, 0, Width + bleed * 2, TargetTop + TargetBounds(Def).bottom + 40);
 
             // Backsplash shadow + counter top + front lip.
-            float counterTop = SourceTop - 12, counterBottom = SourceTop + SourceHeight + 4;
+            float counterTop = SourceTop - 12, counterBottom = SourceTop + SourceH + 4;
             var shadow = UIKit.Panel(room, "CounterShadow", new Color(0.35f, 0.25f, 0.18f, 0.18f), 0);
             shadow.rectTransform.TopLeft(0, counterTop - 4, Width + bleed * 2, 6);
             var counter = KitchenArt.Tiled(room, "Counter", KitchenArt.Wood(), Color.white);
@@ -163,7 +187,8 @@ namespace SortEverything.Presentation
             lipShade.rectTransform.TopLeft(0, counterBottom + 8, Width + bleed * 2, 5);
 
             // Open shelf unit for the containers.
-            float shelfTop = TargetTop - 14, shelfBottom = TargetTop + TargetHeight + 10;
+            var (usedTop, usedBottom) = TargetBounds(Def);
+            float shelfTop = TargetTop + usedTop - 14, shelfBottom = TargetTop + usedBottom + 10;
             var back = KitchenArt.Tiled(room, "ShelfBack", KitchenArt.ShelfBack(), new Color(1, 1, 1, 0.9f));
             back.rectTransform.TopLeft(0, shelfTop, Width + bleed * 2, shelfBottom - shelfTop);
             var topRail = KitchenArt.Tiled(room, "ShelfTop", KitchenArt.Wood(), SpriteFactory.Hex("#E0C29C"));
@@ -176,8 +201,39 @@ namespace SortEverything.Presentation
 
         // ---------- Geometry ----------
 
-        public Vector2 SourcePosition(ObjectDef o) =>
-            new Vector2(6 + o.SourceX * (Width - 12), SourceTop + o.SourceY * SourceHeight);
+        /// <summary>
+        /// Where an unsorted item lies on the counter: its authored grid spot plus a stable per-item nudge, so the
+        /// counter looks like a real mess (overlaps, odd angles) but never hides an item completely.
+        /// </summary>
+        public Vector2 SourcePosition(ObjectDef o)
+        {
+            var grid = new Vector2(6 + o.SourceX * (Width - 12), SourceTop + o.SourceY * SourceH);
+            var center = new Vector2(Width / 2, SourceTop + SourceH / 2);
+            // Pull everything toward a loose pile in the middle, then nudge each item off its grid spot.
+            var p = center + (grid - center) * 0.8f;
+            p += new Vector2((Noise(o, 1) - 0.5f) * 48f, (Noise(o, 2) - 0.5f) * 30f * Mathf.Min(1.6f, SourceH / SourceHeight));
+            p.x = Mathf.Clamp(p.x, 32, Width - 32);
+            p.y = Mathf.Clamp(p.y, SourceTop + 30, SourceTop + SourceH - 26);
+            return p;
+        }
+
+        /// <summary>Stable messy tilt for an unsorted item.</summary>
+        public static float SourceRotation(ObjectDef o) => (Noise(o, 3) - 0.5f) * 44f;
+
+        /// <summary>Unsorted items vary a little in size; sorted ones sit uniformly in their slots.</summary>
+        public static float SourceScale(ObjectDef o) => 1.0f + Noise(o, 4) * 0.12f;
+        public const float SlotScale = 0.9f;
+
+        static float Noise(ObjectDef o, int salt)
+        {
+            unchecked
+            {
+                uint h = 2166136261u ^ (uint)(salt * 16777619);
+                foreach (char c in o.InstanceId) { h ^= c; h *= 16777619u; }
+                h ^= h >> 13; h *= 0x5bd1e995; h ^= h >> 15;
+                return (h & 0xFFFFFF) / (float)0x1000000;
+            }
+        }
 
         public Vector2 SlotPosition(string targetId, int slot)
         {
@@ -213,7 +269,7 @@ namespace SortEverything.Presentation
             return best;
         }
 
-        public bool OverSource(Vector2 p) => new Rect(6, SourceTop, Width - 12, SourceHeight).Contains(p);
+        public bool OverSource(Vector2 p) => new Rect(6, SourceTop, Width - 12, SourceH).Contains(p);
 
         // ---------- State sync ----------
 
@@ -226,11 +282,29 @@ namespace SortEverything.Presentation
                 view.SetDragging(false, Def.IsPlanning);
                 var target = s.TargetOf(o.InstanceId);
                 view.Place(target == null ? SourcePosition(o) : SlotPosition(target, s.SlotOf(o.InstanceId)));
-                view.SetRotation(target == null && beforeProfile ? BeforeRotation(o.SourceIndex) : 0f);
                 view.SetAssigned(target != null, Def.IsPlanning);
+                view.SetRotation(target == null && beforeProfile ? SourceRotation(o) : 0f, instant: true);
+                view.SnapMotion();
             }
             foreach (var t in Def.Targets) Targets[t.TargetId].SetUsage(s.UnitsIn(t.TargetId));
+            RefreshProgress(s, animate: false);
         }
+
+        /// <summary>Mess clears and containers get their done badge as the board is sorted.</summary>
+        public void RefreshProgress(BoardState s, bool animate)
+        {
+            float fraction = s.ObjectCount == 0 ? 1f : s.SortedCount / (float)s.ObjectCount;
+            _mess.SetProgress(fraction, animate, ReducedMotion);
+            foreach (var t in Def.Targets)
+            {
+                bool any = s.UnitsIn(t.TargetId) > 0;
+                bool allHome = Def.Objects.Where(o => t.AcceptsCategory(o.CategoryId)).All(o => s.TargetOf(o.InstanceId) != null);
+                Targets[t.TargetId].SetDone(any && allHome, animate && !ReducedMotion);
+            }
+        }
+
+        /// <summary>Board-space center of a target card.</summary>
+        public Vector2 TargetCenter(string targetId) => TargetRectBoard(targetId).center;
 
         public static float BeforeRotation(int index)
         {
@@ -265,7 +339,7 @@ namespace SortEverything.Presentation
             StartCoroutine(UIKit.Tween(duration, t =>
             {
                 float s = 1 + Mathf.Sin(t * Mathf.PI) * amount;
-                tv.transform.localScale = new Vector3(s, s, 1);
+                tv.transform.localScale = new Vector3(s, 2 - s, 1); // a little squash: wider and shorter
             }));
         }
 
@@ -324,6 +398,8 @@ namespace SortEverything.Presentation
         Image _finish;
         Text _usage;
         Text _status;
+        Image _done;
+        bool _isDone;
         int _cols, _rows;
         Coroutine _statusRoutine;
 
@@ -453,13 +529,23 @@ namespace SortEverything.Presentation
                 _usage.rectTransform.Stretch();
             }
 
-            // Faint slot guides.
+            // Soft slot guides: a hint of where things go, quieter than the items themselves.
             for (int i = 0; i < Mathf.Max(1, Def.SlotCount); i++)
             {
                 var c = SlotCenter(i);
-                var g = UIKit.Panel(Rt, "Slot" + i, new Color(1, 1, 1, 0.42f), 10);
-                g.rectTransform.Center(c.x - LocalRect.x, c.y - LocalRect.y, 46, 46);
+                var g = UIKit.Icon(Rt, "Slot" + i, Fx.Glow(), 50, new Color(1, 1, 1, 0.38f));
+                g.preserveAspect = false;
+                g.rectTransform.Center(c.x - LocalRect.x, c.y - LocalRect.y, 50, 42);
             }
+
+            // "Done" stamp: a green check that pops onto the label when everything of its kind is home.
+            _done = UIKit.Icon(Rt, "Done", SpriteFactory.Circle(), 24, UIKit.Primary);
+            _done.rectTransform.anchorMin = _done.rectTransform.anchorMax = new Vector2(1, 1);
+            _done.rectTransform.anchoredPosition = new Vector2(-4, -2);
+            var check = UIKit.Label(_done.transform, "Check", "✓", 16, Color.white, TextAnchor.MiddleCenter, FontStyle.Bold);
+            check.rectTransform.Stretch(0, -1, 0, 1);
+            _done.gameObject.AddComponent<Outline>().effectColor = new Color(1, 1, 1, 0.9f);
+            _done.gameObject.SetActive(false);
 
             _finish = UIKit.Panel(Rt, "Finish", new Color(1, 1, 1, 0), 16);
             _finish.rectTransform.Stretch();
@@ -484,6 +570,17 @@ namespace SortEverything.Presentation
             float x0 = LocalRect.x + (LocalRect.width - gridW) / 2 + 24;
             float y0 = LocalRect.y + BoardView.Header + 4 + 24;
             return new Vector2(x0 + col * BoardView.SlotPitch, y0 + row * BoardView.SlotPitch);
+        }
+
+        public void SetDone(bool on, bool animate)
+        {
+            if (on == _isDone) return;
+            _isDone = on;
+            _done.gameObject.SetActive(on);
+            if (!on) return;
+            var rt = _done.rectTransform;
+            if (!animate || !isActiveAndEnabled) { rt.localScale = Vector3.one; return; }
+            StartCoroutine(UIKit.Tween(0.35f, t => rt.localScale = Vector3.one * Mathf.Max(0.01f, UIKit.EaseOutBack(t) * 1f)));
         }
 
         public void SetUsage(int units)
@@ -526,8 +623,13 @@ namespace SortEverything.Presentation
         }
     }
 
+    /// <summary>
+    /// One draggable item. Visual motion (lift, tilt while dragging, squash on landing, hops) runs on small
+    /// springs in Update so it feels physical; positions still come only from committed state.
+    /// </summary>
     public sealed class ObjectView : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, IDragHandler, IBeginDragHandler, IEndDragHandler, IInitializePotentialDragHandler
     {
+        public const float ArtSize = 50f;
         public ObjectDef Def;
         public RectTransform Rt;
         BoardView _board;
@@ -538,34 +640,42 @@ namespace SortEverything.Presentation
         Image _hint;
         public Vector2 Position { get; private set; }
 
+        // Springs
+        float _scale = 1, _scaleVel, _scaleTarget = 1, _restScale = 1;
+        float _rot, _rotVel, _restRot;
+        Vector2 _squash = Vector2.one, _squashVel;
+        bool _dragging;
+        Vector2 _lastPos;
+        float _tilt;
+        float _hopT = -1, _hopDelay, _hopOffset;
+
         public static ObjectView Create(RectTransform layer, BoardView board, ObjectDef def, bool planning)
         {
             var rt = UIKit.Rect(layer, "Obj_" + def.InstanceId);
             rt.anchorMin = rt.anchorMax = new Vector2(0, 1);
             rt.pivot = new Vector2(0.5f, 0.5f);
-            rt.sizeDelta = new Vector2(48, 48); // invisible hit region ≥ 48 units
+            rt.sizeDelta = new Vector2(54, 54); // invisible hit region ≥ 48 units
             var hit = rt.gameObject.AddComponent<Image>();
             hit.color = new Color(0, 0, 0, 0);
             hit.raycastTarget = true;
             var v = rt.gameObject.AddComponent<ObjectView>();
             v.Def = def; v.Rt = rt; v._board = board;
 
-            v._hint = UIKit.Icon(rt, "Hint", SpriteFactory.Ring(), 58, new Color(1f, 0.8f, 0.2f, 0f));
+            v._hint = UIKit.Icon(rt, "Hint", SpriteFactory.Ring(), 62, new Color(1f, 0.8f, 0.2f, 0f));
             v._shadow = UIKit.Icon(rt, "Shadow", SpriteFactory.Shadow(), 40);
-            v._shadow.rectTransform.sizeDelta = new Vector2(38, 14);
-            v._shadow.rectTransform.anchoredPosition = new Vector2(0, -18);
+            v._shadow.rectTransform.sizeDelta = new Vector2(40, 14);
+            v._shadow.rectTransform.anchoredPosition = new Vector2(0, -20);
             v._shadow.preserveAspect = false;
             v._art = UIKit.Rect(rt, "Art");
-            v._art.sizeDelta = new Vector2(44, 44);
+            v._art.sizeDelta = new Vector2(ArtSize, ArtSize) * (def.Large ? 1.08f : 1f);
             v._sprite = v._art.gameObject.AddComponent<Image>();
             v._sprite.sprite = SpriteFactory.Object(def.AssetId);
             v._sprite.preserveAspect = true;
             v._sprite.raycastTarget = false;
-            if (def.Large) v._art.localScale = new Vector3(1.08f, 1.08f, 1);
 
             // Unit badge: always visible for 2-unit objects, shown on pickup for 1-unit planning objects.
             var badge = UIKit.Icon(rt, "Badge", SpriteFactory.Circle(), 18, def.Large ? UIKit.Ink : UIKit.InkSoft);
-            badge.rectTransform.anchoredPosition = new Vector2(17, 17);
+            badge.rectTransform.anchoredPosition = new Vector2(19, 19);
             var bt = UIKit.Label(badge.transform, "Units", def.Units.ToString(), 13, Color.white, TextAnchor.MiddleCenter, FontStyle.Bold);
             bt.rectTransform.Stretch();
             v._badge = badge.gameObject;
@@ -579,19 +689,106 @@ namespace SortEverything.Presentation
             Rt.anchoredPosition = new Vector2(boardPos.x, -boardPos.y);
         }
 
-        public void SetRotation(float deg) => _art.localRotation = Quaternion.Euler(0, 0, deg);
+        /// <summary>Resting tilt (messy on the counter, straight in a container).</summary>
+        public void SetRotation(float deg, bool instant = false)
+        {
+            _restRot = deg;
+            if (instant || _board.ReducedMotion) { _rot = deg; _rotVel = 0; ApplyVisual(); }
+        }
 
-        public void SetAssigned(bool assigned, bool planning) { }
+        /// <summary>Resting size: varied on the counter, uniform in a container.</summary>
+        public void SetAssigned(bool assigned, bool planning)
+        {
+            _restScale = assigned ? BoardView.SlotScale : BoardView.SourceScale(Def);
+            if (!_dragging) _scaleTarget = _restScale;
+        }
+
+        /// <summary>Jumps every spring to rest (used after a full re-sync).</summary>
+        public void SnapMotion()
+        {
+            _scale = _scaleTarget = _dragging ? 1.18f : _restScale; _scaleVel = 0;
+            _rot = _restRot; _rotVel = 0; _squash = Vector2.one; _squashVel = Vector2.zero; _hopT = -1; _hopOffset = 0; _tilt = 0;
+            _lastPos = Position;
+            ApplyVisual();
+        }
 
         public void SetDragging(bool on, bool planning)
         {
-            float s = on ? 1.08f : 1f;
-            Rt.localScale = new Vector3(s, s, 1);
-            _shadow.rectTransform.sizeDelta = on ? new Vector2(46, 18) : new Vector2(38, 14);
-            _shadow.rectTransform.anchoredPosition = on ? new Vector2(0, -26) : new Vector2(0, -18);
-            _shadow.color = new Color(1, 1, 1, on ? 0.8f : 1f);
+            _dragging = on;
+            _scaleTarget = on ? 1.18f : _restScale;
+            if (on && !_board.ReducedMotion) { _scaleVel += 6f; _squash = new Vector2(0.86f, 1.14f); } // pop up off the counter
+            _shadow.rectTransform.sizeDelta = on ? new Vector2(44, 16) : new Vector2(40, 14);
+            _shadow.rectTransform.anchoredPosition = on ? new Vector2(0, -32) : new Vector2(0, -20);
+            _shadow.color = new Color(1, 1, 1, on ? 0.55f : 1f);
             _badge.SetActive(Def.Large || (on && planning));
-            if (on) _art.localRotation = Quaternion.identity;
+            _lastPos = Position;
+            if (_board.ReducedMotion) SnapMotion();
+        }
+
+        /// <summary>Squash-and-stretch as the item lands in place.</summary>
+        public void Land(float strength = 1f)
+        {
+            if (_board.ReducedMotion) return;
+            _squash = new Vector2(1f + 0.3f * strength, 1f - 0.3f * strength);
+            _squashVel = Vector2.zero;
+        }
+
+        /// <summary>A wobble for a refused drop.</summary>
+        public void Wobble()
+        {
+            if (_board.ReducedMotion) return;
+            _rotVel += 900f;
+        }
+
+        /// <summary>A little celebratory hop after a delay (completion wave).</summary>
+        public void Hop(float delay)
+        {
+            if (_board.ReducedMotion) return;
+            _hopDelay = delay; _hopT = 0;
+        }
+
+        void Update()
+        {
+            float dt = Mathf.Min(Time.unscaledDeltaTime, 0.05f);
+            if (dt <= 0) return;
+            if (_board.ReducedMotion) { ApplyVisual(); return; }
+
+            // Tilt into the direction of travel while dragging, like something held loosely.
+            if (_dragging)
+            {
+                float vx = (Position.x - _lastPos.x) / dt;
+                _tilt = Mathf.Lerp(_tilt, Mathf.Clamp(-vx * 0.035f, -20f, 20f), 1 - Mathf.Exp(-12f * dt));
+            }
+            else _tilt = Mathf.Lerp(_tilt, 0, 1 - Mathf.Exp(-12f * dt));
+            _lastPos = Position;
+
+            // Springs: scale, rotation, squash.
+            _scaleVel += (220f * (_scaleTarget - _scale) - 16f * _scaleVel) * dt;
+            _scale += _scaleVel * dt;
+            float rotTarget = _dragging ? _tilt : _restRot;
+            _rotVel += (160f * (rotTarget - _rot) - 11f * _rotVel) * dt;
+            _rot += _rotVel * dt;
+            _squashVel += (260f * (Vector2.one - _squash) - 13f * _squashVel) * dt;
+            _squash += _squashVel * dt;
+
+            _hopOffset = 0;
+            if (_hopT >= 0)
+            {
+                _hopT += dt;
+                float t = _hopT - _hopDelay;
+                if (t >= 0.4f) { _hopT = -1; Land(0.6f); }
+                else if (t > 0) _hopOffset = Mathf.Sin(t / 0.4f * Mathf.PI) * 16f;
+            }
+            ApplyVisual();
+        }
+
+        void ApplyVisual()
+        {
+            if (_board.ReducedMotion) { _scale = _scaleTarget; _rot = _dragging ? 0 : _restRot; _squash = Vector2.one; }
+            Rt.localScale = new Vector3(_scale, _scale, 1);
+            _art.localScale = new Vector3(_squash.x, _squash.y, 1);
+            _art.localRotation = Quaternion.Euler(0, 0, _rot);
+            _art.anchoredPosition = new Vector2(0, _hopOffset + (_dragging ? 4f : 0f));
         }
 
         public void SetHint(bool on) => _hint.color = new Color(1f, 0.8f, 0.2f, on ? 0.95f : 0f);

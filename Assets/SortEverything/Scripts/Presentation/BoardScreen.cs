@@ -32,7 +32,9 @@ namespace SortEverything.Presentation
         RectTransform _root, _hud, _boardHolder, _overlay, _resultSheet;
         Text _taskText, _countText, _timeText;
         Button _deferButton, _hintChip;
-        float _sourceTop, _targetTop;
+        float _sourceTop, _targetTop, _sourceH = BoardView.SourceHeight, _targetsUsedTop, _targetsUsedBottom = BoardView.TargetHeight;
+        int _combo;
+        float _lastAcceptTime = -10f;
 
         // Drag ownership
         ObjectView _drag;
@@ -122,19 +124,26 @@ namespace SortEverything.Presentation
 
             float h = _app.ScreenHeight;
             const float hudH = 56f;
-            float spare = Mathf.Max(0, h - (hudH + BoardView.SourceHeight + BoardView.TargetHeight + 24));
-            _sourceTop = 8 + spare * 0.12f;
-            _targetTop = _sourceTop + BoardView.SourceHeight + 16 + spare * 0.18f;
+            // Containers only use part of the 322-unit target region; give the rest (and any spare screen height)
+            // to the cluttered counter so the board fills the phone instead of leaving an empty band.
+            (_targetsUsedTop, _targetsUsedBottom) = BoardView.TargetBounds(_def);
+            float targetsH = _targetsUsedBottom - _targetsUsedTop;
+            float spare = Mathf.Max(0, h - (hudH + BoardView.SourceHeight + targetsH + 40));
+            _sourceH = BoardView.SourceHeight + Mathf.Min(spare * 0.75f, 190f);
+            spare -= _sourceH - BoardView.SourceHeight;
+            _sourceTop = 8 + spare * 0.2f;
+            _targetTop = _sourceTop + _sourceH + 20 + spare * 0.25f - _targetsUsedTop;
+            _combo = 0;
 
             // Kitchen wall and floor behind everything (decorative, no raycasts).
             KitchenArt.Tiled(_root, "Wall", KitchenArt.WallTile(), Color.white).rectTransform.Stretch(0, -200, 0, -200);
-            float floorTop = hudH + _targetTop + BoardView.TargetHeight + 24;
+            float floorTop = hudH + _targetTop + _targetsUsedBottom + 24;
             var floor = KitchenArt.Tiled(_root, "Floor", KitchenArt.Floor(), Color.white);
             floor.rectTransform.anchorMin = new Vector2(0, 0); floor.rectTransform.anchorMax = new Vector2(1, 1);
             floor.rectTransform.offsetMin = new Vector2(0, -200); floor.rectTransform.offsetMax = new Vector2(0, -floorTop);
             BuildHud(hudH);
             _boardHolder = UIKit.Rect(_root, "BoardHolder").Stretch(0, hudH, 0, 0);
-            _view = BoardView.Create(_boardHolder, _def, _sourceTop, _targetTop, _app.UiCamera, _level.PurposeProp);
+            _view = BoardView.Create(_boardHolder, _def, _sourceTop, _targetTop, _app.UiCamera, _level.PurposeProp, _sourceH);
             _view.ReducedMotion = Reduced;
             _view.PointerDown = OnPointerDown;
             _view.PointerDrag = OnPointerDrag;
@@ -213,8 +222,8 @@ namespace SortEverything.Presentation
 
             // Ready banner: destination/area label + rule summary. Does not block the board.
             var banner = UIKit.Panel(_overlay, "ReadyBanner", new Color(1, 1, 1, 0.94f), 14);
-            banner.rectTransform.TopLeft(12, 56 + _sourceTop + BoardView.SourceHeight - 2, 336, 22);
-            banner.rectTransform.anchoredPosition = new Vector2(12, -(56 + _sourceTop + BoardView.SourceHeight + 1));
+            banner.rectTransform.TopLeft(12, 56 + _sourceTop + _sourceH - 2, 336, 22);
+            banner.rectTransform.anchoredPosition = new Vector2(12, -(56 + _sourceTop + _sourceH + 1));
             banner.rectTransform.sizeDelta = new Vector2(336, 18);
             var t = UIKit.Label(banner.transform, "Text", $"{Strings.Get("destination.house")} · {Strings.Get("area.house_kitchen")} — {RuleSummary()}", 11, UIKit.InkSoft);
             t.rectTransform.Stretch(6, 0, 6, 0);
@@ -422,6 +431,7 @@ namespace SortEverything.Presentation
             v.SetDragging(true, _def.IsPlanning);
             v.Place(p + _dragOffset);
             if (_def.IsPlanning && _state.IsAssigned(v.Def.InstanceId)) _view.ShowReturnArea(true);
+            if (!Reduced && !_state.IsAssigned(v.Def.InstanceId)) Fx.Burst(_view, _view.FxLayer, v.Position + new Vector2(0, 14), new Color(1f, 0.95f, 0.85f), 4, 0.45f);
             _app.Audio.Play("pickup");
             return true;
         }
@@ -480,8 +490,9 @@ namespace SortEverything.Presentation
             v.transform.SetParent(_view.ObjectLayer, true);
             var target = _state.TargetOf(v.Def.InstanceId);
             var to = target == null ? _view.SourcePosition(v.Def) : _view.SlotPosition(target, _state.SlotOf(v.Def.InstanceId));
+            v.SetAssigned(target != null, _def.IsPlanning);
+            v.SetRotation(target == null ? BoardView.SourceRotation(v.Def) : 0f);
             yield return _view.Move(v, to, duration, false);
-            if (target == null) v.SetRotation(BoardView.BeforeRotation(v.Def.SourceIndex));
         }
 
         void Reject(ObjectView v, DropResult result)
@@ -499,6 +510,8 @@ namespace SortEverything.Presentation
             var tv = _view.Targets[result.TargetId];
             tv.ShowStatus(Strings.Get(result.Kind == DropKind.Full ? "status.full" : "status.wrong_category"), this);
             _view.Shake(tv);
+            v.Wobble();
+            _combo = 0;
             _app.Audio.Play("reject");
             StartCoroutine(ReturnToCommitted(v, 0.2f));
             if (!ok) _app.ShowSaveError(null);
@@ -540,28 +553,70 @@ namespace SortEverything.Presentation
 
             v.transform.SetParent(_view.ObjectLayer, true);
             var dest = facts.Return ? _view.SourcePosition(v.Def) : _view.SlotPosition(facts.ToTarget, facts.Slot);
-            StartCoroutine(_view.Move(v, dest, 0.17f, overshoot: !facts.Return));
-            if (facts.Return) v.SetRotation(BoardView.BeforeRotation(v.Def.SourceIndex));
+            v.SetAssigned(!facts.Return, _def.IsPlanning);
+            v.SetRotation(facts.Return ? BoardView.SourceRotation(v.Def) : 0f);
             foreach (var t in _def.Targets) _view.Targets[t.TargetId].SetUsage(_state.UnitsIn(t.TargetId));
-            _app.Audio.Play(AudioFeedback.FamilyFor(v.Def.CategoryId));
-            _app.Audio.Haptic();
 
+            // Quick drops in a row build a gentle combo: rising pitch, bigger sparkles, a word of praise.
+            bool sorted = !facts.Return;
+            if (sorted && facts.FirstAssignment)
+            {
+                _combo = Time.unscaledTime - _lastAcceptTime < 3.5f ? _combo + 1 : 1;
+                _lastAcceptTime = Time.unscaledTime;
+            }
+            int combo = _combo;
+            StartCoroutine(LandRoutine(v, dest, facts, combo));
+            _app.Audio.Haptic();
+            if (sorted)
+            {
+                _app.Audio.Play(AudioFeedback.FamilyFor(v.Def.CategoryId));
+                _app.Audio.Play("sparkle", 1f + Mathf.Min(combo - 1, 8) * 0.06f);
+            }
+            else _app.Audio.Play("pickup", 0.8f);
             if (!_def.IsPlanning && facts.FirstAssignment && Mastery)
             {
                 int streak = Run?.streak ?? 0;
                 if (streak == 3 || streak == 5 || streak > 5 && streak % 5 == 0)
-                {
                     _app.Audio.Play("streak", 1f + Mathf.Min(streak, 8) * 0.03f);
-                    _app.Toast(streak == 3 ? "Neat! 3 in a row" : $"Tidy streak · {streak}", 1f);
-                }
-            }
-            if (facts.CategoryComplete && !facts.Solved)
-            {
-                _view.Pulse(_view.Targets[facts.ToTarget]);
-                _app.Audio.Play("category");
             }
             RefreshHud();
             if (completion != null) OnBoardSolved(completion);
+        }
+
+        static readonly string[] Praise = { "Nice!", "Tidy!", "So neat!", "Lovely!", "Sparkling!" };
+
+        /// <summary>Flies the item home, then lands it with squash, sparkles and a container bounce.</summary>
+        IEnumerator LandRoutine(ObjectView v, Vector2 dest, BoardFacts facts, int combo)
+        {
+            yield return _view.Move(v, dest, 0.17f, overshoot: !facts.Return);
+            if (_view == null || v == null) yield break;
+            v.Land(facts.Return ? 0.5f : 1f);
+            if (facts.Return) { _view.RefreshProgress(_state, animate: true); yield break; }
+
+            var color = UIKit.CategoryColor(v.Def.CategoryId);
+            var tv = _view.Targets[facts.ToTarget];
+            if (!Reduced)
+            {
+                Fx.Burst(_view, _view.FxLayer, dest, color, 8 + Mathf.Min(combo, 6) * 2, 0.8f + Mathf.Min(combo, 6) * 0.08f);
+                _view.Pulse(tv, 0.035f, 0.22f);
+                if (facts.FirstAssignment && (combo == 3 || combo == 5 || combo == 8 || combo > 8 && combo % 4 == 0))
+                    Fx.FloatText(_view, _view.FxLayer, dest + new Vector2(0, -36), Praise[Mathf.Min((combo - 3) / 2, Praise.Length - 1)], SpriteFactory.Hex("#FFE9A8"), 20);
+            }
+            _view.RefreshProgress(_state, animate: true);
+
+            if (facts.CategoryComplete && !facts.Solved)
+            {
+                var center = _view.TargetCenter(facts.ToTarget);
+                if (!Reduced)
+                {
+                    Fx.Flash(_view, _view.FxLayer, center, new Color(1f, 0.95f, 0.7f, 0.8f), 160f);
+                    Fx.Ring(_view, _view.FxLayer, center, Color.Lerp(color, Color.white, 0.4f), 40f, 190f, 0.5f);
+                    Fx.Burst(_view, _view.FxLayer, center, color, 16, 1.3f);
+                    Fx.FloatText(_view, _view.FxLayer, center + new Vector2(0, -20), Strings.Get("category." + v.Def.CategoryId) + " done!", Color.white, 20);
+                }
+                _view.Pulse(tv, 0.08f, 0.3f);
+                _app.Audio.Play("category");
+            }
         }
 
         // ---------- Completion and result ----------
@@ -588,11 +643,43 @@ namespace SortEverything.Presentation
             if (facts.NewRecognitions.Contains(Progression.KitchenReady)) S.Telemetry.Emit("area_ready", "\"areaId\":\"house_kitchen\"");
             foreach (var d in facts.NewDiscoveries) S.Telemetry.Emit("discovery", $"\"assetId\":\"{d}\"");
 
+            StartCoroutine(Celebrate(facts));
+        }
+
+        /// <summary>
+        /// The payoff: the last bits of mess vanish, a glow sweeps the counter, every item hops in a wave,
+        /// confetti falls and the scene's purpose appears. Then the result sheet slides in.
+        /// </summary>
+        IEnumerator Celebrate(CompletionFacts facts)
+        {
+            yield return new WaitForSecondsRealtime(Reduced ? 0f : 0.22f); // let the last item land
+            if (this == null || _phase != Phase.Completing) yield break;
+            _view.RefreshProgress(_state, animate: true);
             _view.ShowPurposeProp(true, Reduced);
             StartCoroutine(_view.FinishMicroAction(_level.FinishMicroAction));
             _app.Audio.Play("complete");
             if (!string.IsNullOrEmpty(facts.AnchorUnlocked)) _app.Audio.Play("restoration");
             else if (facts.NewDiscoveries.Count > 0) _app.Audio.Play("discovery");
+
+            if (!Reduced)
+            {
+                // Glow sweep across the counter, left to right.
+                for (int i = 0; i < 6; i++)
+                    Fx.Flash(_view, _view.FxLayer, new Vector2(30 + i * 60, _sourceTop + _sourceH * 0.5f), new Color(1f, 0.97f, 0.8f, 0.7f), 150f, 0.3f + i * 0.06f);
+                int k = 0;
+                foreach (var o in _def.Objects.OrderBy(o => _view.Objects[o.InstanceId].Position.x).ThenBy(o => _view.Objects[o.InstanceId].Position.y))
+                    _view.Objects[o.InstanceId].Hop(0.05f * k++);
+                foreach (var t in _def.Targets)
+                {
+                    var c = _view.TargetCenter(t.TargetId);
+                    Fx.Burst(_view, _view.FxLayer, c, UIKit.CategoryColor(t.Accepts[0]), 14, 1.4f);
+                }
+                Fx.Confetti(_view, _view.FxLayer, BoardView.Width, -20f, 80);
+                string cheer = _level.LevelId == KitchenCatalogue.LevelId(20) ? "Kitchen restored!" : "Sparkling clean!";
+                Fx.FloatText(_view, _view.FxLayer, new Vector2(BoardView.Width / 2, _sourceTop + _sourceH * 0.45f), cheer, SpriteFactory.Hex("#FFE9A8"), 30, 24f);
+                yield return new WaitForSecondsRealtime(1.25f);
+            }
+            if (this == null || _phase != Phase.Completing) yield break;
             ShowResult(facts);
         }
 
@@ -605,13 +692,13 @@ namespace SortEverything.Presentation
             _hud.gameObject.SetActive(false);
 
             // Move the finished arrangement to the top; the result sheet uses the freed lower space.
-            float shift = 56 + _targetTop - 8;
+            float shift = 56 + _targetTop + _targetsUsedTop - 8;
             var boardRt = _view.Root;
             var basePos = boardRt.anchoredPosition;
             StartCoroutine(UIKit.Tween(Reduced ? 0 : 0.25f, t => boardRt.anchoredPosition = basePos + new Vector2(0, shift * UIKit.EaseOut(t))));
             _view.SourceRegion.gameObject.SetActive(false);
 
-            float sheetTop = BoardView.TargetHeight + 8;
+            float sheetTop = _targetsUsedBottom - _targetsUsedTop + 8;
             var sheet = UIKit.Panel(_overlay, "ResultSheet", UIKit.Paper, 22, raycast: true);
             _resultSheet = sheet.rectTransform;
             _resultSheet.anchorMin = new Vector2(0, 0); _resultSheet.anchorMax = new Vector2(1, 1);
