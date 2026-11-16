@@ -1,3 +1,31 @@
+# Art direction: Premium Cozy Stylized 3D
+
+## Current object art: modeled 3D props, baked to sprites
+
+The 18 kitchen objects are modeled as real 3D props in code, so their geometry and materials are designed rather than painted on. They are baked into the game's existing object sprites, which means the runtime keeps one 2D pipeline and pays nothing for 3D.
+
+- **Models:** `Scripts/Editor/Art3D/ObjectModels.cs`, built with `MeshKit` (turned profiles, swept tubes, sculpted organic forms, beveled boxes, leaves, embossed symbols). Details are modeled, not painted: bottle cap ribs and neck ring, carton gable, fin and spout, an embossed orange slice, can lid and tab, ceramic rims, fruit stems, leaves and seeds.
+- **Materials:** one shared stylized shader (`Art3D/BakeStylized.shader`) with per-family settings:
+  - produce: matte or glossy, with light wrap and organic tone variation;
+  - ceramic: glazed, tight highlight;
+  - paper and cardboard: matte;
+  - plastic: soft highlight;
+  - clear plastic: real transparency with the water visible inside;
+  - painted metal and polished metal: reflections of a warm room;
+  - wood: grain tone.
+- **Lighting:** one soft top-left key light, a gentle fill, warm core shadows (never grey), baked ambient occlusion, controlled highlights and a soft rim. There is no bloom and no glare spots. Contact shadows are added in-game by `ObjectView`, so the sprites carry none.
+- **Camera:** one shared orthographic, slightly elevated three-quarter view. Every prop is framed at 84% of its square.
+- **Outline:** a thin warm-brown outline, matching the containers and props.
+- **Bake:** **Sort Everything ▸ Bake 3D Object Art** writes `Resources/SortEverything/Art/<id>.png` at 512×512. These sprites replace the code-drawn versions automatically. Command line:
+  `-executeMethod SortEverything.Editor.Art3D.ArtBaker.BakeCommandLine [-only apple,mug]`. Run it without `-nographics`, and add `--burst-disable-compilation` on this Mac.
+- **Review:** check `Docs/Screenshots/art3d/`, which has the props at a large size and at gameplay size on the counter. Judge each prop against the brief's acceptance questions at real size.
+
+Object IDs, categories, `relativeSize` and other metadata are unchanged. To swap in hand-made art, overwrite `Art/<id>.png`.
+
+---
+
+## Earlier 2.5D direction (kept for reference)
+
 # Art direction: Cozy Playful 2.5D
 
 The 18 kitchen objects follow this direction in two ways:

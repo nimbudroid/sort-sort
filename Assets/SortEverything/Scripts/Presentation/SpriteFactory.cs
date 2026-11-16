@@ -48,7 +48,7 @@ namespace SortEverything.Presentation
                 case "fruit": return Object("apple");
                 case "vegetables": return Object("carrot");
                 case "drinks": return Object("water_bottle");
-                default: return Object("fork");
+                default: return Object("mug"); // reads best at icon size
             }
         }
 
