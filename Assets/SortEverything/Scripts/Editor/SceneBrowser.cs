@@ -22,7 +22,7 @@ namespace SortEverything.Editor
         [MenuItem("Sort Everything/Scene Browser")]
         public static void Open() => GetWindow<SceneBrowser>("Kitchen Scenes").minSize = new Vector2(640, 560);
 
-        void OnEnable() => _cat = Catalogue.CreateKitchen("kitchen_20", SortEverything.Runtime.ContentDb.DataLevels);
+        void OnEnable() => _cat = Catalogue.CreateHouse("kitchen_20", SortEverything.Runtime.ContentDb.DataLevels, SortEverything.Runtime.ContentDb.AreaUnlocks);
 
         void OnGUI()
         {

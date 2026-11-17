@@ -99,19 +99,22 @@ The result screen shows the composed counter, and **Inspect Scene** shows the wh
 
 ## 4. An area or room
 
-What is data today, in `Content/areas.json`:
-- The counter surface (`surface` ID or a sprite at `Art/Surfaces/<id>.png`) and its `surfaceColor`.
-- The wall/backsplash.
-- Cabinet colors.
-- The counter lip.
-- Mess (`enabled`, `density` = decals per item, the `decals` set from `crumbs`, `drip`, `ring`), plus per-level overrides in `levelMess`.
+Rooms are data. The Living Room was added this way.
 
-Levels choose their area with `areaId`.
+1. **Categories** the room needs go in `Content/categories.json` (`id`, `name`, `color`, `icon` = an object id). The Kitchen's four stay as they are.
+2. **Objects** go in `objects.json` (with `name`). Their art goes in `Art/<id>.png`; models live in `Scripts/Editor/Art3D/ObjectModels.cs` and are baked with **Sort Everything ▸ Bake 3D Object Art**.
+3. **Containers:** add archetypes to `containers.json`, map new categories in `categoryArchetypes`, and use the room's `containerOverrides` / `sharedArchetype` for room-specific looks. For example, kitchenware goes to a "Back to the kitchen" tray in the Living Room.
+4. **The room** goes in `areas.json`. Fill in:
+   - its looks: `surface`, `surfaceColor`, `wall`, `cabinet`, `lip` and `mess`;
+   - when it opens: `unlockAfterLevel`, the first completion of that level opens the room (existing saves that already qualify open it at boot), plus `unlockText` and `tagline`;
+   - its structure: `chapters` (five scenes each; `planned: true` for chapters not authored yet) and overview `regions` (furniture, clutter, and the composed `restored` objects shown once the region's scenes are all complete).
+5. **Scenes** go in `Content/Levels/<room>.json` with `"areaId"`. They're numbered from 1 within the room. Add scene profiles in `scenes.json` for arrivals and finales.
+6. **Validate.** It checks:
+   - unlock levels, chapters, regions, categories and container overrides;
+   - each room's contrast, using only the objects that room uses;
+   - characters, and solvable boards.
 
-**Not yet data-only:**
-- A new room's entry on Home and its restoration overview with milestones and anchors. `GameApp.ShowHome` and `KitchenOverviewView` are written for the Kitchen.
-- The smallest change: make the overview read region names, anchor levels and composition item lists from `areas.json`, and list areas on Home.
-- Restoration anchors grant progress and economy, so they also need a save-safe ID scheme decided against GDD Sections 29–30 before they move to data.
+The House screen lists every room with authored scenes, in `order`, and shows each one's saved overview or how it opens.
 
 ---
 

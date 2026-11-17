@@ -19,6 +19,7 @@ namespace SortEverything.Domain
         public bool NewBestTime;
         public long ActiveMs;
         public bool OptionalBoardOnly;
+        public List<string> AreasUnlocked = new List<string>();
     }
 
     /// <summary>
@@ -75,6 +76,23 @@ namespace SortEverything.Domain
         }
 
         public static bool AreaRouteTraversed(SaveData s, Catalogue cat, string areaId) => CursorLevel(s, cat, areaId) == null;
+
+        /// <summary>
+        /// Opens every room whose unlocking level has its completion seal. Idempotent; returns the rooms opened now.
+        /// Runs on scene completion and at boot (so existing saves that already qualify open their rooms).
+        /// </summary>
+        public static List<string> UnlockAreas(SaveData s, Catalogue cat)
+        {
+            var opened = new List<string>();
+            foreach (var kv in cat.AreaUnlocks)
+            {
+                if (s.unlockedAreaIds.Contains(kv.Key) || !s.HasSeal(kv.Value)) continue;
+                if (cat.InstalledInArea(kv.Key).Count == 0) continue;
+                s.unlockedAreaIds.Add(kv.Key);
+                opened.Add(kv.Key);
+            }
+            return opened;
+        }
 
         public static string BoardMarker(string levelId, string boardId) => $"board_complete:{levelId}:{boardId}";
         public static string TraceId(string levelId) => "trace:" + levelId;
@@ -276,6 +294,7 @@ namespace SortEverything.Domain
 
             s.deferredLevelIds.Remove(level.LevelId);
             AdvanceCursor(s, cat, level.AreaId);
+            facts.AreasUnlocked.AddRange(UnlockAreas(s, cat));
 
             if (level.ProjectAnchorId == "finished_020" && !s.recognitions.Contains(KitchenReady)
                 && KitchenCatalogue.OrdinaryScenes.All(n => s.HasSeal(KitchenCatalogue.LevelId(n))))

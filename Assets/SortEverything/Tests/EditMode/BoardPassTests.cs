@@ -125,7 +125,7 @@ namespace SortEverything.Tests
                     },
                 },
             };
-            var built = DataLevelBuilder.Build(file, ContentDb.Objects, 21);
+            var built = DataLevelBuilder.Build(file, ContentDb.Objects, _ => 20);
             Assert.AreEqual(1, built.Count);
             var cat = Catalogue.CreateKitchen("kitchen_20", built);
             var level = cat.Level("kitchen_extra_test");
@@ -165,6 +165,28 @@ namespace SortEverything.Tests
                 }
                 Assert.LessOrEqual(L.MaxPileCover(), BoardLayoutConfig.Current.maxOverlap + 0.02f);
             }
+        }
+
+        [Test]
+        public void House_LivingRoom_OpensAfterKitchen5_NumbersFromOne_AndKeepsTheEconomy()
+        {
+            var cat = Catalogue.CreateHouse("kitchen_20", ContentDb.DataLevels, ContentDb.AreaUnlocks);
+            var room = cat.InstalledInArea("house_living_room");
+            Assert.AreEqual(5, room.Count, "Living Room chapter 1 has five scenes");
+            CollectionAssert.AreEqual(new[] { 1, 2, 3, 4, 5 }, room.Select(l => l.OrdinalInArea).ToArray());
+            Assert.IsTrue(room.All(l => l.FirstCompletionCoins == 0 && string.IsNullOrEmpty(l.ProjectAnchorId)), "no new economy without an approved proposal");
+            Assert.AreEqual("living_room_002", room[0].PreviewLevelId);
+            Assert.AreEqual(20, cat.InstalledInArea(KitchenCatalogue.AreaId).Count, "the Kitchen is unchanged");
+
+            var save = SaveFactory.Create("p");
+            Assert.IsFalse(Progression.IsAvailable(save, cat, room[0]), "locked before Kitchen 5");
+            Assert.IsEmpty(Progression.UnlockAreas(save, cat));
+            save.seals.Add(KitchenCatalogue.LevelId(5));
+            CollectionAssert.AreEqual(new[] { "house_living_room" }, Progression.UnlockAreas(save, cat));
+            Assert.IsEmpty(Progression.UnlockAreas(save, cat), "idempotent");
+            Assert.IsTrue(Progression.IsAvailable(save, cat, room[0]));
+            Assert.IsFalse(Progression.IsAvailable(save, cat, room[1]), "rooms progress scene by scene");
+            foreach (var l in room) Assert.IsNotNull(Solver.Solve(l.RequiredBoard).Allocation, l.LevelId);
         }
 
         [Test]

@@ -38,7 +38,11 @@ namespace SortEverything.Presentation
                 case "vegetables": return SpriteFactory.Hex("#B9D49A"); // green wicker
                 case "drinks": return SpriteFactory.Hex("#A9C6DD");     // drinks crate
                 case "kitchenware": return SpriteFactory.Hex("#C9A983"); // wooden drawer
-                default: return SpriteFactory.Hex("#F1E6CF");           // shared tray
+                default:
+                {
+                    var c = Runtime.ContentDb.Category(categoryId);
+                    return c != null ? SpriteFactory.Hex(c.color) : SpriteFactory.Hex("#F1E6CF");
+                }           // shared tray
             }
         }
 

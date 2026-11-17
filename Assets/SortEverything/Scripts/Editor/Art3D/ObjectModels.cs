@@ -37,6 +37,12 @@ namespace SortEverything.Editor.Art3D
         static Mat Wood(string baseHex = "#B9824E", string shadeHex = "#6B4122") => new Mat
         { Base = H(baseHex), Shade = H(shadeHex), Spec = 0.14f, Gloss = 0.3f, Rim = 0.1f, Wrap = 0.25f, Noise = 0.07f, NoiseScale = 16f };
 
+        static Mat Fabric(string baseHex, string shadeHex) => new Mat
+        { Base = H(baseHex), Shade = H(shadeHex), Spec = 0.05f, Gloss = 0.12f, Rim = 0.28f, Wrap = 0.6f, Noise = 0.07f, NoiseScale = 46f };
+        static Mat Wax(string baseHex, string shadeHex) => new Mat
+        { Base = H(baseHex), Shade = H(shadeHex), Spec = 0.2f, Gloss = 0.35f, Rim = 0.3f, Wrap = 0.75f, Noise = 0.02f };
+        static Mat Glow(string hex) => new Mat { Base = H(hex), Shade = H(hex), Spec = 0f, Gloss = 0f, Rim = 0.2f, Wrap = 1f, Noise = 0f };
+
         static Mat Grad(Mat m, string tintHex, float strength, Vector3 axis, float from, float to)
         {
             m.Tint2 = H(tintHex); m.Tint2.a = strength; m.GradY = new Vector2(from, to); m.GradAxis = axis;
@@ -57,6 +63,9 @@ namespace SortEverything.Editor.Art3D
         {
             "apple", "banana", "orange", "strawberry", "carrot", "pepper", "broccoli", "corn",
             "water_bottle", "milk_carton", "juice_carton", "soda_can", "spoon", "fork", "plate", "mug", "spatula", "pan",
+            // Living Room
+            "book", "magazine", "newspaper", "cushion", "folded_blanket", "slipper",
+            "remote", "game_controller", "headphones", "candle", "photo_frame", "succulent",
         };
 
         public static Model Build(string id)
@@ -442,6 +451,253 @@ namespace SortEverything.Editor.Art3D
                     m.Pose = new Vector3(-38, 30, 0);
                     break;
                 }
+                // ===================== LIVING ROOM =====================
+                case "book":
+                {
+                    var cover = Fabric("#C2453B", "#6A1A14"); cover.Spec = 0.12f; cover.Gloss = 0.3f; cover.Noise = 0.04f;
+                    P("frontCover", Transform(RoundedBox(new Vector3(0.6f, 0.86f, 0.045f), 0.02f, 5), new Vector3(0.02f, 0, -0.135f), Vector3.zero), cover);
+                    P("backCover", Transform(RoundedBox(new Vector3(0.6f, 0.86f, 0.045f), 0.02f, 5), new Vector3(0.02f, 0, 0.135f), Vector3.zero), cover);
+                    P("spine", Tube(Line(new Vector3(-0.27f, -0.43f, 0), new Vector3(-0.27f, 0.43f, 0), 8), t => 0.14f, 32, (a, t) => 1f, 1f, Vector3.right), cover);
+                    P("pages", Transform(RoundedBox(new Vector3(0.56f, 0.82f, 0.23f), 0.015f, 5), new Vector3(0.04f, 0, 0), Vector3.zero), Paper("#F5EDD9", "#B9A584"));
+                    var bands = new List<Mesh>
+                    {
+                        Tube(Line(new Vector3(-0.27f, 0.27f, 0), new Vector3(-0.27f, 0.31f, 0), 2), t => 0.143f, 32, null, 1f, Vector3.right),
+                        Tube(Line(new Vector3(-0.27f, -0.31f, 0), new Vector3(-0.27f, -0.27f, 0), 2), t => 0.143f, 32, null, 1f, Vector3.right),
+                        Transform(RoundedBox(new Vector3(0.3f, 0.12f, 0.012f), 0.01f, 3), new Vector3(0.06f, 0.18f, -0.16f), Vector3.zero),
+                    };
+                    P("gold", Combine(bands), Metal("#D9B260", 0.55f));
+                    m.Pose = new Vector3(4, -38, 0);
+                    break;
+                }
+                case "magazine":
+                {
+                    Mesh Curl(Mesh mm) => Warp(mm, v => new Vector3(v.x, v.y + 0.06f * v.x * v.x * 4f, v.z));
+                    P("pages", Curl(Transform(RoundedBox(new Vector3(0.64f, 0.035f, 0.86f), 0.012f, 6), new Vector3(0.01f, -0.025f, 0.01f), Vector3.zero)), Paper("#F7F2E8", "#BDB2A0"));
+                    var coverMat = Plastic("#5FA8C8", "#24607E", 0.35f); coverMat.Gloss = 0.7f;
+                    P("cover", Curl(RoundedBox(new Vector3(0.66f, 0.02f, 0.88f), 0.01f, 6)), coverMat);
+                    var deco = new List<Mesh>
+                    {
+                        Curl(Transform(RoundedBox(new Vector3(0.5f, 0.012f, 0.13f), 0.006f, 3), new Vector3(0, 0.015f, -0.32f), Vector3.zero)),
+                        Curl(Transform(RoundedBox(new Vector3(0.22f, 0.012f, 0.04f), 0.006f, 3), new Vector3(-0.14f, 0.015f, 0.3f), Vector3.zero)),
+                        Curl(Transform(RoundedBox(new Vector3(0.22f, 0.012f, 0.04f), 0.006f, 3), new Vector3(-0.14f, 0.015f, 0.37f), Vector3.zero)),
+                    };
+                    P("title", Combine(deco), Paper("#FFFFFF", "#C9CFD6"));
+                    P("photo", Curl(Transform(Extrude(Circle2(0.15f, 40), 0.014f, 0.3f), new Vector3(0.08f, 0.016f, 0.04f), new Vector3(90, 0, 0))), Paper("#F2A34F", "#A85A1A"));
+                    m.Pose = new Vector3(-52, 18, 0);
+                    break;
+                }
+                case "newspaper":
+                {
+                    var paper = Paper("#EEE8DA", "#A39A86");
+                    P("lower", Transform(RoundedBox(new Vector3(0.72f, 0.04f, 0.52f), 0.012f, 6), new Vector3(0, -0.035f, 0), Vector3.zero), paper);
+                    P("upper", Transform(RoundedBox(new Vector3(0.7f, 0.04f, 0.5f), 0.012f, 6), new Vector3(0.01f, 0.01f, 0), new Vector3(0, 0, 1.5f)), paper);
+                    P("fold", Tube(Line(new Vector3(-0.355f, -0.012f, -0.25f), new Vector3(-0.355f, -0.012f, 0.25f), 6), t => 0.035f, 20, null, 1f, Vector3.up), paper);
+                    var ink = new List<Mesh> { Transform(RoundedBox(new Vector3(0.56f, 0.01f, 0.08f), 0.004f, 2), new Vector3(0.02f, 0.034f, -0.17f), Vector3.zero) };
+                    for (int c = 0; c < 3; c++)
+                        for (int r = 0; r < 4; r++)
+                            ink.Add(Transform(RoundedBox(new Vector3(0.16f, 0.008f, 0.025f), 0.003f, 2), new Vector3(-0.17f + c * 0.19f, 0.033f, -0.05f + r * 0.065f), Vector3.zero));
+                    P("ink", Combine(ink), Paper("#6E6A64", "#3A3733"));
+                    P("photo", Transform(RoundedBox(new Vector3(0.16f, 0.009f, 0.12f), 0.004f, 2), new Vector3(0.21f, 0.034f, 0.02f), Vector3.zero), Paper("#8FB2C9", "#4D6C80"));
+                    m.Pose = new Vector3(-55, -18, 0);
+                    break;
+                }
+                case "cushion":
+                {
+                    var pillow = Warp(RoundedBox(new Vector3(0.82f, 0.82f, 0.34f), 0.15f, 16), v =>
+                    {
+                        float nx = Mathf.Clamp01(Mathf.Abs(v.x) / 0.41f), ny = Mathf.Clamp01(Mathf.Abs(v.y) / 0.41f);
+                        float puff = Mathf.Sqrt(Mathf.Max(0.05f, (1 - Mathf.Pow(nx, 3)) * (1 - Mathf.Pow(ny, 3))));
+                        float pinch = 1f - 0.08f * nx * ny;                      // corners pull in to soft points
+                        return new Vector3(v.x * pinch, v.y * pinch, v.z * (0.25f + 0.75f * puff));
+                    });
+                    P("pillow", pillow, Fabric("#E4B23E", "#8A5A12"));
+                    var edge = new List<Vector3>();
+                    for (int i = 0; i <= 64; i++)
+                    {
+                        float a = i / 64f * Mathf.PI * 2f;
+                        float x = Mathf.Cos(a), y = Mathf.Sin(a);
+                        float k = 1f / Mathf.Pow(Mathf.Pow(Mathf.Abs(x), 4) + Mathf.Pow(Mathf.Abs(y), 4), 0.25f);   // rounded square
+                        edge.Add(new Vector3(x * k * 0.385f, y * k * 0.385f, 0));
+                    }
+                    P("piping", Tube(edge, t => 0.025f, 12, null, 1f, Vector3.forward, false), Fabric("#C98F22", "#6E4410"));
+                    P("button", Transform(Ellipsoid(new Vector3(0.045f, 0.045f, 0.025f)), new Vector3(0, 0, -0.165f), Vector3.zero), Fabric("#B9821E", "#6E4410"));
+                    m.Pose = new Vector3(-8, -24, 6);
+                    break;
+                }
+                case "folded_blanket":
+                {
+                    var wool = Fabric("#E7A3A0", "#8E4A48");
+                    var layers = new List<Mesh>();
+                    for (int i = 0; i < 3; i++)
+                        layers.Add(Transform(RoundedBox(new Vector3(0.84f - i * 0.03f, 0.11f, 0.56f), 0.05f, 8), new Vector3(i * 0.015f, -0.13f + i * 0.115f, 0), new Vector3(0, i * 1.5f, 0)));
+                    P("layers", Combine(layers), wool);
+                    var stripes = new List<Mesh>();
+                    for (int i = 0; i < 3; i++)
+                        stripes.Add(Transform(RoundedBox(new Vector3(0.05f, 0.112f, 0.565f), 0.03f, 4), new Vector3(0.27f + i * 0.015f, -0.13f + i * 0.115f, 0), new Vector3(0, i * 1.5f, 0)));
+                    P("stripe", Combine(stripes), Fabric("#FFF4E6", "#B9A08C"));
+                    var fringe = new List<Mesh>();
+                    for (int k = 0; k < 9; k++)
+                    {
+                        float z = Mathf.Lerp(-0.24f, 0.24f, k / 8f);
+                        fringe.Add(Tube(Bezier(new Vector3(0.43f, 0.11f, z), new Vector3(0.47f, 0.1f, z), new Vector3(0.49f, 0.06f, z), new Vector3(0.5f, 0.03f, z + 0.01f), 6), t => 0.012f, 8));
+                    }
+                    P("fringe", Combine(fringe), Fabric("#F2C1BE", "#9A5856"));
+                    m.Pose = new Vector3(-22, -28, 0);
+                    break;
+                }
+                case "slipper":
+                {
+                    // A cosy slipper seen from the side: long cream sole, a plush upper over the toes with an open back.
+                    var foot = new List<Vector2>();
+                    for (int i = 0; i < 48; i++)
+                    {
+                        float a = i / 48f * Mathf.PI * 2f;
+                        float x = Mathf.Cos(a) * 0.19f * (1f + 0.15f * Mathf.Sin(a)), y = Mathf.Sin(a) * 0.48f;
+                        x *= y < 0 ? 0.85f : 1f;
+                        foot.Add(new Vector2(x, y));
+                    }
+                    P("sole", Transform(Extrude(foot, 0.08f, 0.35f, 3), Vector3.zero, new Vector3(90, 0, 0)), Plastic("#EFE3CF", "#A8977A", 0.12f));
+                    // Upper: a dome over the front 60% only.
+                    var upper = Warp(Sphere(1f, 32, 48), v => new Vector3(v.x * 0.205f, Mathf.Max(0, v.y) * 0.19f + 0.04f, v.z * 0.3f));
+                    P("upper", Transform(upper, new Vector3(0, 0, 0.17f), Vector3.zero), Fabric("#8C7BC0", "#4A3A7A"));
+                    // Fluffy cuff around the opening.
+                    var cuff = new List<Vector3>();
+                    for (int i = 0; i <= 32; i++) { float a = Mathf.Lerp(-Mathf.PI * 0.5f, Mathf.PI * 0.5f, i / 32f); cuff.Add(new Vector3(Mathf.Sin(a) * 0.205f, 0.04f + Mathf.Cos(a) * 0.17f, -0.13f)); }
+                    P("cuff", Tube(cuff, t => 0.045f, 16, null, 1f, Vector3.forward), Fabric("#F4F0FA", "#B9AEC9"));
+                    var pom = Sculpt(d => 0.07f * (1f + 0.18f * (Noise3(d * 9f) - 0.5f)), 24, 32);
+                    P("pom", Transform(pom, new Vector3(0, 0.22f, 0.24f), Vector3.zero), Fabric("#FFFFFF", "#C9C2D6"));
+                    m.Pose = new Vector3(-28, -62, 0);
+                    break;
+                }
+                case "remote":
+                {
+                    var body = Warp(RoundedBox(new Vector3(0.24f, 0.07f, 0.86f), 0.035f, 8), v => new Vector3(v.x * (1f - 0.12f * Mathf.Clamp01(v.z / 0.43f)), v.y, v.z));
+                    P("body", body, Plastic("#3A3A42", "#121216", 0.35f));
+                    P("power", Transform(Extrude(Circle2(0.035f, 24), 0.02f, 0.4f), new Vector3(0, 0.04f, -0.33f), new Vector3(90, 0, 0)), Plastic("#E2483C", "#7A1A12", 0.4f));
+                    P("dpad", Transform(Extrude(Circle2(0.075f, 32), 0.018f, 0.4f), new Vector3(0, 0.04f, -0.15f), new Vector3(90, 0, 0)), Plastic("#6D6E78", "#2A2A30"));
+                    P("ok", Transform(Extrude(Circle2(0.032f, 24), 0.024f, 0.4f), new Vector3(0, 0.046f, -0.15f), new Vector3(90, 0, 0)), Plastic("#9DA0AC", "#4A4C56"));
+                    var keys = new List<Mesh>();
+                    for (int r = 0; r < 4; r++)
+                        for (int c = 0; c < 3; c++)
+                            keys.Add(Transform(RoundedBox(new Vector3(0.045f, 0.022f, 0.035f), 0.01f, 3), new Vector3(-0.06f + c * 0.06f, 0.042f, 0.03f + r * 0.065f), Vector3.zero));
+                    P("keys", Combine(keys), Plastic("#B6B9C4", "#5A5D68", 0.25f));
+                    m.Pose = new Vector3(-62, 28, 0);
+                    break;
+                }
+                case "game_controller":
+                {
+                    var shell = Plastic("#EFEBE3", "#9E968A", 0.35f);
+                    var parts = new List<Mesh>
+                    {
+                        RoundedBox(new Vector3(0.62f, 0.15f, 0.34f), 0.07f, 10),
+                        Transform(Ellipsoid(new Vector3(0.13f, 0.1f, 0.21f), 24, 32), new Vector3(-0.27f, -0.01f, 0.12f), new Vector3(0, -18, 0)),
+                        Transform(Ellipsoid(new Vector3(0.13f, 0.1f, 0.21f), 24, 32), new Vector3(0.27f, -0.01f, 0.12f), new Vector3(0, 18, 0)),
+                    };
+                    P("shell", Combine(parts), shell);
+                    var dpad = new List<Mesh>
+                    {
+                        Transform(RoundedBox(new Vector3(0.12f, 0.03f, 0.04f), 0.012f, 3), new Vector3(-0.2f, 0.08f, -0.03f), Vector3.zero),
+                        Transform(RoundedBox(new Vector3(0.04f, 0.03f, 0.12f), 0.012f, 3), new Vector3(-0.2f, 0.08f, -0.03f), Vector3.zero),
+                    };
+                    P("dpad", Combine(dpad), Plastic("#4A4D58", "#1E2026"));
+                    string[] cols = { "#E2483C", "#3B8EE0", "#5FB55A", "#F2C53D" };
+                    Vector2[] at = { new Vector2(0.2f, -0.08f), new Vector2(0.27f, -0.03f), new Vector2(0.2f, 0.02f), new Vector2(0.13f, -0.03f) };
+                    for (int i = 0; i < 4; i++)
+                        P("btn" + i, Transform(Ellipsoid(new Vector3(0.026f, 0.018f, 0.026f)), new Vector3(at[i].x, 0.08f, at[i].y), Vector3.zero), Plastic(cols[i], "#3A3A3A", 0.45f));
+                    var sticks = new List<Mesh>
+                    {
+                        Transform(Lathe(Smooth(new List<Vector2> { new Vector2(0.05f, 0), new Vector2(0.055f, 0.03f), new Vector2(0.045f, 0.045f), new Vector2(0, 0.04f) }, 3), 32, null, true), new Vector3(-0.09f, 0.07f, 0.09f), Vector3.zero),
+                        Transform(Lathe(Smooth(new List<Vector2> { new Vector2(0.05f, 0), new Vector2(0.055f, 0.03f), new Vector2(0.045f, 0.045f), new Vector2(0, 0.04f) }, 3), 32, null, true), new Vector3(0.09f, 0.07f, 0.09f), Vector3.zero),
+                    };
+                    P("sticks", Combine(sticks), Plastic("#4A4D58", "#1E2026"));
+                    m.Pose = new Vector3(-48, 12, 0);
+                    break;
+                }
+                case "headphones":
+                {
+                    var arc = new List<Vector3>();
+                    for (int i = 0; i <= 40; i++) { float a = Mathf.Lerp(Mathf.PI, 0f, i / 40f); arc.Add(new Vector3(Mathf.Cos(a) * 0.4f, Mathf.Sin(a) * 0.46f, 0)); }
+                    P("band", Tube(arc, t => 0.05f, 20, null, 0.6f, Vector3.forward), Plastic("#E88464", "#8E3A22", 0.35f));
+                    var pad = new List<Vector3>();
+                    for (int i = 0; i <= 30; i++) { float a = Mathf.Lerp(Mathf.PI * 0.72f, Mathf.PI * 0.28f, i / 30f); pad.Add(new Vector3(Mathf.Cos(a) * 0.37f, Mathf.Sin(a) * 0.43f, 0)); }
+                    P("pad", Tube(pad, t => 0.045f, 16, null, 0.7f, Vector3.forward), Fabric("#5A4A48", "#2A2220"));
+                    var cup = Lathe(Smooth(new List<Vector2> { new Vector2(0f, -0.06f), new Vector2(0.14f, -0.06f), new Vector2(0.17f, -0.03f), new Vector2(0.17f, 0.03f), new Vector2(0.15f, 0.06f), new Vector2(0f, 0.06f) }, 4), 48);
+                    P("cupL", Transform(cup, new Vector3(-0.42f, -0.06f, 0), new Vector3(0, 0, 90)), Plastic("#E88464", "#8E3A22", 0.35f));
+                    P("cupR", Transform(cup, new Vector3(0.42f, -0.06f, 0), new Vector3(0, 0, 90)), Plastic("#E88464", "#8E3A22", 0.35f));
+                    var ring = new List<Vector3>();
+                    for (int i = 0; i <= 40; i++) { float a = i / 40f * Mathf.PI * 2f; ring.Add(new Vector3(0, Mathf.Cos(a) * 0.12f, Mathf.Sin(a) * 0.12f)); }
+                    P("cushionL", Transform(Tube(ring, t => 0.045f, 14, null, 1f, Vector3.right, false), new Vector3(-0.36f, -0.06f, 0), Vector3.zero), Fabric("#4A3E3C", "#1E1918"));
+                    P("cushionR", Transform(Tube(ring, t => 0.045f, 14, null, 1f, Vector3.right, false), new Vector3(0.36f, -0.06f, 0), Vector3.zero), Fabric("#4A3E3C", "#1E1918"));
+                    m.Pose = new Vector3(-8, 28, 0);
+                    break;
+                }
+                case "candle":
+                {
+                    P("saucer", Lathe(Smooth(new List<Vector2> { new Vector2(0f, -0.42f), new Vector2(0.3f, -0.42f), new Vector2(0.36f, -0.38f), new Vector2(0.37f, -0.35f), new Vector2(0.3f, -0.37f), new Vector2(0f, -0.375f) }, 4), 64), Metal("#D2AE62", 0.6f));
+                    var body = Lathe(Smooth(new List<Vector2> { new Vector2(0f, -0.38f), new Vector2(0.19f, -0.38f), new Vector2(0.2f, -0.3f), new Vector2(0.2f, 0.18f), new Vector2(0.185f, 0.22f), new Vector2(0.12f, 0.2f), new Vector2(0f, 0.17f) }, 5), 64,
+                        (a, t) => 1f + 0.015f * Mathf.Sin(a * Mathf.PI * 6f) * t);
+                    P("wax", body, Wax("#F6EDD8", "#B9A27A"));
+                    var drips = new List<Mesh>();
+                    float[] ang = { 0.3f, 2.1f, 4.0f };
+                    float[] len = { 0.16f, 0.24f, 0.12f };
+                    for (int i = 0; i < 3; i++)
+                    {
+                        var dir = new Vector3(Mathf.Cos(ang[i]), 0, Mathf.Sin(ang[i]));
+                        drips.Add(Tube(Line(dir * 0.2f + Vector3.up * 0.2f, dir * 0.205f + Vector3.up * (0.2f - len[i]), 8), t => Mathf.Lerp(0.022f, 0.03f, t), 12));
+                    }
+                    P("drips", Combine(drips), Wax("#F9F1DE", "#C2AA80"));
+                    P("wick", Tube(Bezier(new Vector3(0, 0.17f, 0), new Vector3(0, 0.22f, 0), new Vector3(0.01f, 0.25f, 0), new Vector3(0.02f, 0.27f, 0), 6), t => 0.01f, 8), Stem("#2A1E16"));
+                    var flame = Warp(Sphere(1f, 24, 32), v => new Vector3(v.x * 0.055f * (1f - Mathf.Max(0, v.y) * 0.75f), v.y * 0.11f, v.z * 0.055f * (1f - Mathf.Max(0, v.y) * 0.75f)));
+                    P("flame", Transform(flame, new Vector3(0.02f, 0.37f, 0), Vector3.zero), Glow("#FFC24A"));
+                    P("core", Transform(Ellipsoid(new Vector3(0.025f, 0.05f, 0.025f)), new Vector3(0.02f, 0.345f, -0.03f), Vector3.zero), Glow("#FFF6D6"));
+                    m.Pose = new Vector3(0, 15, 0);
+                    break;
+                }
+                case "photo_frame":
+                {
+                    var wood = Wood("#4A3527", "#1E120A"); wood.Spec = 0.25f; wood.Gloss = 0.5f;
+                    float W = 0.64f, Hh = 0.8f, b = 0.09f, d = 0.07f;
+                    var bars = new List<Mesh>
+                    {
+                        Transform(RoundedBox(new Vector3(W, b, d), 0.025f, 4), new Vector3(0, Hh / 2 - b / 2, 0), Vector3.zero),
+                        Transform(RoundedBox(new Vector3(W, b, d), 0.025f, 4), new Vector3(0, -Hh / 2 + b / 2, 0), Vector3.zero),
+                        Transform(RoundedBox(new Vector3(b, Hh, d), 0.025f, 4), new Vector3(-W / 2 + b / 2, 0, 0), Vector3.zero),
+                        Transform(RoundedBox(new Vector3(b, Hh, d), 0.025f, 4), new Vector3(W / 2 - b / 2, 0, 0), Vector3.zero),
+                    };
+                    P("frame", Combine(bars), wood);
+                    P("mat", Transform(RoundedBox(new Vector3(W - 2 * b + 0.01f, Hh - 2 * b + 0.01f, 0.02f), 0.005f, 3), new Vector3(0, 0, 0.012f), Vector3.zero), Paper("#BFE0F0", "#6E9AB2"));
+                    P("sun", Transform(Extrude(Circle2(0.06f, 32), 0.012f, 0.3f), new Vector3(0.1f, 0.14f, -0.004f), Vector3.zero), Paper("#F7C760", "#B07E1A"));
+                    P("hills", Transform(Extrude(new List<Vector2> { new Vector2(-0.23f, -0.31f), new Vector2(0.23f, -0.31f), new Vector2(0.23f, -0.12f), new Vector2(0.12f, -0.02f), new Vector2(0.0f, -0.1f), new Vector2(-0.1f, 0.02f), new Vector2(-0.23f, -0.1f) }, 0.014f, 0.25f),
+                        new Vector3(0, 0, -0.006f), Vector3.zero), Paper("#7FB27A", "#3E6A3A"));
+                    P("stand", Transform(RoundedBox(new Vector3(0.12f, 0.5f, 0.03f), 0.012f, 3), new Vector3(0, -0.12f, 0.16f), new Vector3(-22, 0, 0)), wood);
+                    m.Pose = new Vector3(6, -26, 0);
+                    break;
+                }
+                case "succulent":
+                {
+                    P("pot", Lathe(Smooth(new List<Vector2> { new Vector2(0f, -0.36f), new Vector2(0.16f, -0.36f), new Vector2(0.21f, -0.05f), new Vector2(0.245f, -0.04f), new Vector2(0.245f, 0.02f), new Vector2(0.21f, 0.02f), new Vector2(0.2f, -0.02f), new Vector2(0f, -0.03f) }, 4), 64),
+                        Ceramic("#C9734E", "#6E2E16"));
+                    P("soil", Transform(Ellipsoid(new Vector3(0.2f, 0.02f, 0.2f)), new Vector3(0, -0.015f, 0), Vector3.zero), Stem("#4A3324"));
+                    var leaves = new List<Mesh>();
+                    int[] count = { 7, 6, 5, 3 };
+                    float[] tilt = { 20f, 36f, 54f, 72f }, len = { 0.32f, 0.27f, 0.2f, 0.13f };
+                    for (int ring = 0; ring < 4; ring++)
+                        for (int i = 0; i < count[ring]; i++)
+                        {
+                            var leaf = Warp(Sphere(1f, 16, 20), v =>
+                            {
+                                float x = (v.x + 1) * 0.5f; // 0 at base → 1 at tip
+                                float w = Mathf.Sin(Mathf.Clamp01(x * 0.95f + 0.05f) * Mathf.PI) * (1f - x * 0.35f);
+                                return new Vector3(x * len[ring], v.y * 0.05f * w + 0.012f * x * x, v.z * 0.09f * w);
+                            });
+                            float yaw = i * 360f / count[ring] + ring * 23f;
+                            leaves.Add(Transform(leaf, new Vector3(0, 0.0f + ring * 0.03f, 0), new Vector3(0, yaw, tilt[ring])));
+                        }
+                    P("rosette", Combine(leaves), Grad(Produce("#7DB58A", "#2E5A3E", 0.2f, 0.4f), "#E9A3A0", 0.45f, Vector3.up, 0.18f, 0.06f));
+                    m.Pose = new Vector3(-12, 20, 0);
+                    break;
+                }
+
                 default: throw new ArgumentException("No 3D model for " + id);
             }
             return m;

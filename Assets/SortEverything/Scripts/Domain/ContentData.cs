@@ -10,10 +10,23 @@ namespace SortEverything.Domain
     // See Docs/ContentAuthoring.md.
     // ------------------------------------------------------------------------------------------------
 
+    /// <summary>A sorting category defined by data (the Kitchen's four stay in CategoryIds; rooms add their own).</summary>
+    [Serializable]
+    public sealed class CategoryData
+    {
+        public string id;
+        public string name;
+        public string color = "#B9A58A";
+        public string icon = "";     // object id whose sprite stands for the category on container tags
+    }
+
+    [Serializable] public sealed class CategoriesFile { public CategoryData[] categories = Array.Empty<CategoryData>(); }
+
     [Serializable]
     public sealed class ObjectData
     {
         public string id;
+        public string name = "";      // display name (GDD Kitchen objects use the string table)
         public string code;          // two-letter code used by board recipes (GDD Section 25 style)
         public string category;      // a CategoryIds value: sorting correctness comes only from this
         public string color = "#CCCCCC";
@@ -50,11 +63,14 @@ namespace SortEverything.Domain
         public string sharedArchetype = "";
 
         /// <summary>Single-category bins use that category's archetype; bins accepting several kinds use the shared one.</summary>
-        public ContainerArchetypeData ForAccepts(IReadOnlyList<string> accepts)
+        public ContainerArchetypeData ForAccepts(IReadOnlyList<string> accepts, AreaData area = null)
         {
-            string id = accepts.Count == 1
-                ? categoryArchetypes.FirstOrDefault(c => c.category == accepts[0])?.archetype
-                : sharedArchetype;
+            string id;
+            if (accepts.Count == 1)
+                id = area?.containerOverrides.FirstOrDefault(c => c.category == accepts[0])?.archetype
+                     ?? categoryArchetypes.FirstOrDefault(c => c.category == accepts[0])?.archetype;
+            else
+                id = !string.IsNullOrEmpty(area?.sharedArchetype) ? area.sharedArchetype : sharedArchetype;
             return archetypes.FirstOrDefault(a => a.id == id);
         }
     }
@@ -84,6 +100,16 @@ namespace SortEverything.Domain
         public MessData mess = new MessData();
         public LevelMessData[] levelMess = Array.Empty<LevelMessData>();
 
+        // ---- House structure (rooms beyond the Kitchen are data) ----
+        public string unlockAfterLevel = "";      // first completion of this level unlocks the room ("" = unlocked from the start)
+        public string unlockText = "";            // shown on the locked room card
+        public string tagline = "";               // one line on the room card
+        public int order;                         // position on the House screen
+        public ChapterData[] chapters = Array.Empty<ChapterData>();
+        public CategoryArchetype[] containerOverrides = Array.Empty<CategoryArchetype>(); // room-specific container looks
+        public string sharedArchetype = "";       // room-specific shared container ("" = global)
+        public OverviewRegionData[] regions = Array.Empty<OverviewRegionData>();      // room overview (data rooms)
+
         public MessData MessFor(string levelId)
         {
             var o = levelMess.FirstOrDefault(m => m.levelId == levelId);
@@ -98,6 +124,23 @@ namespace SortEverything.Domain
     }
 
     [Serializable] public sealed class AreasFile { public AreaData[] areas = Array.Empty<AreaData>(); }
+
+    /// <summary>A five-scene chapter of a room (ordinals are inclusive, within the room).</summary>
+    [Serializable] public sealed class ChapterData { public string name; public int from = 1, to = 5; public bool planned; }
+
+    /// <summary>
+    /// One region of a data room's overview. It starts untidy, gains a small trace per completed scene, and shows its
+    /// composed, restored look once every scene in [from..to] is completed (from the save, never faked).
+    /// </summary>
+    [Serializable]
+    public sealed class OverviewRegionData
+    {
+        public string name;
+        public int from = 1, to = 5;
+        public string[] furniture = Array.Empty<string>();   // scene prop ids drawn in the region
+        public string[] restored = Array.Empty<string>();    // object ids composed on the surface once restored
+        public string[] clutter = Array.Empty<string>();     // object ids lying around before that
+    }
 
     // ---------- Scene profiles (the Little Project Loop presentation; gameplay rules are untouched) ----------
 
@@ -180,7 +223,7 @@ namespace SortEverything.Domain
         public string areaId = KitchenCatalogue.AreaId;
         public string purpose;
         public string instruction = "";
-        public string region = "finishing";
+        public string region = "";
         public string finishMicroAction = "tray_settle";
         public string purposeProp = "breakfast_tray";
         public bool canDefer;
@@ -196,13 +239,16 @@ namespace SortEverything.Domain
     /// </summary>
     public static class DataLevelBuilder
     {
-        public static List<LevelDef> Build(LevelsFile file, IReadOnlyDictionary<string, ObjectData> objects, int firstOrdinal)
+        /// <summary>Builds data levels. Ordinals continue per area after existingInArea(areaId) levels.</summary>
+        public static List<LevelDef> Build(LevelsFile file, IReadOnlyDictionary<string, ObjectData> objects, Func<string, int> existingInArea)
         {
             var result = new List<LevelDef>();
             if (file?.levels == null) return result;
-            int ordinal = firstOrdinal;
+            var next = new Dictionary<string, int>();
             foreach (var dl in file.levels)
             {
+                if (!next.ContainsKey(dl.areaId)) next[dl.areaId] = existingInArea(dl.areaId) + 1;
+                int ordinal = next[dl.areaId]++;
                 var boards = new List<BoardDef>();
                 foreach (var db in dl.boards)
                 {
@@ -225,7 +271,7 @@ namespace SortEverything.Domain
                     BoardContentVersion = KitchenCatalogue.KitchenBoardContentVersion,
                     DestinationId = KitchenCatalogue.DestinationId,
                     AreaId = dl.areaId,
-                    OrdinalInArea = ordinal++,
+                    OrdinalInArea = ordinal,
                     ThemeId = "kitchen",
                     PurposeKey = "scene." + dl.levelId,
                     PurposeEnglish = dl.purpose,
@@ -245,6 +291,12 @@ namespace SortEverything.Domain
                     AfterProfile = dl.levelId + "_after",
                     InstructionOverride = dl.instruction ?? "",
                 });
+            }
+            // "Next" on the result screen: the following scene of the same area in this file.
+            for (int i = 0; i < result.Count; i++)
+            {
+                var nextInArea = result.Skip(i + 1).FirstOrDefault(l => l.AreaId == result[i].AreaId);
+                result[i].PreviewLevelId = nextInArea?.LevelId ?? "";
             }
             return result;
         }

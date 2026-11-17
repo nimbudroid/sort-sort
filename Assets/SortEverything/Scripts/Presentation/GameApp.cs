@@ -112,7 +112,8 @@ namespace SortEverything.Presentation
         {
             yield return null; // let the safe area settle
             var config = GameConfig.LoadFromResources();
-            var catalogue = Catalogue.CreateKitchen(config.buildProfileId, ContentDb.DataLevels);
+            ContentDb.RegisterStrings();
+            var catalogue = Catalogue.CreateHouse(config.buildProfileId, ContentDb.DataLevels, ContentDb.AreaUnlocks);
             var store = FileSaveStore.Default();
             var telemetry = new Telemetry(System.IO.Path.Combine(Application.persistentDataPath, "SortEverything", "telemetry.jsonl"), config.telemetryEnabled)
             {
@@ -125,6 +126,9 @@ namespace SortEverything.Presentation
                 ShowCorruptModal(diag, store);
                 yield break;
             }
+            // Rooms whose unlocking scene is already sorted open now (saves from before a room existed).
+            var probe = Progression.Clone(Save);
+            if (Progression.UnlockAreas(probe, catalogue).Count > 0) Session.Commit(s => { Progression.UnlockAreas(s, catalogue); return true; });
             telemetry.ParticipantId = Save.participantId;
             telemetry.Emit("session_start", "\"entry\":\"" + outcome + "\"");
             Audio.Init(Save.settings);
@@ -193,53 +197,93 @@ namespace SortEverything.Presentation
             var list = UIKit.ScrollList(root, "HomeList", 10);
             ((RectTransform)list.parent).Stretch(12, 54, 12, 8);
 
-            // Resume card or Continue.
+            // Resume card, then the next task (in the room of the saved attempt, else the first room with work left).
             var selected = Save.Attempt(Save.selectedAttemptId);
             var selectedLevel = selected != null ? Catalogue.Level(selected.levelId) : null;
             if (selectedLevel != null && Catalogue.IsInstalled(selectedLevel.LevelId))
             {
-                Card(list, "Resume", $"{Strings.Get(selectedLevel.PurposeKey)}", $"{Strings.Get("status.in_progress")} · Kitchen {selectedLevel.OrdinalInArea}",
+                Card(list, "Resume", $"{Strings.Get(selectedLevel.PurposeKey)}", $"{Strings.Get("status.in_progress")} · {RoomLabel(selectedLevel)}",
                     Strings.Get("action.resume"), () => OpenFromList(selectedLevel), primary: true);
             }
-            var cursor = Progression.CursorLevel(Save, Catalogue, KitchenCatalogue.AreaId);
+            var focusArea = selectedLevel?.AreaId ?? KitchenCatalogue.AreaId;
+            var cursor = Progression.CursorLevel(Save, Catalogue, focusArea);
+            if (cursor == null || !Progression.IsAvailable(Save, Catalogue, cursor))
+                cursor = Rooms().Where(r => Unlocked(r)).Select(r => Progression.CursorLevel(Save, Catalogue, r.id)).FirstOrDefault(l => l != null);
             if (cursor != null && (selectedLevel == null || cursor.LevelId != selectedLevel.LevelId))
             {
-                Card(list, "Continue", Strings.Get(cursor.PurposeKey), $"Next task · Kitchen {cursor.OrdinalInArea}",
+                Card(list, "Continue", Strings.Get(cursor.PurposeKey), $"Next task · {RoomLabel(cursor)}",
                     Strings.Get("action.continue"), () => OpenFromList(cursor), primary: selectedLevel == null);
             }
             else if (cursor == null && selectedLevel == null)
             {
                 bool ready = Save.recognitions.Contains(Progression.KitchenReady);
-                bool sample = !ready;
                 Card(list, "Done", ready ? Strings.Get("result.kitchen_ready") : Strings.Get("result.sample_complete"),
-                    sample ? "Every installed kitchen task has been visited." : "Your kitchen is restored. Replay any scene or try a saved puzzle.",
-                    Strings.Get("action.replay_scenes"), ShowArea, primary: true);
+                    "Every open task in the house is done. Replay any scene, or try a saved puzzle.",
+                    Strings.Get("action.replay_scenes"), () => ShowArea(KitchenCatalogue.AreaId), primary: true);
             }
 
-            // House overview / kitchen project.
-            var overviewHolder = UIKit.Rect(list, "OverviewHolder");
-            overviewHolder.Size(206);
-            var lbl = UIKit.Label(overviewHolder, "Label", $"{Strings.Get("destination.house")} · {Strings.Get("area.house_kitchen")} — {CompletedCount()}/{Catalogue.InstalledInArea(KitchenCatalogue.AreaId).Count} scenes sorted", 12, UIKit.InkSoft, TextAnchor.MiddleLeft);
-            lbl.rectTransform.TopLeft(2, 0, 330, 18);
-            var ov = KitchenOverviewView.Build(overviewHolder, Save, Catalogue, 336, 184);
-            ov.TopLeft(0, 20, 336, 184);
+            // Your House: every room, its restoration as saved, and how locked rooms open.
+            int houseDone = Rooms().Sum(r => Catalogue.InstalledInArea(r.id).Count(l => Save.HasSeal(l.LevelId)));
+            int houseTotal = Rooms().Sum(r => Catalogue.InstalledInArea(r.id).Count);
+            var houseLbl = UIKit.Label(list, "HouseLabel", $"{Strings.Get("destination.house")} — {houseDone}/{houseTotal} scenes sorted", 13, UIKit.InkSoft, TextAnchor.LowerLeft, FontStyle.Bold);
+            houseLbl.Size(22);
+            foreach (var room in Rooms()) RoomCard(list, room);
 
-            var later = Progression.LaterPuzzles(Save, Catalogue, KitchenCatalogue.AreaId).ToList();
-            var row1 = UIKit.Rect(list, "Row1"); row1.Size(46); UIKit.HStack(row1, 8);
-            UIKit.Button(row1, "Kitchen", "Kitchen scenes", () => { _laterFilter = false; ShowArea(); });
-            UIKit.Button(row1, "Later", later.Count > 0 ? $"{Strings.Get("action.later_puzzles")} ({later.Count})" : Strings.Get("action.later_puzzles"), () => { _laterFilter = true; ShowArea(); });
-            var row2 = UIKit.Rect(list, "Row2"); row2.Size(46); UIKit.HStack(row2, 8);
-            UIKit.Button(row2, "Project", "Kitchen Project", ShowProject);
-            UIKit.Button(row2, "Collection", "Collection", ShowCollection);
             var row3 = UIKit.Rect(list, "Row3"); row3.Size(46); UIKit.HStack(row3, 8);
+            UIKit.Button(row3, "Collection", "Collection", ShowCollection);
             UIKit.Button(row3, "Records", "Records", ShowRecords);
-            UIKit.Button(row3, "Settings", Strings.Get("action.settings"), ShowSettings);
             var row4 = UIKit.Rect(list, "Row4"); row4.Size(46); UIKit.HStack(row4, 8);
+            UIKit.Button(row4, "Settings", Strings.Get("action.settings"), ShowSettings);
             UIKit.Button(row4, "AllLevels", "All levels", () => ShowShowcase(false));
-            UIKit.Button(row4, "AllArt", "All art", () => ShowShowcase(true));
+            var row5 = UIKit.Rect(list, "Row5"); row5.Size(46); UIKit.HStack(row5, 8);
+            UIKit.Button(row5, "AllArt", "All art", () => ShowShowcase(true));
+        }
+
+        /// <summary>Rooms with authored scenes, in House order.</summary>
+        IEnumerable<AreaData> Rooms() => ContentDb.Rooms.Where(r => Catalogue.InstalledInArea(r.id).Count > 0);
+
+        bool Unlocked(AreaData room) => Save.unlockedAreaIds.Contains(room.id);
+
+        string RoomLabel(LevelDef l) => $"{Strings.Get("area." + l.AreaId)} {l.OrdinalInArea}";
+
+        /// <summary>One room on the House screen: its saved overview, progress and actions — or how it opens.</summary>
+        void RoomCard(RectTransform list, AreaData room)
+        {
+            var levels = Catalogue.InstalledInArea(room.id);
+            int done = levels.Count(l => Save.HasSeal(l.LevelId));
+            bool open = Unlocked(room);
+            bool kitchen = room.id == KitchenCatalogue.AreaId;
+            var card = UIKit.Panel(list, "Room_" + room.id, open ? Color.white : SpriteFactory.Hex("#EFE6DA"), 16);
+            float overviewH = kitchen ? 184 : 120;
+            card.Size(open ? 36 + overviewH + 58 : 96);
+            var name = UIKit.Label(card.transform, "Name", Strings.Get("area." + room.id), 17, open ? UIKit.Ink : UIKit.InkSoft, TextAnchor.MiddleLeft, FontStyle.Bold);
+            name.rectTransform.TopLeft(12, 6, 180, 24);
+            var prog = UIKit.Label(card.transform, "Progress", open ? $"{done}/{levels.Count} scenes" : "Locked", 12, open ? UIKit.InkSoft : UIKit.InkSoft, TextAnchor.MiddleRight, FontStyle.Bold);
+            prog.rectTransform.TopLeft(196, 6, 128, 24);
+            if (!open)
+            {
+                var tag = UIKit.Label(card.transform, "Tagline", room.tagline, 12, UIKit.InkSoft, TextAnchor.UpperLeft);
+                tag.rectTransform.TopLeft(12, 30, 312, 18);
+                var how = UIKit.Label(card.transform, "Unlock", room.unlockText, 12, UIKit.Ink, TextAnchor.UpperLeft);
+                how.rectTransform.TopLeft(12, 50, 312, 40);
+                return;
+            }
+            var holder = UIKit.Rect(card.transform, "OverviewHolder").TopLeft(6, 32, 324, overviewH);
+            if (kitchen) KitchenOverviewView.Build(holder, Save, Catalogue, 324, overviewH).TopLeft(0, 0, 324, overviewH);
+            else RoomOverviewView.Build(holder, Save, Catalogue, room, 324, overviewH).TopLeft(0, 0, 324, overviewH);
+            var row = UIKit.Rect(card.transform, "Actions").TopLeft(6, 36 + overviewH + 6, 324, 44);
+            UIKit.HStack(row, 6);
+            var next = Progression.CursorLevel(Save, Catalogue, room.id);
+            if (next != null && Progression.IsAvailable(Save, Catalogue, next))
+                UIKit.Button(row, "Continue", "Continue", () => OpenFromList(next), primary: true, fontSize: 14);
+            UIKit.Button(row, "Scenes", "Scenes", () => { _laterFilter = false; ShowArea(room.id); }, fontSize: 14);
+            int later = Progression.LaterPuzzles(Save, Catalogue, room.id).Count();
+            if (later > 0) UIKit.Button(row, "Later", $"Later ({later})", () => { _laterFilter = true; ShowArea(room.id); }, fontSize: 14);
+            if (kitchen) UIKit.Button(row, "Project", "Project", ShowProject, fontSize: 14);
         }
 
         int CompletedCount() => Catalogue.InstalledInArea(KitchenCatalogue.AreaId).Count(l => Save.HasSeal(l.LevelId));
+        string _areaId = KitchenCatalogue.AreaId;
 
         void CoinChip(RectTransform parent, float parentWidth)
         {
@@ -263,29 +307,42 @@ namespace SortEverything.Presentation
             ((RectTransform)b.transform).TopLeft(218, 20, 110, 48);
         }
 
-        public void ShowArea()
+        public void ShowArea() => ShowArea(_areaId);
+
+        public void ShowArea(string areaId)
         {
+            _areaId = areaId ?? KitchenCatalogue.AreaId;
+            var room = ContentDb.Area(_areaId);
             ClearScreen();
             _lastBrowseScreen = "area";
             var root = UIKit.Rect(_screenLayer, "Area").Stretch();
             var top = UIKit.Rect(root, "Top").TopLeft(12, 8, 336, 48);
             var back = UIKit.Button(top, "Home", "‹ " + Strings.Get("action.home"), ShowHome);
             ((RectTransform)back.transform).TopLeft(0, 2, 84, 44);
-            var title = UIKit.Label(top, "Title", Strings.Get("area.house_kitchen"), 20, UIKit.Ink, TextAnchor.MiddleCenter, FontStyle.Bold);
+            var title = UIKit.Label(top, "Title", Strings.Get("area." + _areaId), 20, UIKit.Ink, TextAnchor.MiddleCenter, FontStyle.Bold);
             title.rectTransform.TopLeft(90, 0, 156, 48);
             var filter = UIKit.Button(top, "Filter", _laterFilter ? "All scenes" : Strings.Get("action.later_puzzles"), () => { _laterFilter = !_laterFilter; ShowArea(); });
             ((RectTransform)filter.transform).TopLeft(252, 2, 84, 44);
 
             var list = UIKit.ScrollList(root, "Scenes", 6);
             ((RectTransform)list.parent).Stretch(12, 62, 12, 8);
-            var levels = _laterFilter ? Progression.LaterPuzzles(Save, Catalogue, KitchenCatalogue.AreaId).ToList() : Catalogue.InstalledInArea(KitchenCatalogue.AreaId).ToList();
+            var levels = _laterFilter ? Progression.LaterPuzzles(Save, Catalogue, _areaId).ToList() : Catalogue.InstalledInArea(_areaId).ToList();
             if (levels.Count == 0)
             {
                 var empty = UIKit.Label(list, "Empty", _laterFilter ? "No puzzles saved for later." : "No scenes installed.", 14, UIKit.InkSoft);
                 empty.Size(60);
             }
+            string lastChapter = null;
             foreach (var l in levels)
             {
+                // Chapter headings (data): "Breakfast", "Clear the Space", ...
+                var chapter = room.chapters.FirstOrDefault(c => l.OrdinalInArea >= c.from && l.OrdinalInArea <= c.to);
+                if (!_laterFilter && chapter != null && chapter.name != lastChapter)
+                {
+                    lastChapter = chapter.name;
+                    var h = UIKit.Label(list, "Chapter_" + chapter.name, $"Chapter · {chapter.name}", 13, UIKit.InkSoft, TextAnchor.LowerLeft, FontStyle.Bold);
+                    h.Size(24);
+                }
                 var status = Progression.Status(Save, Catalogue, l);
                 bool laterOptional = Progression.HasLaterOptionalBoard(Save, l);
                 var row = UIKit.Panel(list, "Row_" + l.LevelId, status == LevelStatus.Locked ? SpriteFactory.Hex("#EFE6DA") : Color.white, 14, raycast: true);
@@ -310,6 +367,14 @@ namespace SortEverything.Presentation
                     btn.onClick.AddListener(() => OpenFromList(captured));
                 }
             }
+            if (!_laterFilter)
+                foreach (var c in room.chapters.Where(c => c.planned))
+                {
+                    var soon = UIKit.Panel(list, "Planned_" + c.name, SpriteFactory.Hex("#EFE6DA"), 14);
+                    soon.Size(44);
+                    var t = UIKit.Label(soon.transform, "Text", $"Chapter · {c.name} — coming later", 13, UIKit.InkSoft, TextAnchor.MiddleLeft, FontStyle.Bold);
+                    t.rectTransform.Stretch(14, 0, 8, 0);
+                }
         }
 
         public void ShowExplore()
@@ -346,8 +411,9 @@ namespace SortEverything.Presentation
         {
             var note = UIKit.Label(list, "Note", "Every kitchen scene is open here, even locked ones. Playing one saves progress as normal.", 12, UIKit.InkSoft, TextAnchor.MiddleLeft);
             note.Size(34);
-            foreach (var l in Catalogue.InstalledInArea(KitchenCatalogue.AreaId))
+            foreach (var l in Rooms().SelectMany(r => Catalogue.InstalledInArea(r.id)))
             {
+                if (l.OrdinalInArea == 1) { var hh = UIKit.Label(list, "RoomHeading_" + l.AreaId, Strings.Get("area." + l.AreaId), 15, UIKit.Ink, TextAnchor.LowerLeft, FontStyle.Bold); hh.Size(28); }
                 var status = Progression.Status(Save, Catalogue, l);
                 var row = UIKit.Panel(list, "Row_" + l.LevelId, Color.white, 14, raycast: true);
                 row.Size(84);
@@ -380,11 +446,12 @@ namespace SortEverything.Presentation
 
         void BuildArtShowcase(RectTransform list)
         {
-            foreach (var cat in CategoryIds.Ordered)
+            foreach (var cat in ContentDb.AllCategoryIds)
             {
+                var objs = ContentDb.ObjectsFile.objects.Where(o => o.category == cat).ToList();
+                if (objs.Count == 0) continue;
                 Heading(list, Strings.Get("category." + cat));
-                Grid(list, KitchenCatalogue.Assets.Where(a => a.CategoryId == cat)
-                    .Select(a => (Strings.Get("asset." + a.AssetId), SpriteFactory.Object(a.AssetId))).ToList(), 4, 72);
+                Grid(list, objs.Select(o => (Strings.Get("asset." + o.id), SpriteFactory.Object(o.id))).ToList(), 4, 72);
             }
             Heading(list, "Containers");
             Grid(list, ContentDb.Containers.archetypes.Select(a => (a.label, ContainerArt.Back(a))).ToList(), 3, 92);
@@ -396,7 +463,7 @@ namespace SortEverything.Presentation
             Grid(list, new (string, Sprite)[] { ("counter", KitchenArt.Surface(ContentDb.Area(KitchenCatalogue.AreaId).surface, ContentDb.Area(KitchenCatalogue.AreaId).surfaceColor)), ("wall tile", KitchenArt.WallTile()), ("wood", KitchenArt.Wood()), ("shelf back", KitchenArt.ShelfBack()),
                 ("floor", KitchenArt.Floor()), ("weave", KitchenArt.Weave()), ("crate slats", KitchenArt.Slats()), ("gingham", KitchenArt.Gingham()) }.ToList(), 4, 64, tiled: true);
             Heading(list, "Interface");
-            Grid(list, CategoryIds.Ordered.Select(c => (Strings.Get("category." + c), SpriteFactory.CategoryIcon(c)))
+            Grid(list, ContentDb.AllCategoryIds.Select(c => (Strings.Get("category." + c), SpriteFactory.CategoryIcon(c)))
                 .Concat(new[] { ("hand", SpriteFactory.Hand()) }).ToList(), 5, 52);
             Heading(list, "Kitchen overview (current progress)");
             var holder = UIKit.Rect(list, "Overview"); holder.Size(190);
@@ -529,25 +596,42 @@ namespace SortEverything.Presentation
             var top = UIKit.Rect(root, "Top").TopLeft(12, 8, 336, 48);
             var back = UIKit.Button(top, "Back", "‹ " + Strings.Get("action.back"), ShowHome);
             ((RectTransform)back.transform).TopLeft(0, 2, 84, 44);
-            int found = KitchenCatalogue.Assets.Count(a => Save.discoveries.Contains(a.AssetId));
-            var title = UIKit.Label(top, "Title", $"Kitchen shelf {found}/18", 20, UIKit.Ink, TextAnchor.MiddleCenter, FontStyle.Bold);
-            title.rectTransform.TopLeft(90, 0, 200, 48);
-            var grid = UIKit.Rect(root, "Grid").TopLeft(12, 64, 336, 480);
-            for (int i = 0; i < KitchenCatalogue.Assets.Length; i++)
+            // The House collection: every object, grouped by the room where it is first found.
+            var seen = new HashSet<string>();
+            var groups = new List<(string room, List<string> ids)>();
+            foreach (var room in Rooms())
             {
-                var a = KitchenCatalogue.Assets[i];
-                bool d = Save.discoveries.Contains(a.AssetId);
-                var cell = UIKit.Panel(grid, a.AssetId, d ? Color.white : SpriteFactory.Hex("#E9DFD2"), 12);
-                cell.rectTransform.TopLeft((i % 4) * 85, (i / 4) * 92, 80, 86);
-                var ic = UIKit.Icon(cell.transform, "Icon", SpriteFactory.Object(a.AssetId), 50, d ? Color.white : new Color(0.25f, 0.2f, 0.18f, 0.35f));
-                ic.rectTransform.TopLeft(15, 6, 50, 50);
-                var l = UIKit.Label(cell.transform, "Name", d ? Strings.Get("asset." + a.AssetId) : "?", 11, UIKit.Ink, TextAnchor.MiddleCenter);
-                l.rectTransform.TopLeft(2, 58, 76, 24);
+                var ids = room.id == KitchenCatalogue.AreaId
+                    ? KitchenCatalogue.Assets.Select(x => x.AssetId).ToList()
+                    : Catalogue.InstalledInArea(room.id).SelectMany(l => l.Boards).SelectMany(b => b.Objects).Select(o => o.AssetId).Distinct().ToList();
+                ids = ids.Where(seen.Add).ToList();
+                if (ids.Count > 0) groups.Add((room.id, ids));
             }
-            if (Save.recognitions.Contains(Progression.KitchenCollectionComplete))
+            int total = groups.Sum(g => g.ids.Count), found = groups.Sum(g => g.ids.Count(Save.discoveries.Contains));
+            var title = UIKit.Label(top, "Title", $"House collection {found}/{total}", 19, UIKit.Ink, TextAnchor.MiddleCenter, FontStyle.Bold);
+            title.rectTransform.TopLeft(90, 0, 240, 48);
+            var list = UIKit.ScrollList(root, "CollectionList", 6);
+            ((RectTransform)list.parent).Stretch(12, 62, 12, 8);
+            foreach (var (roomId, ids) in groups)
             {
-                var badge = UIKit.Label(root, "Badge", "★ Kitchen shelf complete", 15, UIKit.Gold, TextAnchor.MiddleCenter, FontStyle.Bold);
-                badge.rectTransform.TopLeft(12, 530, 336, 30);
+                int f = ids.Count(Save.discoveries.Contains);
+                bool complete = roomId == KitchenCatalogue.AreaId && Save.recognitions.Contains(Progression.KitchenCollectionComplete);
+                var h = UIKit.Label(list, "Room_" + roomId, $"{Strings.Get("area." + roomId)} · {f}/{ids.Count}" + (complete ? "  ★ complete" : ""), 14, complete ? UIKit.Gold : UIKit.Ink, TextAnchor.LowerLeft, FontStyle.Bold);
+                h.Size(26);
+                for (int i = 0; i < ids.Count; i += 4)
+                {
+                    var row = UIKit.Rect(list, "Row" + i); row.Size(90);
+                    for (int j = i; j < Mathf.Min(i + 4, ids.Count); j++)
+                    {
+                        bool d = Save.discoveries.Contains(ids[j]);
+                        var cell = UIKit.Panel(row, ids[j], d ? Color.white : SpriteFactory.Hex("#E9DFD2"), 12);
+                        cell.rectTransform.TopLeft((j - i) * 85, 2, 80, 86);
+                        var ic = UIKit.Icon(cell.transform, "Icon", SpriteFactory.Object(ids[j]), 50, d ? Color.white : new Color(0.25f, 0.2f, 0.18f, 0.35f));
+                        ic.rectTransform.TopLeft(15, 6, 50, 50);
+                        var l = UIKit.Label(cell.transform, "Name", d ? Strings.Get("asset." + ids[j]) : "?", 11, UIKit.Ink, TextAnchor.MiddleCenter);
+                        l.rectTransform.TopLeft(2, 58, 76, 24);
+                    }
+                }
             }
         }
 

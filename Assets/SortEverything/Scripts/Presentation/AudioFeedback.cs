@@ -40,6 +40,8 @@ namespace SortEverything.Presentation
             _clips["mat_ceramic"] = Tone(new[] { 980f, 1460f }, 0.22f, 0.26f, 0.2f, noise: 0.04f);
             _clips["mat_glass"] = Tone(new[] { 1760f, 2640f, 3520f }, 0.35f, 0.18f, 0.25f);
             _clips["mat_wood"] = Tone(new[] { 210f, 330f }, 0.1f, 0.34f, 0.45f, noise: 0.2f);
+            _clips["mat_fabric"] = Tone(new[] { 120f, 180f }, 0.14f, 0.3f, 0.9f, noise: 0.55f);  // a soft cloth "fwump"
+            _clips["mat_wax"] = Tone(new[] { 260f, 390f }, 0.08f, 0.28f, 0.5f, noise: 0.25f);
             _clips["streak"] = Tone(new[] { 880f, 1320f }, 0.12f, 0.2f, 0.4f);
             _clips["category"] = Arp(new[] { 523f, 659f }, 0.08f, 0.25f);
             _clips["complete"] = Arp(new[] { 523f, 659f, 784f, 1046f, 1318f, 1568f }, 0.08f, 0.32f);
@@ -63,7 +65,7 @@ namespace SortEverything.Presentation
         {
             switch (material)
             {
-                case "fruit": case "plastic": case "carton": case "metal": case "ceramic": case "glass": case "wood": return "mat_" + material;
+                case "fruit": case "plastic": case "carton": case "metal": case "ceramic": case "glass": case "wood": case "fabric": case "wax": return "mat_" + material;
                 case "paper": return "mat_carton";
                 default: return FamilyFor(categoryId);
             }

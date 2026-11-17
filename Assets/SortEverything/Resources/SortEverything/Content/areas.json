@@ -10,9 +10,147 @@
       "cabinet": "#9FB9AA",
       "cabinetShade": "#7F9C8C",
       "lip": "#7E5333",
-      "mess": { "enabled": true, "density": 1.0, "decals": ["crumbs", "drip", "ring"] },
+      "mess": {
+        "enabled": true,
+        "density": 1.0,
+        "decals": [
+          "crumbs",
+          "drip",
+          "ring"
+        ]
+      },
       "levelMess": [
-        { "levelId": "kitchen_001", "density": 0.8, "decals": ["crumbs", "drip"] }
+        {
+          "levelId": "kitchen_001",
+          "density": 0.8,
+          "decals": [
+            "crumbs",
+            "drip"
+          ]
+        }
+      ],
+      "order": 0,
+      "tagline": "Where every morning starts",
+      "chapters": [
+        {
+          "name": "Breakfast",
+          "from": 1,
+          "to": 5
+        },
+        {
+          "name": "Pantry",
+          "from": 6,
+          "to": 10
+        },
+        {
+          "name": "Cooking",
+          "from": 11,
+          "to": 15
+        },
+        {
+          "name": "Finishing",
+          "from": 16,
+          "to": 20
+        }
+      ]
+    },
+    {
+      "id": "house_living_room",
+      "name": "Living Room",
+      "order": 1,
+      "tagline": "Make it cosy again",
+      "unlockAfterLevel": "kitchen_005",
+      "unlockText": "Restore the breakfast corner (Kitchen 5) to open the Living Room.",
+      "surface": "rug",
+      "surfaceColor": "#86795F",
+      "surfaceTint": "#FFFFFF",
+      "wall": "wallpaper_sage",
+      "cabinet": "#B49A7E",
+      "cabinetShade": "#95795D",
+      "lip": "#5E5040",
+      "mess": {
+        "enabled": true,
+        "density": 0.8,
+        "decals": [
+          "crumbs",
+          "ring"
+        ]
+      },
+      "levelMess": [],
+      "chapters": [
+        {
+          "name": "Clear the Space",
+          "from": 1,
+          "to": 5
+        },
+        {
+          "name": "Make It Cosy",
+          "from": 6,
+          "to": 10,
+          "planned": true
+        },
+        {
+          "name": "Family Time",
+          "from": 11,
+          "to": 15,
+          "planned": true
+        }
+      ],
+      "containerOverrides": [
+        {
+          "category": "kitchenware",
+          "archetype": "kitchen_return_tray"
+        }
+      ],
+      "sharedArchetype": "storage_bench",
+      "regions": [
+        {
+          "name": "Sofa & shelves",
+          "from": 1,
+          "to": 5,
+          "furniture": [
+            "sofa",
+            "floor_lamp"
+          ],
+          "restored": [
+            "cushion",
+            "folded_blanket",
+            "book",
+            "candle"
+          ],
+          "clutter": [
+            "newspaper",
+            "slipper",
+            "mug",
+            "remote"
+          ]
+        },
+        {
+          "name": "Cosy corner",
+          "from": 6,
+          "to": 10,
+          "furniture": [
+            "armchair"
+          ],
+          "restored": [],
+          "clutter": [
+            "magazine",
+            "headphones"
+          ]
+        },
+        {
+          "name": "Family time",
+          "from": 11,
+          "to": 15,
+          "furniture": [
+            "wall_art"
+          ],
+          "restored": [],
+          "clutter": [
+            "game_controller",
+            "plate"
+          ]
+        }
       ]
     }
   ]

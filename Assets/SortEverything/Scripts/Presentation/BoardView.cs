@@ -110,7 +110,7 @@ namespace SortEverything.Presentation
             DragLayer = UIKit.Rect(Root, "Drag").Stretch();
 
             foreach (var t in Def.Targets)
-                Targets[t.TargetId] = TargetView.Create(binLayer, FrontLayer, Def, t, Layout.Bins[t.TargetId], ContentDb.Containers.ForAccepts(t.Accepts) ?? Fallback);
+                Targets[t.TargetId] = TargetView.Create(binLayer, FrontLayer, Def, t, Layout.Bins[t.TargetId], ContentDb.Containers.ForAccepts(t.Accepts, Area) ?? Fallback);
 
             // Draw order: big items underneath, small ones on top (raycasts hit the visible top item first).
             foreach (var o in Def.Objects.OrderBy(o => Layout.Pile[o.InstanceId].Layer))
@@ -464,7 +464,8 @@ namespace SortEverything.Presentation
 
             // Sticker tag: icon + short name; limited bins add a small "used/capacity" pill.
             bool shared = Def.Accepts.Count > 1;
-            string label = shared ? (Def.Accepts.Count == 2 && Def.TargetId.Length == 2 ? "" : Strings.Get("target.shared")) : Strings.Get("category." + Def.Accepts[0]);
+            // Shared containers carry their own name (the Kitchen's "Shared tray", the Living Room's "Storage bench").
+            string label = shared ? (Def.Accepts.Count == 2 && Def.TargetId.Length == 2 ? "" : (!string.IsNullOrEmpty(a.label) && a.id != "fallback" ? a.label : Strings.Get("target.shared"))) : Strings.Get("category." + Def.Accepts[0]);
             const float iconSize = 16;
             float iconsW = Def.Accepts.Count * (iconSize + 1);
             float textW = label.Length > 0 ? Mathf.Min(w - 22 - iconsW, 7.4f * label.Length + 6) : 0;

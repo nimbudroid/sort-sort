@@ -19,6 +19,7 @@ namespace SortEverything.Presentation
         public static readonly string[] Known =
         {
             "window_morning", "wall_shelf", "toast_plate", "jam_jar", "flower_vase", "napkin",
+            "sofa", "floor_lamp", "wall_art", "armchair", "popcorn_bowl", "tea_cup",
             "window", "stove", "pantry_shelf", "plate_shelf", "table", "plant", "rail", "basket",
         };
 
@@ -118,6 +119,52 @@ namespace SortEverything.Presentation
                     c.Shade = true; c.Gloss = 0.8f;
                     c.Capsule(40, 74, 92, 66, 3.2f, H("#C9D1DA"));
                     c.Ellipse(96, 65, 9, 6, -8, H("#C9D1DA"));
+                    break;
+                case "sofa":
+                    c.RoundRect(64, 74, 58, 26, 12, 0, H("#7C93A8"));                 // body
+                    c.RoundRect(64, 52, 48, 18, 10, 0, H("#8BA2B6"));                 // back cushions
+                    c.RoundRect(14, 70, 10, 22, 8, 0, H("#6D8498")); c.RoundRect(114, 70, 10, 22, 8, 0, H("#6D8498")); // arms
+                    c.RoundRect(44, 74, 18, 10, 6, 0, H("#9AB0C3")); c.RoundRect(84, 74, 18, 10, 6, 0, H("#9AB0C3")); // seats
+                    c.RoundRect(40, 56, 11, 10, 5, -12, H("#E4B23E"));                 // a cushion
+                    c.RoundRect(22, 102, 3, 6, 1, 0, H("#5E4128")); c.RoundRect(106, 102, 3, 6, 1, 0, H("#5E4128"));
+                    break;
+                case "armchair":
+                    c.RoundRect(64, 76, 40, 26, 12, 0, H("#C98F6E"));
+                    c.RoundRect(64, 52, 32, 22, 12, 0, H("#D59E7E"));
+                    c.RoundRect(28, 72, 9, 20, 7, 0, H("#B87F60")); c.RoundRect(100, 72, 9, 20, 7, 0, H("#B87F60"));
+                    c.RoundRect(40, 104, 3, 6, 1, 0, H("#5E4128")); c.RoundRect(88, 104, 3, 6, 1, 0, H("#5E4128"));
+                    break;
+                case "floor_lamp":
+                    c.Gloss = 0.5f;
+                    c.Capsule(64, 40, 64, 112, 2.5f, H("#3E3A36"));
+                    c.Ellipse(64, 114, 16, 4, 0, H("#3E3A36"));
+                    c.Gloss = 0.1f;
+                    c.Polygon(new[] { new Vector2(46, 14), new Vector2(82, 14), new Vector2(92, 44), new Vector2(36, 44) }, H("#F4DFA8"));
+                    c.Shade = false; c.Ellipse(64, 44, 26, 5, 0, new Color(1f, 0.95f, 0.75f, 0.9f), outline: false);
+                    break;
+                case "wall_art":
+                    c.RoundRect(64, 60, 40, 32, 3, 0, H("#4A3527"));
+                    c.Shade = false;
+                    c.RoundRect(64, 60, 34, 26, 2, 0, H("#F6E7CF"), outline: false);
+                    c.Circle(80, 50, 7, H("#F2B05E"), outline: false);
+                    c.Polygon(new[] { new Vector2(32, 84), new Vector2(54, 58), new Vector2(72, 84) }, H("#7FA88A"), outline: false);
+                    c.Polygon(new[] { new Vector2(56, 84), new Vector2(76, 64), new Vector2(96, 84) }, H("#5E8B74"), outline: false);
+                    break;
+                case "popcorn_bowl":
+                    c.Gloss = 0.3f; c.Bevel = 8;
+                    for (int i = 0; i < 9; i++) c.Circle(40 + (i % 5) * 12 + (i / 5) * 6, 56 - (i / 5) * 9 + (i % 2) * 3, 9, H("#FFF3D6"));
+                    c.Gloss = 0.5f;
+                    c.Custom((x, y) => Mathf.Max(Mathf.Sqrt((x - 64) * (x - 64) / 1600f + (y - 62) * (y - 62) / 900f) * 30 - 30, 62 - y), H("#D9473E"), true, 22, 60, 106, 96);
+                    c.Shade = false;
+                    for (int i = 0; i < 4; i++) c.RoundRect(44 + i * 13, 78, 3, 12, 1, 0, new Color(1, 1, 1, 0.85f), outline: false);
+                    break;
+                case "tea_cup":
+                    c.Gloss = 0.5f;
+                    c.Ellipse(64, 84, 34, 10, 0, H("#F3EBDD"));
+                    c.Custom((x, y) => Mathf.Max(Mathf.Abs(x - 64) - (20 - (y - 52) * 0.15f), Mathf.Abs(y - 66) - 16), H("#F3EBDD"), true, 40, 48, 88, 84);
+                    c.Ellipse(64, 52, 20, 5, 0, H("#B57A43"));
+                    c.Ring(88, 66, 8, 2.5f, H("#F3EBDD"));
+                    c.Shade = false; c.RoundRect(64, 68, 18, 2, 1, 0, H("#7FA0C9"), outline: false);
                     break;
                 default:
                     return KitchenArt.Prop(id);

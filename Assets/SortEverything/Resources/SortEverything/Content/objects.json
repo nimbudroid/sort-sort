@@ -1,22 +1,390 @@
 {
   "objects": [
-    { "id": "apple",        "code": "AP", "category": "fruit",       "color": "#D9443A", "relativeSize": 1.0,  "material": "fruit",   "tags": ["produce", "round"],  "art": "" },
-    { "id": "banana",       "code": "BA", "category": "fruit",       "color": "#F2C744", "relativeSize": 1.1,  "material": "fruit",   "tags": ["produce", "long"],   "art": "" },
-    { "id": "orange",       "code": "OR", "category": "fruit",       "color": "#F08A24", "relativeSize": 1.0,  "material": "fruit",   "tags": ["produce", "round"],  "art": "" },
-    { "id": "strawberry",   "code": "ST", "category": "fruit",       "color": "#E0394A", "relativeSize": 0.9,  "material": "fruit",   "tags": ["produce", "small"],  "art": "" },
-    { "id": "carrot",       "code": "CA", "category": "vegetables",  "color": "#EE7A2B", "relativeSize": 1.05, "material": "fruit",   "tags": ["produce", "long"],   "art": "" },
-    { "id": "pepper",       "code": "PE", "category": "vegetables",  "color": "#D83A2E", "relativeSize": 1.0,  "material": "fruit",   "tags": ["produce"],           "art": "" },
-    { "id": "broccoli",     "code": "BR", "category": "vegetables",  "color": "#4E9A3E", "relativeSize": 1.05, "material": "fruit",   "tags": ["produce"],           "art": "" },
-    { "id": "corn",         "code": "CO", "category": "vegetables",  "color": "#F1CF45", "relativeSize": 1.1,  "material": "fruit",   "tags": ["produce", "long"],   "art": "" },
-    { "id": "water_bottle", "code": "WA", "category": "drinks",      "color": "#9CC9E8", "relativeSize": 1.2,  "material": "plastic", "tags": ["bottle"],            "art": "" },
-    { "id": "milk_carton",  "code": "MI", "category": "drinks",      "color": "#F4F1EA", "relativeSize": 1.3,  "material": "carton",  "tags": ["carton"],            "art": "" },
-    { "id": "juice_carton", "code": "JU", "category": "drinks",      "color": "#F2A33A", "relativeSize": 1.1,  "material": "carton",  "tags": ["carton"],            "art": "" },
-    { "id": "soda_can",     "code": "SO", "category": "drinks",      "color": "#D23B3B", "relativeSize": 1.0,  "material": "metal",   "tags": ["can"],               "art": "" },
-    { "id": "spoon",        "code": "SP", "category": "kitchenware", "color": "#B9C2CC", "relativeSize": 0.95, "material": "metal",   "tags": ["utensil", "cutlery"], "art": "" },
-    { "id": "fork",         "code": "FO", "category": "kitchenware", "color": "#B9C2CC", "relativeSize": 0.95, "material": "metal",   "tags": ["utensil", "cutlery"], "art": "" },
-    { "id": "plate",        "code": "PL", "category": "kitchenware", "color": "#F3EBDD", "relativeSize": 1.4,  "material": "ceramic", "tags": ["dish"],              "art": "" },
-    { "id": "mug",          "code": "MU", "category": "kitchenware", "color": "#4F7FC4", "relativeSize": 1.05, "material": "ceramic", "tags": ["dish"],              "art": "" },
-    { "id": "spatula",      "code": "SX", "category": "kitchenware", "color": "#3E3B3A", "relativeSize": 1.05, "material": "plastic", "tags": ["utensil"],           "art": "" },
-    { "id": "pan",          "code": "PA", "category": "kitchenware", "color": "#3B3A3E", "relativeSize": 1.35, "material": "metal",   "tags": ["cookware"],          "art": "" }
+    {
+      "id": "apple",
+      "code": "AP",
+      "category": "fruit",
+      "color": "#D9443A",
+      "relativeSize": 1.0,
+      "material": "fruit",
+      "tags": [
+        "produce",
+        "round"
+      ],
+      "art": ""
+    },
+    {
+      "id": "banana",
+      "code": "BA",
+      "category": "fruit",
+      "color": "#F2C744",
+      "relativeSize": 1.1,
+      "material": "fruit",
+      "tags": [
+        "produce",
+        "long"
+      ],
+      "art": ""
+    },
+    {
+      "id": "orange",
+      "code": "OR",
+      "category": "fruit",
+      "color": "#F08A24",
+      "relativeSize": 1.0,
+      "material": "fruit",
+      "tags": [
+        "produce",
+        "round"
+      ],
+      "art": ""
+    },
+    {
+      "id": "strawberry",
+      "code": "ST",
+      "category": "fruit",
+      "color": "#E0394A",
+      "relativeSize": 0.9,
+      "material": "fruit",
+      "tags": [
+        "produce",
+        "small"
+      ],
+      "art": ""
+    },
+    {
+      "id": "carrot",
+      "code": "CA",
+      "category": "vegetables",
+      "color": "#EE7A2B",
+      "relativeSize": 1.05,
+      "material": "fruit",
+      "tags": [
+        "produce",
+        "long"
+      ],
+      "art": ""
+    },
+    {
+      "id": "pepper",
+      "code": "PE",
+      "category": "vegetables",
+      "color": "#D83A2E",
+      "relativeSize": 1.0,
+      "material": "fruit",
+      "tags": [
+        "produce"
+      ],
+      "art": ""
+    },
+    {
+      "id": "broccoli",
+      "code": "BR",
+      "category": "vegetables",
+      "color": "#4E9A3E",
+      "relativeSize": 1.05,
+      "material": "fruit",
+      "tags": [
+        "produce"
+      ],
+      "art": ""
+    },
+    {
+      "id": "corn",
+      "code": "CO",
+      "category": "vegetables",
+      "color": "#F1CF45",
+      "relativeSize": 1.1,
+      "material": "fruit",
+      "tags": [
+        "produce",
+        "long"
+      ],
+      "art": ""
+    },
+    {
+      "id": "water_bottle",
+      "code": "WA",
+      "category": "drinks",
+      "color": "#9CC9E8",
+      "relativeSize": 1.2,
+      "material": "plastic",
+      "tags": [
+        "bottle"
+      ],
+      "art": ""
+    },
+    {
+      "id": "milk_carton",
+      "code": "MI",
+      "category": "drinks",
+      "color": "#F4F1EA",
+      "relativeSize": 1.3,
+      "material": "carton",
+      "tags": [
+        "carton"
+      ],
+      "art": ""
+    },
+    {
+      "id": "juice_carton",
+      "code": "JU",
+      "category": "drinks",
+      "color": "#F2A33A",
+      "relativeSize": 1.1,
+      "material": "carton",
+      "tags": [
+        "carton"
+      ],
+      "art": ""
+    },
+    {
+      "id": "soda_can",
+      "code": "SO",
+      "category": "drinks",
+      "color": "#D23B3B",
+      "relativeSize": 1.0,
+      "material": "metal",
+      "tags": [
+        "can"
+      ],
+      "art": ""
+    },
+    {
+      "id": "spoon",
+      "code": "SP",
+      "category": "kitchenware",
+      "color": "#B9C2CC",
+      "relativeSize": 0.95,
+      "material": "metal",
+      "tags": [
+        "utensil",
+        "cutlery"
+      ],
+      "art": ""
+    },
+    {
+      "id": "fork",
+      "code": "FO",
+      "category": "kitchenware",
+      "color": "#B9C2CC",
+      "relativeSize": 0.95,
+      "material": "metal",
+      "tags": [
+        "utensil",
+        "cutlery"
+      ],
+      "art": ""
+    },
+    {
+      "id": "plate",
+      "code": "PL",
+      "category": "kitchenware",
+      "color": "#F3EBDD",
+      "relativeSize": 1.4,
+      "material": "ceramic",
+      "tags": [
+        "dish"
+      ],
+      "art": ""
+    },
+    {
+      "id": "mug",
+      "code": "MU",
+      "category": "kitchenware",
+      "color": "#4F7FC4",
+      "relativeSize": 1.05,
+      "material": "ceramic",
+      "tags": [
+        "dish"
+      ],
+      "art": ""
+    },
+    {
+      "id": "spatula",
+      "code": "SX",
+      "category": "kitchenware",
+      "color": "#3E3B3A",
+      "relativeSize": 1.05,
+      "material": "plastic",
+      "tags": [
+        "utensil"
+      ],
+      "art": ""
+    },
+    {
+      "id": "pan",
+      "code": "PA",
+      "category": "kitchenware",
+      "color": "#3B3A3E",
+      "relativeSize": 1.35,
+      "material": "metal",
+      "tags": [
+        "cookware"
+      ],
+      "art": ""
+    },
+    {
+      "id": "book",
+      "code": "BK",
+      "name": "Book",
+      "category": "books",
+      "color": "#C2453B",
+      "relativeSize": 1.1,
+      "material": "paper",
+      "tags": [
+        "book"
+      ],
+      "art": ""
+    },
+    {
+      "id": "magazine",
+      "code": "MG",
+      "name": "Magazine",
+      "category": "books",
+      "color": "#5FA8C8",
+      "relativeSize": 1.2,
+      "material": "paper",
+      "tags": [
+        "paper"
+      ],
+      "art": ""
+    },
+    {
+      "id": "newspaper",
+      "code": "NP",
+      "name": "Newspaper",
+      "category": "books",
+      "color": "#ECE6D8",
+      "relativeSize": 1.15,
+      "material": "paper",
+      "tags": [
+        "paper"
+      ],
+      "art": ""
+    },
+    {
+      "id": "cushion",
+      "code": "CU",
+      "name": "Cushion",
+      "category": "textiles",
+      "color": "#E4B23E",
+      "relativeSize": 1.3,
+      "material": "fabric",
+      "tags": [
+        "soft"
+      ],
+      "art": ""
+    },
+    {
+      "id": "folded_blanket",
+      "code": "FB",
+      "name": "Throw blanket",
+      "category": "textiles",
+      "color": "#E7A3A0",
+      "relativeSize": 1.35,
+      "material": "fabric",
+      "tags": [
+        "soft"
+      ],
+      "art": ""
+    },
+    {
+      "id": "slipper",
+      "code": "SL",
+      "name": "Slipper",
+      "category": "textiles",
+      "color": "#8C7BC0",
+      "relativeSize": 1.05,
+      "material": "fabric",
+      "tags": [
+        "soft",
+        "shoe"
+      ],
+      "art": ""
+    },
+    {
+      "id": "remote",
+      "code": "RM",
+      "name": "Remote control",
+      "category": "gadgets",
+      "color": "#3A3A42",
+      "relativeSize": 1.0,
+      "material": "plastic",
+      "tags": [
+        "gadget"
+      ],
+      "art": ""
+    },
+    {
+      "id": "game_controller",
+      "code": "GC",
+      "name": "Game controller",
+      "category": "gadgets",
+      "color": "#EFEBE3",
+      "relativeSize": 1.15,
+      "material": "plastic",
+      "tags": [
+        "gadget",
+        "game"
+      ],
+      "art": ""
+    },
+    {
+      "id": "headphones",
+      "code": "HP",
+      "name": "Headphones",
+      "category": "gadgets",
+      "color": "#E88464",
+      "relativeSize": 1.15,
+      "material": "plastic",
+      "tags": [
+        "gadget",
+        "music"
+      ],
+      "art": ""
+    },
+    {
+      "id": "candle",
+      "code": "CN",
+      "name": "Candle",
+      "category": "decor",
+      "color": "#F3E9D2",
+      "relativeSize": 1.0,
+      "material": "wax",
+      "tags": [
+        "decor",
+        "light"
+      ],
+      "art": ""
+    },
+    {
+      "id": "photo_frame",
+      "code": "PF",
+      "name": "Photo frame",
+      "category": "decor",
+      "color": "#4A3527",
+      "relativeSize": 1.15,
+      "material": "wood",
+      "tags": [
+        "decor",
+        "memory"
+      ],
+      "art": ""
+    },
+    {
+      "id": "succulent",
+      "code": "SU",
+      "name": "Succulent",
+      "category": "decor",
+      "color": "#6FAE7E",
+      "relativeSize": 1.0,
+      "material": "ceramic",
+      "tags": [
+        "decor",
+        "plant"
+      ],
+      "art": ""
+    }
   ]
 }

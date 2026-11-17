@@ -16,7 +16,7 @@ namespace SortEverything.Editor
     /// </summary>
     public static class ContentValidator
     {
-        public static readonly string[] Materials = { "fruit", "plastic", "carton", "paper", "metal", "ceramic", "glass", "wood" };
+        public static readonly string[] Materials = { "fruit", "plastic", "carton", "paper", "metal", "ceramic", "glass", "wood", "fabric", "wax" };
         public static readonly string[] Templates = { TemplateIds.Unlimited, TemplateIds.P1, TemplateIds.P2, TemplateIds.P3, TemplateIds.P4 };
         public const float MinContrastDeltaE = 25f;
         const string FontPath = "Assets/SortEverything/Resources/SortEverything/Fonts/Lato-Regular.ttf";
@@ -42,7 +42,7 @@ namespace SortEverything.Editor
             foreach (var o in ContentDb.ObjectsFile.objects)
             {
                 string id = string.IsNullOrEmpty(o.id) ? "(missing id)" : o.id;
-                if (!CategoryIds.Ordered.Contains(o.category)) issues.Add($"object {id}: unknown category '{o.category}'.");
+                if (!ContentDb.AllCategoryIds.Contains(o.category)) issues.Add($"object {id}: unknown category '{o.category}'.");
                 if (o.relativeSize <= 0) issues.Add($"object {id}: missing relativeSize.");
                 if (string.IsNullOrEmpty(o.material) || !Materials.Contains(o.material)) issues.Add($"object {id}: missing or unknown material '{o.material}' (use {string.Join(", ", Materials)}).");
                 if (!HasArt(o, builtIn.ContainsKey(o.id))) issues.Add($"object {id}: no sculpted art (built-in drawing, Art/{o.id}.png or the 'art' path).");
@@ -72,10 +72,12 @@ namespace SortEverything.Editor
             }
 
             // ---- Areas + contrast (adjust the surface, not the items) ----
+            var houseForContrast = Catalogue.CreateHouse("kitchen_20", ContentDb.DataLevels, ContentDb.AreaUnlocks);
             foreach (var area in ContentDb.Areas.areas)
             {
                 if (!ColorUtility.TryParseHtmlString(area.surfaceColor, out var surface)) { issues.Add($"area {area.id}: surfaceColor '{area.surfaceColor}' is not a color."); continue; }
-                foreach (var o in ContentDb.ObjectsFile.objects)
+                var used = new HashSet<string>(houseForContrast.Levels.Where(l => l.AreaId == area.id).SelectMany(l => l.Boards).SelectMany(b => b.Objects).Select(o => o.AssetId));
+                foreach (var o in ContentDb.ObjectsFile.objects.Where(x => used.Contains(x.id)))
                 {
                     if (!ColorUtility.TryParseHtmlString(o.color, out var c)) { issues.Add($"object {o.id}: color '{o.color}' is not a color."); continue; }
                     float de = DeltaE(c, surface);
@@ -83,6 +85,38 @@ namespace SortEverything.Editor
                 }
                 foreach (var lm in area.levelMess)
                     if (string.IsNullOrEmpty(lm.levelId)) issues.Add($"area {area.id}: levelMess entry without levelId.");
+            }
+
+            // ---- Data categories ----
+            foreach (var c in ContentDb.Categories.categories)
+            {
+                if (string.IsNullOrEmpty(c.id) || string.IsNullOrEmpty(c.name)) issues.Add("categories.json: a category needs an id and a name.");
+                if (CategoryIds.Ordered.Contains(c.id)) issues.Add($"category {c.id}: redefines a GDD Kitchen category.");
+                if (!ColorUtility.TryParseHtmlString(c.color, out _)) issues.Add($"category {c.id}: color '{c.color}' is not a color.");
+                if (!string.IsNullOrEmpty(c.icon) && !objects.ContainsKey(c.icon)) issues.Add($"category {c.id}: icon object '{c.icon}' is missing.");
+            }
+
+            // ---- Rooms (House structure) ----
+            var house = Catalogue.CreateHouse("kitchen_20", ContentDb.DataLevels, ContentDb.AreaUnlocks);
+            foreach (var area in ContentDb.Areas.areas)
+            {
+                string A = $"room {area.id}";
+                var levels = house.InstalledInArea(area.id);
+                if (!string.IsNullOrEmpty(area.unlockAfterLevel) && house.Level(area.unlockAfterLevel) == null) issues.Add($"{A}: unlockAfterLevel '{area.unlockAfterLevel}' is not a level.");
+                if (area.id != KitchenCatalogue.AreaId && levels.Count > 0 && string.IsNullOrEmpty(area.unlockAfterLevel)) issues.Add($"{A}: a room after the Kitchen needs an unlockAfterLevel.");
+                foreach (var ch in area.chapters.Where(c => !c.planned))
+                    for (int n = ch.from; n <= ch.to; n++)
+                        if (levels.All(l => l.OrdinalInArea != n)) issues.Add($"{A}: chapter '{ch.name}' expects scene {n}, which is not authored.");
+                foreach (var r in area.regions)
+                {
+                    foreach (var id in r.restored.Concat(r.clutter)) if (!objects.ContainsKey(id)) issues.Add($"{A}/{r.name}: unknown object '{id}'.");
+                    foreach (var f in r.furniture) if (!SceneArt.Known.Contains(f) && Resources.Load<Sprite>("SortEverything/Art/Props/" + f) == null) issues.Add($"{A}/{r.name}: unknown furniture '{f}'.");
+                }
+                foreach (var oc in area.containerOverrides)
+                    if (containers.archetypes.All(a => a.id != oc.archetype)) issues.Add($"{A}: container override uses missing archetype '{oc.archetype}'.");
+                CheckGlyphs(area.name, A, FontCoverage(FontPath, out _), issues);
+                CheckGlyphs(area.unlockText, A, FontCoverage(FontPath, out _), issues);
+                CheckGlyphs(area.tagline, A, FontCoverage(FontPath, out _), issues);
             }
 
             // ---- Data level files (references) ----
@@ -102,14 +136,14 @@ namespace SortEverything.Editor
                         foreach (var t in b.targets)
                         {
                             if (t.accepts.Length == 0) issues.Add($"{L}/{b.id}/{t.id}: container accepts nothing.");
-                            foreach (var cat in t.accepts) if (!CategoryIds.Ordered.Contains(cat)) issues.Add($"{L}/{b.id}/{t.id}: unknown category '{cat}'.");
-                            if (containers.ForAccepts(t.accepts) == null) issues.Add($"{L}/{b.id}/{t.id}: no container archetype for {string.Join("+", t.accepts)}.");
+                            foreach (var cat in t.accepts) if (!ContentDb.AllCategoryIds.Contains(cat)) issues.Add($"{L}/{b.id}/{t.id}: unknown category '{cat}'.");
+                            if (containers.ForAccepts(t.accepts, ContentDb.Area(dl.areaId)) == null) issues.Add($"{L}/{b.id}/{t.id}: no container archetype for {string.Join("+", t.accepts)}.");
                         }
                     }
                 }
 
             // ---- Every level that will be installed (GDD + data): fit, solvability, strings ----
-            var catalogue = Catalogue.CreateKitchen("kitchen_20", ContentDb.DataLevels);
+            var catalogue = house;
             var fontChars = FontCoverage(FontPath, out string fontError);
             if (fontError != null) issues.Add(fontError);
             foreach (var level in catalogue.Levels)
@@ -172,6 +206,8 @@ namespace SortEverything.Editor
             foreach (var s in Strings.AllValues) CheckGlyphs(s, "string table", fontChars, issues);
             foreach (var a in ContentDb.Areas.areas) CheckGlyphs(a.name, $"area {a.id}", fontChars, issues);
             foreach (var a in containers.archetypes) CheckGlyphs(a.label, $"container {a.id}", fontChars, issues);
+            foreach (var c in ContentDb.Categories.categories) CheckGlyphs(c.name, $"category {c.id}", fontChars, issues);
+            foreach (var o in ContentDb.ObjectsFile.objects) CheckGlyphs(o.name, $"object {o.id}", fontChars, issues);
             foreach (var s in BoardInstructionStrings) CheckGlyphs(s, "instruction", fontChars, issues);
             return issues;
         }

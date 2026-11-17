@@ -324,6 +324,8 @@ namespace SortEverything.Domain
     {
         public readonly IReadOnlyList<LevelDef> Levels;
         public readonly BuildProfile Profile;
+        /// <summary>Rooms unlocked by a level's first completion (areaId → levelId), from area data.</summary>
+        public readonly Dictionary<string, string> AreaUnlocks = new Dictionary<string, string>();
         readonly Dictionary<string, LevelDef> _byId;
 
         public static readonly string[] ProfileIds = { "kitchen_gate_08", "kitchen_20" };
@@ -335,6 +337,14 @@ namespace SortEverything.Domain
         }
 
         public static Catalogue CreateKitchen(string profileId) => CreateKitchen(profileId, null);
+
+        /// <summary>The full House: the Kitchen, data rooms and their unlock rules (areaId → unlocking levelId).</summary>
+        public static Catalogue CreateHouse(string profileId, IReadOnlyList<LevelDef> dataLevels, IEnumerable<KeyValuePair<string, string>> unlocks)
+        {
+            var c = CreateKitchen(profileId, dataLevels);
+            if (unlocks != null) foreach (var kv in unlocks) if (!string.IsNullOrEmpty(kv.Value)) c.AreaUnlocks[kv.Key] = kv.Value;
+            return c;
+        }
 
         /// <summary>The GDD Kitchen plus optional data levels (installed in the full profile only, after Level 20).</summary>
         public static Catalogue CreateKitchen(string profileId, IReadOnlyList<LevelDef> dataLevels)

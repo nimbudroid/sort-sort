@@ -1,0 +1,8 @@
+{
+  "categories": [
+    { "id": "books",    "name": "Books & paper", "color": "#D7A28E", "icon": "book" },
+    { "id": "textiles", "name": "Soft things",   "color": "#E8C9A0", "icon": "cushion" },
+    { "id": "gadgets",  "name": "Gadgets",       "color": "#A9B8C6", "icon": "remote" },
+    { "id": "decor",    "name": "Decor",         "color": "#B9D0B0", "icon": "candle" }
+  ]
+}

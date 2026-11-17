@@ -247,7 +247,7 @@ namespace SortEverything.Presentation
         {
             if (_countText == null) return;
             int n = _level.OrdinalInArea, total = _app.Catalogue.InstalledInArea(_level.AreaId).Count;
-            _countText.text = $"{Strings.Get("area.house_kitchen")} {n}/{total}";
+            _countText.text = $"{Strings.Get("area." + _level.AreaId)} {n}/{total}";
             float f = _state.ObjectCount == 0 ? 0 : _state.SortedCount / (float)_state.ObjectCount;
             _progressFill.rectTransform.anchorMax = new Vector2(f, 1);
             _progressFill.gameObject.SetActive(f > 0);
@@ -791,12 +791,29 @@ namespace SortEverything.Presentation
             string sub = comp != null && !string.IsNullOrEmpty(comp.subtitle) ? comp.subtitle
                 : Strings.Get(_level.PurposeKey) + " — " + _view.PropBacking.GetComponentInChildren<Text>().text;
             UIKit.Label(list, "Purpose", sub, 13, UIKit.InkSoft).Size(comp != null ? 34 : 20);
-            if (sampleEnd) UIKit.Label(list, "Sample", Strings.Get("result.sample_complete"), 14, UIKit.Primary, TextAnchor.MiddleCenter, FontStyle.Bold).Size(20);
+            // Rooms are built chapter by chapter: name the chapter the player just finished.
+            var thisRoom = ContentDb.Area(_level.AreaId);
+            var chapter = _level.AreaId == KitchenCatalogue.AreaId ? null : thisRoom.chapters.FirstOrDefault(c => _level.OrdinalInArea >= c.from && _level.OrdinalInArea <= c.to);
+            if (chapter != null && chapter.to == _level.OrdinalInArea && facts.NewSeal)
+            {
+                UIKit.Label(list, "Chapter", $"Chapter complete · {chapter.name}", 15, UIKit.Primary, TextAnchor.MiddleCenter, FontStyle.Bold).Size(22);
+                if (sampleEnd) UIKit.Label(list, "More", $"More {Strings.Get("area." + _level.AreaId)} chapters are on the way.", 12, UIKit.InkSoft).Size(18);
+            }
+            else if (sampleEnd) UIKit.Label(list, "Sample", Strings.Get("result.sample_complete"), 14, UIKit.Primary, TextAnchor.MiddleCenter, FontStyle.Bold).Size(20);
 
             var gains = new List<string>();
             if (facts.CoinsEarned > 0) gains.Add($"+{facts.CoinsEarned} coins (total {Save.wallet})");
-            if (facts.TraceAdded) gains.Add("Added to your kitchen");
+            if (facts.TraceAdded) gains.Add("Added to your " + Strings.Get("area." + _level.AreaId).ToLowerInvariant());
             if (gains.Count > 0) UIKit.Label(list, "Gains", string.Join("  ·  ", gains), 14, UIKit.Ink, TextAnchor.MiddleCenter, FontStyle.Bold).Size(22);
+            foreach (var room in facts.AreasUnlocked)
+            {
+                // A new room opened: tell the player where it is (it waits on the House screen; no forced move).
+                var opened = UIKit.Panel(list, "RoomOpened", SpriteFactory.Hex("#FFF1D6"), 14); opened.Size(48);
+                var ot = UIKit.Label(opened.transform, "Text", $"New room open: {Strings.Get("area." + room)}", 15, UIKit.Ink, TextAnchor.MiddleCenter, FontStyle.Bold);
+                ot.rectTransform.Stretch(8, 0, 8, 0);
+                var otSub = UIKit.Label(opened.transform, "Sub", ContentDb.Area(room).tagline, 11, UIKit.InkSoft, TextAnchor.LowerCenter);
+                otSub.rectTransform.Stretch(8, 0, 8, 2);
+            }
 
             if (facts.NewDiscoveries.Count > 0)
             {
@@ -823,7 +840,7 @@ namespace SortEverything.Presentation
             {
                 var next = _app.Catalogue.Level(preview);
                 var card = UIKit.Panel(list, "NextPreview", Color.white, 14); card.Size(56);
-                var nl = UIKit.Label(card.transform, "Name", $"Next · Kitchen {next.OrdinalInArea}: {Strings.Get(next.PurposeKey)}", 13, UIKit.Ink, TextAnchor.UpperLeft, FontStyle.Bold);
+                var nl = UIKit.Label(card.transform, "Name", $"Next · {Strings.Get("area." + next.AreaId)} {next.OrdinalInArea}: {Strings.Get(next.PurposeKey)}", 13, UIKit.Ink, TextAnchor.UpperLeft, FontStyle.Bold);
                 nl.rectTransform.TopLeft(10, 4, 300, 20);
                 var objs = next.FirstBoard.Objects;
                 for (int i = 0; i < objs.Count && i < 9; i++)

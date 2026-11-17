@@ -48,7 +48,12 @@ namespace SortEverything.Presentation
                 case "fruit": return Object("apple");
                 case "vegetables": return Object("carrot");
                 case "drinks": return Object("water_bottle");
-                default: return Object("mug"); // reads best at icon size
+                case "kitchenware": return Object("mug"); // reads best at icon size
+                default:
+                {
+                    var c = Runtime.ContentDb.Category(categoryId);
+                    return Object(c != null && !string.IsNullOrEmpty(c.icon) ? c.icon : "mug");
+                }
             }
         }
 

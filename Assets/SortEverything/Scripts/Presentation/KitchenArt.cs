@@ -131,6 +131,8 @@ namespace SortEverything.Presentation
                 case "pantry_shelf": return ShelfBack();
                 case "floor_check": return Floor();
                 case "honey_wood": return Wood();
+                case "rug": return Rug(baseHex);
+                case "wallpaper_sage": return Wallpaper("#DCE5D2", "#C9D6BD", "#F3EBDD");
                 default: return ButcherBlock(baseHex);
             }
         }
@@ -150,6 +152,27 @@ namespace SortEverything.Presentation
             float tone = 0.96f + Hash(plank, 13) * 0.07f;
             float edge = (y % 24) < 2 ? 0.05f : 0f; // soft bevel highlight on each plank (light from above)
             return Shade(baseC, tone + grain + edge);
+        }));
+
+        /// <summary>A soft wool rug: a chunky knit rib with gentle tonal variation (base color from area data).</summary>
+        public static Sprite Rug(string baseHex) => Get("rug_" + baseHex, () => Tile("rug_" + baseHex, 96, 96, 60, (x, y) =>
+        {
+            var baseC = H(baseHex);
+            float rib = Mathf.Abs(Mathf.Sin((x + (y / 8 % 2) * 4) * Mathf.PI / 8f));          // knit columns
+            float row = Mathf.Abs(Mathf.Sin(y * Mathf.PI / 8f));
+            float k = 0.9f + 0.08f * rib + 0.04f * row + (Hash(x / 4, y / 4) - 0.5f) * 0.04f;
+            if ((y / 48) % 2 == 0 && y % 48 >= 40) k *= 1.06f;                                   // a faint woven stripe
+            return Shade(baseC, k);
+        }));
+
+        /// <summary>Striped wallpaper with a small dot motif.</summary>
+        public static Sprite Wallpaper(string aHex, string bHex, string dotHex) => Get("wallpaper_" + aHex, () => Tile("wallpaper_" + aHex, 64, 64, 120, (x, y) =>
+        {
+            bool stripe = (x / 16) % 2 == 0;
+            var c = stripe ? H(aHex) : H(bHex);
+            float dx = (x % 16) - 8, dy = (y % 32) - 16 + ((x / 16) % 2) * 0;
+            if (!stripe && dx * dx + dy * dy < 5) c = Color.Lerp(c, H(dotHex), 0.8f);
+            return Shade(c, 0.98f + (Hash(x / 8, y / 8) - 0.5f) * 0.03f);
         }));
 
         /// <summary>Pale warm stone with soft speckles (alternative counter).</summary>
