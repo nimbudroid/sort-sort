@@ -1,0 +1,504 @@
+{
+  "levels": [
+    {
+      "levelId": "living_room_001",
+      "areaId": "house_living_room",
+      "purpose": "Tidy the sofa",
+      "instruction": "Put each item with its group",
+      "region": "Sofa corner",
+      "finishMicroAction": "basket_alignment",
+      "purposeProp": "pantry_shelf",
+      "canDefer": false,
+      "boards": [
+        {
+          "id": "a",
+          "required": true,
+          "template": "U",
+          "objects": [
+            "cushion",
+            "book",
+            "folded_blanket",
+            "magazine",
+            "slipper",
+            "newspaper"
+          ],
+          "targets": [
+            {
+              "id": "textiles_only",
+              "accepts": [
+                "textiles"
+              ],
+              "capacity": -1,
+              "x": 0.25,
+              "y": 0.5,
+              "rectProfile": "wide",
+              "slotProfile": "four_square",
+              "slots": 3
+            },
+            {
+              "id": "books_only",
+              "accepts": [
+                "books"
+              ],
+              "capacity": -1,
+              "x": 0.75,
+              "y": 0.5,
+              "rectProfile": "wide",
+              "slotProfile": "four_square",
+              "slots": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "levelId": "living_room_002",
+      "areaId": "house_living_room",
+      "purpose": "Clear the coffee table",
+      "instruction": "Mugs and plates go back to the kitchen",
+      "region": "Sofa corner",
+      "finishMicroAction": "tray_settle",
+      "purposeProp": "breakfast_tray",
+      "canDefer": false,
+      "boards": [
+        {
+          "id": "a",
+          "required": true,
+          "template": "U",
+          "objects": [
+            "remote",
+            "mug",
+            "book",
+            "game_controller",
+            "plate",
+            "magazine",
+            "headphones",
+            "spoon"
+          ],
+          "targets": [
+            {
+              "id": "gadgets_only",
+              "accepts": [
+                "gadgets"
+              ],
+              "capacity": -1,
+              "x": 0.1667,
+              "y": 0.5,
+              "rectProfile": "narrow",
+              "slotProfile": "three_vertical",
+              "slots": 3
+            },
+            {
+              "id": "kitchenware_only",
+              "accepts": [
+                "kitchenware"
+              ],
+              "capacity": -1,
+              "x": 0.5,
+              "y": 0.5,
+              "rectProfile": "narrow",
+              "slotProfile": "three_vertical",
+              "slots": 3
+            },
+            {
+              "id": "books_only",
+              "accepts": [
+                "books"
+              ],
+              "capacity": -1,
+              "x": 0.8333,
+              "y": 0.5,
+              "rectProfile": "narrow",
+              "slotProfile": "two",
+              "slots": 2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "levelId": "living_room_003",
+      "areaId": "house_living_room",
+      "purpose": "Share the storage bench",
+      "instruction": "The basket holds two soft things \u00b7 the bench is shared",
+      "region": "Sofa corner",
+      "finishMicroAction": "tray_settle",
+      "purposeProp": "carry_handle_tray",
+      "canDefer": true,
+      "boards": [
+        {
+          "id": "a",
+          "required": true,
+          "template": "P1",
+          "objects": [
+            "cushion",
+            "remote",
+            "folded_blanket",
+            "game_controller",
+            "slipper",
+            "headphones"
+          ],
+          "targets": [
+            {
+              "id": "textiles_only",
+              "accepts": [
+                "textiles"
+              ],
+              "capacity": 2,
+              "x": 0.25,
+              "y": 0.5,
+              "rectProfile": "wide",
+              "slotProfile": "two",
+              "slots": 2
+            },
+            {
+              "id": "shared",
+              "accepts": [
+                "textiles",
+                "gadgets"
+              ],
+              "capacity": 4,
+              "x": 0.75,
+              "y": 0.5,
+              "rectProfile": "wide",
+              "slotProfile": "four_square",
+              "slots": 4
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "levelId": "living_room_004",
+      "areaId": "house_living_room",
+      "purpose": "Style the bookshelf",
+      "instruction": "Put each item with its group",
+      "region": "Cosy shelves",
+      "finishMicroAction": "basket_alignment",
+      "purposeProp": "pantry_shelf",
+      "canDefer": false,
+      "boards": [
+        {
+          "id": "a",
+          "required": true,
+          "template": "U",
+          "objects": [
+            "book",
+            "candle",
+            "magazine",
+            "photo_frame",
+            "newspaper",
+            "succulent"
+          ],
+          "targets": [
+            {
+              "id": "books_only",
+              "accepts": [
+                "books"
+              ],
+              "capacity": -1,
+              "x": 0.25,
+              "y": 0.5,
+              "rectProfile": "wide",
+              "slotProfile": "four_square",
+              "slots": 3
+            },
+            {
+              "id": "decor_only",
+              "accepts": [
+                "decor"
+              ],
+              "capacity": -1,
+              "x": 0.75,
+              "y": 0.5,
+              "rectProfile": "wide",
+              "slotProfile": "four_square",
+              "slots": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "levelId": "living_room_005",
+      "areaId": "house_living_room",
+      "purpose": "Make it cosy",
+      "instruction": "Put each item with its group",
+      "region": "Cosy shelves",
+      "finishMicroAction": "tray_settle",
+      "purposeProp": "breakfast_tray",
+      "canDefer": false,
+      "boards": [
+        {
+          "id": "a",
+          "required": true,
+          "template": "U",
+          "objects": [
+            "cushion",
+            "book",
+            "remote",
+            "candle",
+            "folded_blanket",
+            "magazine",
+            "headphones",
+            "succulent"
+          ],
+          "targets": [
+            {
+              "id": "textiles_only",
+              "accepts": [
+                "textiles"
+              ],
+              "capacity": -1,
+              "x": 0.25,
+              "y": 0.25,
+              "rectProfile": "quad",
+              "slotProfile": "two",
+              "slots": 2
+            },
+            {
+              "id": "books_only",
+              "accepts": [
+                "books"
+              ],
+              "capacity": -1,
+              "x": 0.75,
+              "y": 0.25,
+              "rectProfile": "quad",
+              "slotProfile": "two",
+              "slots": 2
+            },
+            {
+              "id": "gadgets_only",
+              "accepts": [
+                "gadgets"
+              ],
+              "capacity": -1,
+              "x": 0.25,
+              "y": 0.75,
+              "rectProfile": "quad",
+              "slotProfile": "two",
+              "slots": 2
+            },
+            {
+              "id": "decor_only",
+              "accepts": [
+                "decor"
+              ],
+              "capacity": -1,
+              "x": 0.75,
+              "y": 0.75,
+              "rectProfile": "quad",
+              "slotProfile": "two",
+              "slots": 2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "levelId": "living_room_006",
+      "areaId": "house_living_room",
+      "purpose": "Sort the game shelf",
+      "instruction": "Put each item with its group",
+      "region": "Cosy shelves",
+      "finishMicroAction": "basket_alignment",
+      "purposeProp": "pantry_shelf",
+      "canDefer": false,
+      "boards": [
+        {
+          "id": "a",
+          "required": true,
+          "template": "U",
+          "objects": [
+            "board_game",
+            "book",
+            "game_controller",
+            "jigsaw_puzzle",
+            "magazine",
+            "playing_cards"
+          ],
+          "targets": [
+            {
+              "id": "games_only",
+              "accepts": [
+                "games"
+              ],
+              "capacity": -1,
+              "x": 0.1667,
+              "y": 0.5,
+              "rectProfile": "narrow",
+              "slotProfile": "three_vertical",
+              "slots": 3
+            },
+            {
+              "id": "books_only",
+              "accepts": [
+                "books"
+              ],
+              "capacity": -1,
+              "x": 0.5,
+              "y": 0.5,
+              "rectProfile": "narrow",
+              "slotProfile": "two",
+              "slots": 2
+            },
+            {
+              "id": "gadgets_only",
+              "accepts": [
+                "gadgets"
+              ],
+              "capacity": -1,
+              "x": 0.8333,
+              "y": 0.5,
+              "rectProfile": "narrow",
+              "slotProfile": "one",
+              "slots": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "levelId": "living_room_007",
+      "areaId": "house_living_room",
+      "purpose": "Set up family game night",
+      "instruction": "Put each item with its group",
+      "region": "Reading corner",
+      "finishMicroAction": "tray_settle",
+      "purposeProp": "breakfast_tray",
+      "canDefer": false,
+      "boards": [
+        {
+          "id": "a",
+          "required": true,
+          "template": "U",
+          "objects": [
+            "board_game",
+            "cushion",
+            "candle",
+            "mug",
+            "playing_cards",
+            "folded_blanket",
+            "photo_frame",
+            "plate"
+          ],
+          "targets": [
+            {
+              "id": "games_only",
+              "accepts": [
+                "games"
+              ],
+              "capacity": -1,
+              "x": 0.25,
+              "y": 0.25,
+              "rectProfile": "quad",
+              "slotProfile": "two",
+              "slots": 2
+            },
+            {
+              "id": "textiles_only",
+              "accepts": [
+                "textiles"
+              ],
+              "capacity": -1,
+              "x": 0.75,
+              "y": 0.25,
+              "rectProfile": "quad",
+              "slotProfile": "two",
+              "slots": 2
+            },
+            {
+              "id": "decor_only",
+              "accepts": [
+                "decor"
+              ],
+              "capacity": -1,
+              "x": 0.25,
+              "y": 0.75,
+              "rectProfile": "quad",
+              "slotProfile": "two",
+              "slots": 2
+            },
+            {
+              "id": "kitchenware_only",
+              "accepts": [
+                "kitchenware"
+              ],
+              "capacity": -1,
+              "x": 0.75,
+              "y": 0.75,
+              "rectProfile": "quad",
+              "slotProfile": "two",
+              "slots": 2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "levelId": "living_room_008",
+      "areaId": "house_living_room",
+      "purpose": "Finish the reading corner",
+      "instruction": "Put each item with its group",
+      "region": "Reading corner",
+      "finishMicroAction": "basket_alignment",
+      "purposeProp": "breakfast_tray",
+      "canDefer": false,
+      "boards": [
+        {
+          "id": "a",
+          "required": true,
+          "template": "U",
+          "objects": [
+            "book",
+            "cushion",
+            "candle",
+            "magazine",
+            "folded_blanket",
+            "succulent",
+            "newspaper"
+          ],
+          "targets": [
+            {
+              "id": "books_only",
+              "accepts": [
+                "books"
+              ],
+              "capacity": -1,
+              "x": 0.1667,
+              "y": 0.5,
+              "rectProfile": "narrow",
+              "slotProfile": "three_vertical",
+              "slots": 3
+            },
+            {
+              "id": "textiles_only",
+              "accepts": [
+                "textiles"
+              ],
+              "capacity": -1,
+              "x": 0.5,
+              "y": 0.5,
+              "rectProfile": "narrow",
+              "slotProfile": "two",
+              "slots": 2
+            },
+            {
+              "id": "decor_only",
+              "accepts": [
+                "decor"
+              ],
+              "capacity": -1,
+              "x": 0.8333,
+              "y": 0.5,
+              "rectProfile": "narrow",
+              "slotProfile": "two",
+              "slots": 2
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "categories": [
+    {
+      "id": "books",
+      "name": "Books & paper",
+      "color": "#D7A28E",
+      "icon": "book"
+    },
+    {
+      "id": "textiles",
+      "name": "Soft things",
+      "color": "#E8C9A0",
+      "icon": "cushion"
+    },
+    {
+      "id": "gadgets",
+      "name": "Gadgets",
+      "color": "#A9B8C6",
+      "icon": "remote"
+    },
+    {
+      "id": "decor",
+      "name": "Decor",
+      "color": "#B9D0B0",
+      "icon": "candle"
+    },
+    {
+      "id": "games",
+      "name": "Games & puzzles",
+      "color": "#C9B6E4",
+      "icon": "board_game"
+    },
+    {
+      "id": "glassware",
+      "name": "Glasses & jugs",
+      "color": "#BFDCE8",
+      "icon": "glass"
+    },
+    {
+      "id": "linens",
+      "name": "Table linens",
+      "color": "#F0C2B0",
+      "icon": "cloth_napkin"
+    }
+  ]
+}

@@ -1,0 +1,386 @@
+{
+  "levels": [
+    {
+      "levelId": "dining_room_001",
+      "areaId": "house_dining_room",
+      "purpose": "Clear the dining table",
+      "instruction": "Put each item with its group",
+      "region": "Table",
+      "finishMicroAction": "tray_settle",
+      "purposeProp": "prep_surface",
+      "canDefer": false,
+      "boards": [
+        {
+          "id": "a",
+          "required": true,
+          "template": "U",
+          "objects": [
+            "plate",
+            "glass",
+            "cloth_napkin",
+            "mug",
+            "water_jug",
+            "spoon"
+          ],
+          "targets": [
+            {
+              "id": "kitchenware_only",
+              "accepts": [
+                "kitchenware"
+              ],
+              "capacity": -1,
+              "x": 0.1667,
+              "y": 0.5,
+              "rectProfile": "narrow",
+              "slotProfile": "three_vertical",
+              "slots": 3
+            },
+            {
+              "id": "glassware_only",
+              "accepts": [
+                "glassware"
+              ],
+              "capacity": -1,
+              "x": 0.5,
+              "y": 0.5,
+              "rectProfile": "narrow",
+              "slotProfile": "two",
+              "slots": 2
+            },
+            {
+              "id": "linens_only",
+              "accepts": [
+                "linens"
+              ],
+              "capacity": -1,
+              "x": 0.8333,
+              "y": 0.5,
+              "rectProfile": "narrow",
+              "slotProfile": "one",
+              "slots": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "levelId": "dining_room_002",
+      "areaId": "house_dining_room",
+      "purpose": "Sort the sideboard",
+      "instruction": "Put each item with its group",
+      "region": "Table",
+      "finishMicroAction": "drawer_close",
+      "purposeProp": "utensil_drawer",
+      "canDefer": false,
+      "boards": [
+        {
+          "id": "a",
+          "required": true,
+          "template": "U",
+          "objects": [
+            "fork",
+            "placemat",
+            "candle",
+            "plate",
+            "cloth_napkin",
+            "bud_vase"
+          ],
+          "targets": [
+            {
+              "id": "kitchenware_only",
+              "accepts": [
+                "kitchenware"
+              ],
+              "capacity": -1,
+              "x": 0.1667,
+              "y": 0.5,
+              "rectProfile": "narrow",
+              "slotProfile": "two",
+              "slots": 2
+            },
+            {
+              "id": "linens_only",
+              "accepts": [
+                "linens"
+              ],
+              "capacity": -1,
+              "x": 0.5,
+              "y": 0.5,
+              "rectProfile": "narrow",
+              "slotProfile": "two",
+              "slots": 2
+            },
+            {
+              "id": "decor_only",
+              "accepts": [
+                "decor"
+              ],
+              "capacity": -1,
+              "x": 0.8333,
+              "y": 0.5,
+              "rectProfile": "narrow",
+              "slotProfile": "two",
+              "slots": 2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "levelId": "dining_room_003",
+      "areaId": "house_dining_room",
+      "purpose": "Share the sideboard shelf",
+      "instruction": "The cabinet holds two glasses \u00b7 the shelf is shared",
+      "region": "Sideboard",
+      "finishMicroAction": "tray_settle",
+      "purposeProp": "bottle_crate",
+      "canDefer": true,
+      "boards": [
+        {
+          "id": "a",
+          "required": true,
+          "template": "P1",
+          "objects": [
+            "glass",
+            "plate",
+            "water_jug",
+            "mug",
+            "glass",
+            "spoon"
+          ],
+          "targets": [
+            {
+              "id": "glassware_only",
+              "accepts": [
+                "glassware"
+              ],
+              "capacity": 2,
+              "x": 0.25,
+              "y": 0.5,
+              "rectProfile": "wide",
+              "slotProfile": "two",
+              "slots": 2
+            },
+            {
+              "id": "shared",
+              "accepts": [
+                "glassware",
+                "kitchenware"
+              ],
+              "capacity": 4,
+              "x": 0.75,
+              "y": 0.5,
+              "rectProfile": "wide",
+              "slotProfile": "four_square",
+              "slots": 4
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "levelId": "dining_room_004",
+      "areaId": "house_dining_room",
+      "purpose": "Fill the sideboard",
+      "instruction": "Put each item with its group",
+      "region": "Sideboard",
+      "finishMicroAction": "drawer_close",
+      "purposeProp": "utensil_drawer",
+      "canDefer": false,
+      "boards": [
+        {
+          "id": "a",
+          "required": true,
+          "template": "U",
+          "objects": [
+            "plate",
+            "glass",
+            "placemat",
+            "candle",
+            "fork",
+            "water_jug",
+            "cloth_napkin",
+            "bud_vase"
+          ],
+          "targets": [
+            {
+              "id": "kitchenware_only",
+              "accepts": [
+                "kitchenware"
+              ],
+              "capacity": -1,
+              "x": 0.25,
+              "y": 0.25,
+              "rectProfile": "quad",
+              "slotProfile": "two",
+              "slots": 2
+            },
+            {
+              "id": "glassware_only",
+              "accepts": [
+                "glassware"
+              ],
+              "capacity": -1,
+              "x": 0.75,
+              "y": 0.25,
+              "rectProfile": "quad",
+              "slotProfile": "two",
+              "slots": 2
+            },
+            {
+              "id": "linens_only",
+              "accepts": [
+                "linens"
+              ],
+              "capacity": -1,
+              "x": 0.25,
+              "y": 0.75,
+              "rectProfile": "quad",
+              "slotProfile": "two",
+              "slots": 2
+            },
+            {
+              "id": "decor_only",
+              "accepts": [
+                "decor"
+              ],
+              "capacity": -1,
+              "x": 0.75,
+              "y": 0.75,
+              "rectProfile": "quad",
+              "slotProfile": "two",
+              "slots": 2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "levelId": "dining_room_005",
+      "areaId": "house_dining_room",
+      "purpose": "Prepare the centrepiece",
+      "instruction": "Put each item with its group",
+      "region": "Dinner",
+      "finishMicroAction": "basket_alignment",
+      "purposeProp": "serving_cloth_tray",
+      "canDefer": false,
+      "boards": [
+        {
+          "id": "a",
+          "required": true,
+          "template": "U",
+          "objects": [
+            "bud_vase",
+            "placemat",
+            "candle",
+            "cloth_napkin",
+            "succulent"
+          ],
+          "targets": [
+            {
+              "id": "decor_only",
+              "accepts": [
+                "decor"
+              ],
+              "capacity": -1,
+              "x": 0.25,
+              "y": 0.5,
+              "rectProfile": "wide",
+              "slotProfile": "four_square",
+              "slots": 3
+            },
+            {
+              "id": "linens_only",
+              "accepts": [
+                "linens"
+              ],
+              "capacity": -1,
+              "x": 0.75,
+              "y": 0.5,
+              "rectProfile": "wide",
+              "slotProfile": "two",
+              "slots": 2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "levelId": "dining_room_006",
+      "areaId": "house_dining_room",
+      "purpose": "Dinner is served",
+      "instruction": "Put each item with its group",
+      "region": "Dinner",
+      "finishMicroAction": "tray_settle",
+      "purposeProp": "serving_cloth_tray",
+      "canDefer": false,
+      "boards": [
+        {
+          "id": "a",
+          "required": true,
+          "template": "U",
+          "objects": [
+            "plate",
+            "glass",
+            "cloth_napkin",
+            "bud_vase",
+            "plate",
+            "glass",
+            "cloth_napkin",
+            "candle"
+          ],
+          "targets": [
+            {
+              "id": "kitchenware_only",
+              "accepts": [
+                "kitchenware"
+              ],
+              "capacity": -1,
+              "x": 0.25,
+              "y": 0.25,
+              "rectProfile": "quad",
+              "slotProfile": "two",
+              "slots": 2
+            },
+            {
+              "id": "glassware_only",
+              "accepts": [
+                "glassware"
+              ],
+              "capacity": -1,
+              "x": 0.75,
+              "y": 0.25,
+              "rectProfile": "quad",
+              "slotProfile": "two",
+              "slots": 2
+            },
+            {
+              "id": "linens_only",
+              "accepts": [
+                "linens"
+              ],
+              "capacity": -1,
+              "x": 0.25,
+              "y": 0.75,
+              "rectProfile": "quad",
+              "slotProfile": "two",
+              "slots": 2
+            },
+            {
+              "id": "decor_only",
+              "accepts": [
+                "decor"
+              ],
+              "capacity": -1,
+              "x": 0.75,
+              "y": 0.75,
+              "rectProfile": "quad",
+              "slotProfile": "two",
+              "slots": 2
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+    "name": "SortEverything.Editor",
+    "rootNamespace": "SortEverything.Editor",
+    "references": ["SortEverything.Domain", "SortEverything.Runtime", "SortEverything.Presentation", "Unity.InputSystem", "UnityEngine.UI"],
+    "includePlatforms": ["Editor"],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
