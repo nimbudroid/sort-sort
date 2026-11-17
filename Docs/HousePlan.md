@@ -2,35 +2,49 @@
 
 This tracks the House-first amendment against what is built.
 
-## Built
+## Built: the two representative rooms the GDD asks to validate first
 
-- **House structure:** Home shows "Your House" with every room in order. Each room shows its saved overview, progress and actions; locked rooms say how they open. The scene list groups scenes by chapter.
-- **Living Room, Chapter 1 "Clear the Space"** (five scenes):
-  1. Tidy the sofa
-  2. Clear the coffee table (mugs and plates go "back to the kitchen")
-  3. Share the storage bench (optional planning puzzle with shared capacity)
-  4. Style the bookshelf
-  5. Make it cosy (composed finale: "The living room is cosy")
-- **New content for the room:**
-  - four categories: Books & paper, Soft things, Gadgets, Decor;
-  - 12 modeled 3D objects;
-  - room containers: blanket basket, bookshelf, media drawer, decor shelf, storage bench, back-to-kitchen tray;
-  - a rug, sage wallpaper and living room props.
-- **Opening the room:** the Living Room opens when Kitchen 5 (the breakfast corner milestone) is first completed. Existing saves that already qualify open it at boot. The result screen says "New room open".
-- **Room overview from the save:** each region is untidy, then gains a trace per completed scene, then shows its composed restored state. Chapters that aren't authored yet say "Coming later".
-- **House collection** grouped by room.
-- **Unchanged:** the Kitchen (20 scenes / 21 boards), its IDs, rules, saves and economy.
+**Room rules (data).** Every room after the Kitchen has three chapters and two formal milestones with unique IDs and explicit prerequisite scenes.
+- **Chapter recognition** (`chapter:<area>:<n>`): granted when the chapter's ordinary scenes are sorted and any planning puzzle in it is solved or left for later.
+- **Milestones:** the midpoint after Chapter 2, and the final one with the room.
+- **Area Ready** (`area_ready:<area>`): granted when every ordinary scene is sorted.
+- **What doesn't count:** planning puzzles never count toward milestones or Area Ready, and replays, coins and cosmetics never grant anything.
+- **Existing saves** catch up at boot.
+
+**Living Room: 8 scenes (3 + 3 + 2)**, opens after Kitchen 5.
+
+| Chapter | Scenes |
+|---|---|
+| 1 · Clear the Space | 1 Tidy the sofa; 2 Clear the coffee table; 3 Share the storage bench (planning) |
+| 2 · Make It Cosy | 4 Style the bookshelf; 5 Make it cosy (composed); 6 Sort the game shelf → midpoint milestone |
+| 3 · Family Time | 7 Set up family game night; 8 Finish the reading corner (composed) → final milestone + Living Room ready |
+
+**Dining Room: 6 scenes (2 + 2 + 2)**, opens after Kitchen 10.
+
+| Chapter | Scenes |
+|---|---|
+| 1 · Clear the Table | 1 Clear the dining table; 2 Sort the sideboard |
+| 2 · Set the Places | 3 Share the sideboard shelf (planning); 4 Fill the sideboard → midpoint milestone |
+| 3 · Dinner Is Served | 5 Prepare the centrepiece; 6 Dinner is served (composed two-place setting) → final milestone + Dining Room ready |
+
+**New objects:** 8 modeled 3D objects (board game, jigsaw, cards, glass, water jug, cloth napkin, placemat, bud vase) and three categories (Games & puzzles, Glasses & jugs, Table linens). The Dining Room reuses the Kitchen's plates, mugs and cutlery.
+
+**The Dining Room's look:** terracotta wallpaper, a walnut table chosen for contrast, a sideboard, a pendant lamp, a glass cabinet and a linen basket.
+
+**Unchanged:** the Kitchen (20 scenes / 21 boards), its IDs, rules, saves, economy and four milestones.
+
+**Next:** play these two rooms with fresh players before producing the other 7 rooms (GDD §11).
 
 ## Decisions needed
 
 1. **Coins for new rooms.** Living Room scenes grant **0 coins**. The GDD says later milestones need a separately authored economy, and the amendment forbids new currencies. Choose a per-scene coin amount, or keep 0.
 2. **When rooms open.** Living Room opens after Kitchen 5. The amendment says "meaningful progress"; confirm this, or choose another milestone.
 3. **Lessons in new rooms.** The planning lesson (shared space) still demonstrates with kitchen produce. A room-themed demo could follow.
-4. **Room milestones and rewards** (Room Ready, keepsakes, House finale) are not implemented. They touch progression and save IDs, so they need agreement first.
+4. **Milestone thresholds:** room milestones are recorded but unlock nothing. GDD §7 asks for the global threshold and destination balance to be reviewed separately.
+5. **Not yet:** room keepsakes and the House Ready finale (needs all ten rooms).
 
 ## Planned (from the amendment), not built
 
-- Living Room chapters 2–3 (Make It Cosy, Family Time).
-- Bedroom, Kids' Room, Study, Home Garden (15 scenes each); Dining Room, Bathroom, Laundry Room, Garage (10 each).
+- Bedroom, Kids' Room, Home Garden (8 scenes each); Attic Study (`house_attic_study`), Bathroom, Laundry Room, Garage (6 each).
 - New task types beyond Sort and Spatial planning: Arrange, Match, Group, Fold and stack, Complete a set. Each is a new rule shape in the existing evaluator and needs approval.
 - House finale; optional systems A–E (collections, little projects, mastery, personal touches, return experience).

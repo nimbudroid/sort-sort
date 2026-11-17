@@ -81,19 +81,17 @@
         {
           "name": "Clear the Space",
           "from": 1,
-          "to": 5
+          "to": 3
         },
         {
           "name": "Make It Cosy",
-          "from": 6,
-          "to": 10,
-          "planned": true
+          "from": 4,
+          "to": 6
         },
         {
           "name": "Family Time",
-          "from": 11,
-          "to": 15,
-          "planned": true
+          "from": 7,
+          "to": 8
         }
       ],
       "containerOverrides": [
@@ -105,9 +103,9 @@
       "sharedArchetype": "storage_bench",
       "regions": [
         {
-          "name": "Sofa & shelves",
+          "name": "Sofa corner",
           "from": 1,
-          "to": 5,
+          "to": 3,
           "furniture": [
             "sofa",
             "floor_lamp"
@@ -115,8 +113,8 @@
           "restored": [
             "cushion",
             "folded_blanket",
-            "book",
-            "candle"
+            "remote",
+            "book"
           ],
           "clutter": [
             "newspaper",
@@ -126,29 +124,191 @@
           ]
         },
         {
-          "name": "Cosy corner",
-          "from": 6,
-          "to": 10,
+          "name": "Cosy shelves",
+          "from": 4,
+          "to": 6,
           "furniture": [
             "armchair"
           ],
-          "restored": [],
+          "restored": [
+            "candle",
+            "succulent",
+            "board_game",
+            "photo_frame"
+          ],
           "clutter": [
             "magazine",
-            "headphones"
+            "headphones",
+            "playing_cards"
           ]
         },
         {
-          "name": "Family time",
-          "from": 11,
-          "to": 15,
+          "name": "Reading corner",
+          "from": 7,
+          "to": 8,
           "furniture": [
             "wall_art"
           ],
-          "restored": [],
+          "restored": [
+            "book",
+            "magazine",
+            "candle",
+            "cushion"
+          ],
           "clutter": [
             "game_controller",
             "plate"
+          ]
+        }
+      ],
+      "milestones": [
+        {
+          "id": "house_living_room_midpoint",
+          "name": "Living Room half restored",
+          "prerequisites": [
+            "living_room_001",
+            "living_room_002",
+            "living_room_004",
+            "living_room_005",
+            "living_room_006"
+          ]
+        },
+        {
+          "id": "house_living_room_restored",
+          "name": "Living Room restored",
+          "prerequisites": [
+            "living_room_001",
+            "living_room_002",
+            "living_room_004",
+            "living_room_005",
+            "living_room_006",
+            "living_room_007",
+            "living_room_008"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "house_dining_room",
+      "name": "Dining Room",
+      "order": 2,
+      "tagline": "Set a welcoming table",
+      "unlockAfterLevel": "kitchen_010",
+      "unlockText": "Restore the pantry corner (Kitchen 10) to open the Dining Room.",
+      "surface": "butcher_block",
+      "surfaceColor": "#6B4A36",
+      "surfaceTint": "#FFFFFF",
+      "wall": "wallpaper_terracotta",
+      "cabinet": "#C9B49A",
+      "cabinetShade": "#A8927A",
+      "lip": "#4A3426",
+      "mess": {
+        "enabled": true,
+        "density": 0.8,
+        "decals": [
+          "crumbs",
+          "ring",
+          "drip"
+        ]
+      },
+      "levelMess": [],
+      "chapters": [
+        {
+          "name": "Clear the Table",
+          "from": 1,
+          "to": 2
+        },
+        {
+          "name": "Set the Places",
+          "from": 3,
+          "to": 4
+        },
+        {
+          "name": "Dinner Is Served",
+          "from": 5,
+          "to": 6
+        }
+      ],
+      "containerOverrides": [
+        {
+          "category": "kitchenware",
+          "archetype": "sideboard_drawer"
+        }
+      ],
+      "sharedArchetype": "sideboard_drawer",
+      "regions": [
+        {
+          "name": "Table",
+          "from": 1,
+          "to": 2,
+          "furniture": [
+            "dining_table"
+          ],
+          "restored": [
+            "plate",
+            "glass",
+            "cloth_napkin"
+          ],
+          "clutter": [
+            "mug",
+            "newspaper",
+            "spoon"
+          ]
+        },
+        {
+          "name": "Sideboard",
+          "from": 3,
+          "to": 4,
+          "furniture": [
+            "sideboard"
+          ],
+          "restored": [
+            "water_jug",
+            "placemat",
+            "bud_vase"
+          ],
+          "clutter": [
+            "fork",
+            "glass"
+          ]
+        },
+        {
+          "name": "Dinner",
+          "from": 5,
+          "to": 6,
+          "furniture": [
+            "pendant_lamp"
+          ],
+          "restored": [
+            "candle",
+            "plate",
+            "glass"
+          ],
+          "clutter": [
+            "placemat",
+            "cloth_napkin"
+          ]
+        }
+      ],
+      "milestones": [
+        {
+          "id": "house_dining_room_midpoint",
+          "name": "Dining Room half restored",
+          "prerequisites": [
+            "dining_room_001",
+            "dining_room_002",
+            "dining_room_004"
+          ]
+        },
+        {
+          "id": "house_dining_room_restored",
+          "name": "Dining Room restored",
+          "prerequisites": [
+            "dining_room_001",
+            "dining_room_002",
+            "dining_room_004",
+            "dining_room_005",
+            "dining_room_006"
           ]
         }
       ]

@@ -71,6 +71,18 @@ namespace SortEverything.Runtime
         public static IEnumerable<KeyValuePair<string, string>> AreaUnlocks =>
             Areas.areas.Where(a => !string.IsNullOrEmpty(a.unlockAfterLevel)).Select(a => new KeyValuePair<string, string>(a.id, a.unlockAfterLevel));
 
+        /// <summary>Chapter and milestone rules of every data room (the Kitchen keeps its GDD anchors).</summary>
+        public static IEnumerable<RoomRules> RoomRules => Areas.areas.Where(a => a.id != KitchenCatalogue.AreaId).Select(a => new RoomRules
+        {
+            AreaId = a.id,
+            Chapters = a.chapters.Where(c => !c.planned).Select(c => (c.from, c.to)).ToList(),
+            HasPlannedChapters = a.chapters.Any(c => c.planned),
+            Milestones = a.milestones.Select(m => (m.id, m.prerequisites ?? System.Array.Empty<string>())).ToList(),
+        });
+
+        /// <summary>The installed House catalogue (Kitchen + data rooms, unlocks and room rules).</summary>
+        public static Catalogue House(string profileId) => Catalogue.CreateHouse(profileId, DataLevels, AreaUnlocks, RoomRules);
+
         /// <summary>Display names from data (categories, objects, rooms) join the string table once.</summary>
         public static void RegisterStrings()
         {

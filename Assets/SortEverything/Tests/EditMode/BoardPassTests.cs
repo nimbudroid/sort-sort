@@ -170,11 +170,12 @@ namespace SortEverything.Tests
         [Test]
         public void House_LivingRoom_OpensAfterKitchen5_NumbersFromOne_AndKeepsTheEconomy()
         {
-            var cat = Catalogue.CreateHouse("kitchen_20", ContentDb.DataLevels, ContentDb.AreaUnlocks);
+            var cat = ContentDb.House("kitchen_20");
             var room = cat.InstalledInArea("house_living_room");
-            Assert.AreEqual(5, room.Count, "Living Room chapter 1 has five scenes");
-            CollectionAssert.AreEqual(new[] { 1, 2, 3, 4, 5 }, room.Select(l => l.OrdinalInArea).ToArray());
-            Assert.IsTrue(room.All(l => l.FirstCompletionCoins == 0 && string.IsNullOrEmpty(l.ProjectAnchorId)), "no new economy without an approved proposal");
+            Assert.AreEqual(8, room.Count, "Living Room is an eight-scene room");
+            CollectionAssert.AreEqual(Enumerable.Range(1, 8).ToArray(), room.Select(l => l.OrdinalInArea).ToArray());
+            Assert.AreEqual(6, cat.InstalledInArea("house_dining_room").Count, "Dining Room is a six-scene room");
+            Assert.IsTrue(cat.Levels.Where(l => l.AreaId != KitchenCatalogue.AreaId).All(l => l.FirstCompletionCoins == 0 && string.IsNullOrEmpty(l.ProjectAnchorId)), "no new economy without an approved proposal");
             Assert.AreEqual("living_room_002", room[0].PreviewLevelId);
             Assert.AreEqual(20, cat.InstalledInArea(KitchenCatalogue.AreaId).Count, "the Kitchen is unchanged");
 
@@ -186,7 +187,39 @@ namespace SortEverything.Tests
             Assert.IsEmpty(Progression.UnlockAreas(save, cat), "idempotent");
             Assert.IsTrue(Progression.IsAvailable(save, cat, room[0]));
             Assert.IsFalse(Progression.IsAvailable(save, cat, room[1]), "rooms progress scene by scene");
-            foreach (var l in room) Assert.IsNotNull(Solver.Solve(l.RequiredBoard).Allocation, l.LevelId);
+            foreach (var l in cat.Levels.Where(l => l.AreaId != KitchenCatalogue.AreaId)) Assert.IsNotNull(Solver.Solve(l.RequiredBoard).Allocation, l.LevelId);
+        }
+
+        [Test]
+        public void House_Chapters_Milestones_AndAreaReady_ComeOnlyFromSeals_AndNeverFromPlanning()
+        {
+            var cat = ContentDb.House("kitchen_20");
+            var save = SaveFactory.Create("p");
+            void Seal(params int[] n) { foreach (var i in n) save.seals.Add($"living_room_{i:000}"); }
+
+            Seal(1, 2);
+            var f = Progression.ApplyHouseProgress(save, cat);
+            Assert.IsEmpty(f.ChaptersCompleted, "chapter 1 waits for its planning puzzle to be solved or left for later");
+            save.deferredLevelIds.Add("living_room_003");
+            f = Progression.ApplyHouseProgress(save, cat);
+            CollectionAssert.AreEqual(new[] { Progression.ChapterId("house_living_room", 1) }, f.ChaptersCompleted);
+            Assert.IsEmpty(Progression.ApplyHouseProgress(save, cat).ChaptersCompleted, "granted once");
+
+            Seal(4, 5, 6);
+            f = Progression.ApplyHouseProgress(save, cat);
+            CollectionAssert.Contains(f.ChaptersCompleted, Progression.ChapterId("house_living_room", 2));
+            CollectionAssert.AreEqual(new[] { "house_living_room_midpoint" }, f.MilestonesEarned, "midpoint after chapter 2, without the planning puzzle");
+            Assert.IsEmpty(f.AreasReady);
+
+            Seal(7, 8);
+            f = Progression.ApplyHouseProgress(save, cat);
+            CollectionAssert.AreEqual(new[] { "house_living_room_restored" }, f.MilestonesEarned);
+            CollectionAssert.AreEqual(new[] { "house_living_room" }, f.AreasReady, "Area Ready without the optional planning puzzle");
+            Assert.IsTrue(save.recognitions.Contains(Progression.AreaReadyId("house_living_room")));
+            var again = Progression.ApplyHouseProgress(save, cat);
+            Assert.IsEmpty(again.MilestonesEarned.Concat(again.AreasReady).Concat(again.ChaptersCompleted), "replays and reboots add nothing");
+            Assert.AreEqual(0, save.wallet, "room progress grants no coins");
+            Assert.IsFalse(save.journeyMilestoneIds.Any(id => id.StartsWith("house_dining")), "other rooms untouched");
         }
 
         [Test]

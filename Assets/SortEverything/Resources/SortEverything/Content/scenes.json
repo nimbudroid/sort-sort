@@ -217,6 +217,215 @@
           }
         ]
       }
+    },
+    {
+      "levelId": "living_room_008",
+      "family": "ARRANGE",
+      "arrivalLine": "One last corner: somewhere to read.",
+      "backsplashShare": 0.27,
+      "light": "morning",
+      "wallProps": [
+        {
+          "prop": "window_morning",
+          "x": 0.26,
+          "y": 0.5,
+          "size": 0.98
+        },
+        {
+          "prop": "floor_lamp",
+          "x": 0.62,
+          "y": 0.55,
+          "size": 1.0
+        },
+        {
+          "prop": "wall_art",
+          "x": 0.88,
+          "y": 0.42,
+          "size": 0.5
+        }
+      ],
+      "composition": {
+        "title": "The living room is ready",
+        "subtitle": "A reading corner with a stack of books, a soft throw and a candle \u2014 the whole room restored.",
+        "tray": "coffee_table",
+        "cloth": "",
+        "x": 0.5,
+        "y": 0.56,
+        "w": 0.9,
+        "h": 0.66,
+        "groups": [
+          {
+            "target": "textiles_only",
+            "mode": "container",
+            "x": 0.2,
+            "y": 0.56,
+            "scale": 0.62
+          },
+          {
+            "target": "books_only",
+            "mode": "items",
+            "itemScale": 0.7,
+            "spots": [
+              {
+                "x": 0.46,
+                "y": 0.3
+              },
+              {
+                "x": 0.58,
+                "y": 0.3
+              },
+              {
+                "x": 0.52,
+                "y": 0.7
+              }
+            ]
+          },
+          {
+            "target": "decor_only",
+            "mode": "items",
+            "itemScale": 0.75,
+            "spots": [
+              {
+                "x": 0.8,
+                "y": 0.3
+              },
+              {
+                "x": 0.84,
+                "y": 0.7
+              }
+            ]
+          }
+        ],
+        "props": [
+          {
+            "prop": "tea_cup",
+            "x": 0.68,
+            "y": 0.72,
+            "size": 0.28
+          }
+        ]
+      }
+    },
+    {
+      "levelId": "dining_room_001",
+      "family": "RESTORE",
+      "arrivalLine": "Guests are coming for dinner tonight.",
+      "backsplashShare": 0.27,
+      "light": "morning",
+      "wallProps": [
+        {
+          "prop": "window_morning",
+          "x": 0.22,
+          "y": 0.5,
+          "size": 0.98
+        },
+        {
+          "prop": "pendant_lamp",
+          "x": 0.55,
+          "y": 0.3,
+          "size": 0.7
+        },
+        {
+          "prop": "wall_art",
+          "x": 0.85,
+          "y": 0.42,
+          "size": 0.55
+        }
+      ]
+    },
+    {
+      "levelId": "dining_room_006",
+      "family": "PREPARE",
+      "arrivalLine": "Last places to set \u2014 dinner is almost ready.",
+      "backsplashShare": 0.27,
+      "light": "morning",
+      "wallProps": [
+        {
+          "prop": "pendant_lamp",
+          "x": 0.5,
+          "y": 0.3,
+          "size": 0.7
+        },
+        {
+          "prop": "window_morning",
+          "x": 0.82,
+          "y": 0.5,
+          "size": 0.9
+        }
+      ],
+      "composition": {
+        "title": "Dinner is served",
+        "subtitle": "Two places set with plates, glasses and napkins, flowers and a candle in the middle \u2014 the dining room is restored.",
+        "tray": "dining_table",
+        "cloth": "",
+        "x": 0.5,
+        "y": 0.56,
+        "w": 0.94,
+        "h": 0.7,
+        "groups": [
+          {
+            "target": "kitchenware_only",
+            "mode": "items",
+            "itemScale": 0.8,
+            "spots": [
+              {
+                "x": 0.22,
+                "y": 0.62
+              },
+              {
+                "x": 0.78,
+                "y": 0.62
+              }
+            ]
+          },
+          {
+            "target": "glassware_only",
+            "mode": "items",
+            "itemScale": 0.75,
+            "spots": [
+              {
+                "x": 0.36,
+                "y": 0.3
+              },
+              {
+                "x": 0.64,
+                "y": 0.3
+              }
+            ]
+          },
+          {
+            "target": "linens_only",
+            "mode": "items",
+            "itemScale": 0.7,
+            "spots": [
+              {
+                "x": 0.08,
+                "y": 0.66
+              },
+              {
+                "x": 0.92,
+                "y": 0.66
+              }
+            ]
+          },
+          {
+            "target": "decor_only",
+            "mode": "items",
+            "itemScale": 0.8,
+            "spots": [
+              {
+                "x": 0.46,
+                "y": 0.5
+              },
+              {
+                "x": 0.56,
+                "y": 0.56
+              }
+            ]
+          }
+        ],
+        "props": []
+      }
     }
   ]
 }

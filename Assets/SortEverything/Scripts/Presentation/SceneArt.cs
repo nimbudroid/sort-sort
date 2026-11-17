@@ -20,6 +20,7 @@ namespace SortEverything.Presentation
         {
             "window_morning", "wall_shelf", "toast_plate", "jam_jar", "flower_vase", "napkin",
             "sofa", "floor_lamp", "wall_art", "armchair", "popcorn_bowl", "tea_cup",
+            "dining_table", "sideboard", "pendant_lamp",
             "window", "stove", "pantry_shelf", "plate_shelf", "table", "plant", "rail", "basket",
         };
 
@@ -165,6 +166,25 @@ namespace SortEverything.Presentation
                     c.Ellipse(64, 52, 20, 5, 0, H("#B57A43"));
                     c.Ring(88, 66, 8, 2.5f, H("#F3EBDD"));
                     c.Shade = false; c.RoundRect(64, 68, 18, 2, 1, 0, H("#7FA0C9"), outline: false);
+                    break;
+                case "dining_table":
+                    c.RoundRect(64, 62, 58, 9, 4, 0, H("#6B4A36"));
+                    c.RoundRect(18, 90, 5, 26, 2, 0, H("#5E4030")); c.RoundRect(110, 90, 5, 26, 2, 0, H("#5E4030"));
+                    c.RoundRect(64, 56, 54, 3, 2, 0, H("#F6EFE3"), outline: false);
+                    c.RoundRect(30, 40, 9, 16, 4, 0, H("#9DB5C8")); c.RoundRect(98, 40, 9, 16, 4, 0, H("#9DB5C8")); // chair backs
+                    break;
+                case "sideboard":
+                    c.RoundRect(64, 78, 56, 30, 5, 0, H("#7C5A44"));
+                    c.RoundRect(42, 80, 20, 22, 3, 0, H("#8E6A52")); c.RoundRect(86, 80, 20, 22, 3, 0, H("#8E6A52"));
+                    c.Circle(56, 80, 2.5f, H("#D2AE62")); c.Circle(72, 80, 2.5f, H("#D2AE62"));
+                    c.RoundRect(20, 112, 3, 6, 1, 0, H("#4A3426")); c.RoundRect(108, 112, 3, 6, 1, 0, H("#4A3426"));
+                    c.Capsule(40, 44, 40, 34, 6, H("#BFDDEA")); c.Ellipse(86, 44, 12, 4, 0, H("#F3EBDD"));
+                    break;
+                case "pendant_lamp":
+                    c.Capsule(64, 0, 64, 52, 1.5f, H("#3E3A36"));
+                    c.Gloss = 0.55f;
+                    c.Custom((x, y) => Mathf.Max(Mathf.Sqrt((x - 64) * (x - 64) / 1100f + (y - 84) * (y - 84) / 900f) * 30 - 30, 84 - y - 30 > 0 ? 84 - y - 30 : -1f), H("#E9C46A"), true, 30, 54, 98, 86);
+                    c.Shade = false; c.Ellipse(64, 86, 30, 5, 0, new Color(1f, 0.96f, 0.8f, 0.95f), outline: false);
                     break;
                 default:
                     return KitchenArt.Prop(id);

@@ -194,6 +194,81 @@
       "lipShare": 0.12,
       "backSprite": "",
       "frontSprite": ""
+    },
+    {
+      "id": "game_cupboard",
+      "label": "Game cupboard",
+      "style": "drawer",
+      "body": "#5E8C7A",
+      "inner": "#D7E8DF",
+      "accent": "#4A7363",
+      "light": "#F3FFF9",
+      "pattern": "",
+      "fillLayout": "grid",
+      "sound": "wood",
+      "lipShare": 0.18,
+      "backSprite": "",
+      "frontSprite": ""
+    },
+    {
+      "id": "glass_cabinet",
+      "label": "Glass cabinet",
+      "style": "fridge",
+      "body": "#E6E1D8",
+      "inner": "#D9ECF2",
+      "accent": "#9FC3D6",
+      "light": "#F7FDFF",
+      "pattern": "",
+      "fillLayout": "grid",
+      "sound": "glass",
+      "lipShare": 0.24,
+      "backSprite": "",
+      "frontSprite": ""
+    },
+    {
+      "id": "linen_basket",
+      "label": "Linen basket",
+      "style": "basket",
+      "body": "#E4D7BF",
+      "inner": "#F6EFE2",
+      "accent": "#BCA987",
+      "light": "#FFFDF6",
+      "pattern": "weave",
+      "fillLayout": "grid",
+      "sound": "wicker",
+      "lipShare": 0.2,
+      "backSprite": "",
+      "frontSprite": ""
+    },
+    {
+      "id": "sideboard_drawer",
+      "label": "Sideboard drawer",
+      "style": "drawer",
+      "body": "#5E4434",
+      "inner": "#D9BC98",
+      "accent": "#4A3426",
+      "light": "#FFF2DE",
+      "pattern": "",
+      "fillLayout": "grid",
+      "sound": "wood",
+      "lipShare": 0.18,
+      "backSprite": "",
+      "frontSprite": ""
+    },
+    {
+      "id": "dining_table",
+      "label": "Dining table",
+      "style": "tray",
+      "body": "#5E4434",
+      "inner": "#F6EFE3",
+      "accent": "#4A3426",
+      "light": "#FFF6E6",
+      "pattern": "",
+      "fillLayout": "grid",
+      "sound": "wood",
+      "lipShare": 0.1,
+      "backSprite": "",
+      "frontSprite": ""
     }
   ],
   "categoryArchetypes": [
@@ -228,6 +303,18 @@
     {
       "category": "decor",
       "archetype": "decor_shelf"
+    },
+    {
+      "category": "games",
+      "archetype": "game_cupboard"
+    },
+    {
+      "category": "glassware",
+      "archetype": "glass_cabinet"
+    },
+    {
+      "category": "linens",
+      "archetype": "linen_basket"
     }
   ],
   "sharedArchetype": "serving_tray"

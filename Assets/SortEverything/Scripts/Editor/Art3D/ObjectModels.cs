@@ -66,6 +66,9 @@ namespace SortEverything.Editor.Art3D
             // Living Room
             "book", "magazine", "newspaper", "cushion", "folded_blanket", "slipper",
             "remote", "game_controller", "headphones", "candle", "photo_frame", "succulent",
+            "board_game", "jigsaw_puzzle", "playing_cards",
+            // Dining Room
+            "glass", "water_jug", "cloth_napkin", "placemat", "bud_vase",
         };
 
         public static Model Build(string id)
@@ -695,6 +698,148 @@ namespace SortEverything.Editor.Art3D
                         }
                     P("rosette", Combine(leaves), Grad(Produce("#7DB58A", "#2E5A3E", 0.2f, 0.4f), "#E9A3A0", 0.45f, Vector3.up, 0.18f, 0.06f));
                     m.Pose = new Vector3(-12, 20, 0);
+                    break;
+                }
+
+                case "board_game":
+                {
+                    var lid = Paper("#3E7FB8", "#1C4A72"); lid.Spec = 0.18f; lid.Gloss = 0.4f;
+                    P("box", RoundedBox(new Vector3(0.86f, 0.13f, 0.86f), 0.03f, 8), lid);
+                    P("panel", Transform(RoundedBox(new Vector3(0.62f, 0.012f, 0.62f), 0.01f, 4), new Vector3(0, 0.068f, 0), Vector3.zero), Paper("#FFF4DE", "#C2A57E"));
+                    string[] cols = { "#E2483C", "#F2C53D", "#5FB55A", "#3B8EE0" };
+                    for (int c = 0; c < 4; c++)
+                    {
+                        var track = new List<Mesh>();
+                        for (int i = 0; i < 4; i++)
+                        {
+                            float t = -0.24f + i * 0.12f;
+                            Vector3 pos = c == 0 ? new Vector3(t, 0.078f, -0.24f) : c == 1 ? new Vector3(0.24f, 0.078f, t) : c == 2 ? new Vector3(-t, 0.078f, 0.24f) : new Vector3(-0.24f, 0.078f, -t);
+                            track.Add(Transform(RoundedBox(new Vector3(0.09f, 0.012f, 0.09f), 0.01f, 3), pos, Vector3.zero));
+                        }
+                        P("track" + c, Combine(track), Paper(cols[c], "#3A3A3A"));
+                    }
+                    P("pawn", Transform(Lathe(Smooth(new List<Vector2> { new Vector2(0f, 0f), new Vector2(0.06f, 0f), new Vector2(0.05f, 0.03f), new Vector2(0.03f, 0.08f), new Vector2(0.045f, 0.12f), new Vector2(0.03f, 0.155f), new Vector2(0f, 0.16f) }, 3), 32), new Vector3(0.05f, 0.075f, 0.02f), Vector3.zero), Plastic("#E2483C", "#7A1A12", 0.5f));
+                    var die = RoundedBox(new Vector3(0.11f, 0.11f, 0.11f), 0.03f, 4);
+                    P("die", Transform(die, new Vector3(-0.08f, 0.13f, 0.08f), new Vector3(0, 25, 0)), Plastic("#FFFFFF", "#B9B4AA", 0.35f));
+                    var pips = new List<Mesh> { Transform(Ellipsoid(new Vector3(0.013f, 0.006f, 0.013f)), new Vector3(-0.08f, 0.187f, 0.08f), Vector3.zero),
+                        Transform(Ellipsoid(new Vector3(0.012f, 0.006f, 0.012f)), new Vector3(-0.11f, 0.187f, 0.06f), Vector3.zero), Transform(Ellipsoid(new Vector3(0.012f, 0.006f, 0.012f)), new Vector3(-0.05f, 0.187f, 0.1f), Vector3.zero) };
+                    P("pips", Combine(pips), Plastic("#2A2A2E", "#000000"));
+                    m.Pose = new Vector3(-48, 22, 0);
+                    break;
+                }
+                case "jigsaw_puzzle":
+                {
+                    var lid = Paper("#E8B34A", "#94661A"); lid.Spec = 0.16f; lid.Gloss = 0.4f;
+                    P("box", RoundedBox(new Vector3(0.82f, 0.14f, 0.6f), 0.03f, 8), lid);
+                    List<Vector2> Piece(float s0)
+                    {
+                        var o = new List<Vector2>();
+                        void Edge(Vector2 a, Vector2 b, float knob)
+                        {
+                            for (int i = 0; i < 16; i++)
+                            {
+                                float t = i / 16f;
+                                var p = Vector2.Lerp(a, b, t);
+                                var nrm = new Vector2(-(b - a).y, (b - a).x).normalized;
+                                float bump = Mathf.Exp(-Mathf.Pow((t - 0.5f) / 0.12f, 2)) * knob;
+                                o.Add(p + nrm * bump);
+                            }
+                        }
+                        Edge(new Vector2(-s0, -s0), new Vector2(s0, -s0), -0.35f * s0);
+                        Edge(new Vector2(s0, -s0), new Vector2(s0, s0), -0.35f * s0);
+                        Edge(new Vector2(s0, s0), new Vector2(-s0, s0), 0.25f * s0);
+                        Edge(new Vector2(-s0, s0), new Vector2(-s0, -s0), 0.3f * s0);
+                        return o;
+                    }
+                    P("emblem", Transform(Extrude(Piece(0.13f), 0.02f, 0.3f), new Vector3(0, 0.078f, 0), new Vector3(90, 0, 0)), Paper("#3E9C8C", "#1A5A50"));
+                    P("loosePiece", Transform(Extrude(Piece(0.075f), 0.03f, 0.35f), new Vector3(0.38f, 0.0f, -0.36f), new Vector3(90, 30, 0)), Paper("#E87A8C", "#8A2A3A"));
+                    m.Pose = new Vector3(-46, -22, 0);
+                    break;
+                }
+                case "playing_cards":
+                {
+                    var cards = new List<Mesh>(); var marks = new List<Mesh>();
+                    for (int i = 0; i < 5; i++)
+                    {
+                        float ang = -24f + i * 12f;
+                        var rot = Quaternion.Euler(0, ang, 0);
+                        var basePos = new Vector3(0, i * 0.012f, -0.32f);
+                        var center = rot * new Vector3(0, 0, 0.3f) + basePos;
+                        cards.Add(Transform(RoundedBox(new Vector3(0.34f, 0.01f, 0.48f), 0.004f, 3), center, rot, Vector3.one));
+                        var mark = i % 2 == 0 ? Extrude(Circle2(0.045f, 4), 0.012f, 0.3f) : Extrude(Drop2(0.05f), 0.012f, 0.3f);
+                        marks.Add(Transform(mark, rot * new Vector3(0.0f, 0.009f, 0.42f) + basePos, rot * Quaternion.Euler(90, 0, i % 2 == 0 ? 45 : 180), Vector3.one));
+                    }
+                    P("cards", Combine(cards), Paper("#F7F4EC", "#B9B2A4"));
+                    P("marks", Combine(marks), Paper("#D23A3A", "#7A1414"));
+                    m.Pose = new Vector3(-52, 0, 0);
+                    break;
+                }
+                case "glass":
+                {
+                    var glassMat = Plastic("#E3F2F7", "#8FB5C4", 0.75f); glassMat.Gloss = 0.95f; glassMat.Rim = 0.65f; glassMat.Alpha = 0.34f; glassMat.Wrap = 0.2f;
+                    P("glass", Lathe(Smooth(new List<Vector2> { new Vector2(0f, -0.5f), new Vector2(0.24f, -0.5f), new Vector2(0.255f, -0.47f), new Vector2(0.29f, 0.45f), new Vector2(0.28f, 0.48f), new Vector2(0.262f, 0.46f), new Vector2(0.23f, -0.38f), new Vector2(0f, -0.4f) }, 5), 72), glassMat);
+                    P("water", Lathe(new List<Vector2> { new Vector2(0f, -0.39f), new Vector2(0.228f, -0.39f), new Vector2(0.25f, 0.12f), new Vector2(0f, 0.12f) }, 64), new Mat { Base = H("#9FD4F0"), Shade = H("#4F8FB8"), Spec = 0.4f, Gloss = 0.8f, Rim = 0.3f, Wrap = 0.2f, Alpha = 0.32f });
+                    m.Pose = new Vector3(-12, 0, 0);
+                    break;
+                }
+                case "water_jug":
+                {
+                    var glassMat = Plastic("#E3F2F7", "#8FB5C4", 0.75f); glassMat.Gloss = 0.95f; glassMat.Rim = 0.6f; glassMat.Alpha = 0.36f; glassMat.Wrap = 0.2f;
+                    Func<float, float, float> spout = (a, t) => 1f + 0.22f * Mathf.Pow(Mathf.Max(0, Mathf.Cos(a * Mathf.PI * 2f)), 6f) * Mathf.Pow(Mathf.Clamp01((t - 0.75f) / 0.25f), 2f);
+                    P("jug", Lathe(Smooth(new List<Vector2> { new Vector2(0f, -0.55f), new Vector2(0.24f, -0.55f), new Vector2(0.28f, -0.48f), new Vector2(0.3f, -0.1f), new Vector2(0.24f, 0.25f), new Vector2(0.22f, 0.45f), new Vector2(0.24f, 0.52f), new Vector2(0.225f, 0.5f), new Vector2(0.2f, 0.3f), new Vector2(0.26f, -0.1f), new Vector2(0.23f, -0.45f), new Vector2(0f, -0.47f) }, 5), 72,
+                        (a, t) => t < 0.55f ? spout(a, t / 0.55f) : 1f), glassMat);
+                    P("water", Lathe(new List<Vector2> { new Vector2(0f, -0.46f), new Vector2(0.22f, -0.46f), new Vector2(0.26f, -0.1f), new Vector2(0.235f, 0.08f), new Vector2(0f, 0.08f) }, 64), new Mat { Base = H("#9FD4F0"), Shade = H("#4F8FB8"), Spec = 0.4f, Gloss = 0.8f, Rim = 0.3f, Wrap = 0.2f, Alpha = 0.34f });
+                    P("handle", Tube(Bezier(new Vector3(-0.24f, 0.35f, 0), new Vector3(-0.5f, 0.35f, 0), new Vector3(-0.48f, -0.15f, 0), new Vector3(-0.28f, -0.2f, 0), 24), t => 0.045f, 18, null, 0.8f, Vector3.forward), glassMat);
+                    m.Pose = new Vector3(-10, 160, 0);
+                    break;
+                }
+                case "cloth_napkin":
+                {
+                    var linen = Fabric("#E58B6E", "#8A3E28");
+                    var folded = Warp(RoundedBox(new Vector3(0.62f, 0.07f, 0.62f), 0.03f, 10), v => new Vector3(v.x, v.y - 0.04f * (v.x * v.x + v.z * v.z) * 2f, v.z));
+                    P("napkin", Transform(folded, new Vector3(0, -0.03f, 0), new Vector3(0, 45, 0)), linen);
+                    var top = Warp(Extrude(new List<Vector2> { new Vector2(-0.3f, -0.3f), new Vector2(0.3f, -0.3f), new Vector2(-0.3f, 0.3f) }.SelectMany((p, i) => new[] { p }).ToList(), 0.05f, 0.4f), v => v);
+                    P("fold", Transform(top, new Vector3(0, 0.035f, 0), new Vector3(90, 45, 0)), linen);
+                    var border = new List<Mesh>();
+                    for (int i = 0; i < 4; i++) border.Add(Transform(RoundedBox(new Vector3(0.6f, 0.012f, 0.025f), 0.008f, 3), Quaternion.Euler(0, 45 + i * 90, 0) * new Vector3(0, 0.012f, 0.26f), Quaternion.Euler(0, 45 + i * 90, 0), Vector3.one));
+                    P("stitch", Combine(border), Fabric("#FFF3E8", "#C9B3A2"));
+                    var ring = new List<Vector3>();
+                    for (int i = 0; i <= 40; i++) { float a = i / 40f * Mathf.PI * 2f; ring.Add(new Vector3(Mathf.Cos(a) * 0.075f, 0.06f + Mathf.Sin(a) * 0.075f, 0)); }
+                    P("napkinRing", Transform(Tube(ring, t => 0.022f, 14, null, 1f, Vector3.forward, false), new Vector3(0.05f, 0, -0.05f), new Vector3(0, 45, 0)), Metal("#D2AE62", 0.6f));
+                    m.Pose = new Vector3(-50, 10, 0);
+                    break;
+                }
+                case "placemat":
+                {
+                    var oval = new List<Vector2>();
+                    for (int i = 0; i < 64; i++) { float a = i / 64f * Mathf.PI * 2f; oval.Add(new Vector2(Mathf.Cos(a) * 0.5f, Mathf.Sin(a) * 0.36f)); }
+                    P("mat", Transform(Extrude(oval, 0.035f, 0.4f), Vector3.zero, new Vector3(90, 0, 0)), Fabric("#D8A65A", "#80561C"));
+                    var rings = new List<Mesh>();
+                    for (int r = 1; r <= 4; r++)
+                    {
+                        float k = r / 5f;
+                        var path = new List<Vector3>();
+                        for (int i = 0; i <= 64; i++) { float a = i / 64f * Mathf.PI * 2f; path.Add(new Vector3(Mathf.Cos(a) * 0.5f * k, 0.018f, Mathf.Sin(a) * 0.36f * k)); }
+                        rings.Add(Tube(path, t => 0.012f, 8, null, 1f, Vector3.up, false));
+                    }
+                    P("weave", Combine(rings), Fabric("#C48E44", "#6E4614"));
+                    m.Pose = new Vector3(-58, 0, 0);
+                    break;
+                }
+                case "bud_vase":
+                {
+                    P("vase", Lathe(Smooth(new List<Vector2> { new Vector2(0f, -0.48f), new Vector2(0.15f, -0.48f), new Vector2(0.22f, -0.38f), new Vector2(0.22f, -0.2f), new Vector2(0.12f, -0.02f), new Vector2(0.07f, 0.08f), new Vector2(0.085f, 0.13f), new Vector2(0.06f, 0.12f), new Vector2(0f, 0.1f) }, 5), 64), Ceramic("#F2F0EC", "#A8A196"));
+                    P("band", Lathe(new List<Vector2> { new Vector2(0.222f, -0.32f), new Vector2(0.222f, -0.27f) }, 64), Ceramic("#7FA6C8", "#3E6688"));
+                    P("stem", Tube(Bezier(new Vector3(0, 0.08f, 0), new Vector3(0.0f, 0.25f, 0), new Vector3(0.03f, 0.38f, 0), new Vector3(0.05f, 0.46f, 0), 16), t => 0.016f, 10), Leafy("#5E9A3E", "#2E5A1E"));
+                    P("leaf", Transform(Leaf(0.2f, 0.07f, 0.15f, 0.01f), new Vector3(0.01f, 0.22f, 0), new Vector3(0, 30, 35)), Leafy());
+                    var bloom = Warp(Sphere(1f, 24, 32), v =>
+                    {
+                        float ph = Mathf.Atan2(v.z, v.x);
+                        float petals = 1f + 0.12f * Mathf.Cos(3 * ph) * Mathf.Clamp01(v.y + 0.3f);
+                        return new Vector3(v.x * 0.075f * petals, v.y * 0.1f + (v.y > 0.7f ? -0.02f : 0), v.z * 0.075f * petals);
+                    });
+                    P("tulip", Transform(bloom, new Vector3(0.05f, 0.53f, 0), new Vector3(0, 0, -8)), Grad(Produce("#F08AA5", "#A8325A", 0.3f, 0.6f), "#F7C3D2", 0.5f, Vector3.up, 0.0f, 0.1f));
+                    m.Pose = new Vector3(0, 20, 0);
                     break;
                 }
 

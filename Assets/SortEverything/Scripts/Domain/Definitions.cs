@@ -168,6 +168,15 @@ namespace SortEverything.Domain
         public BoardDef FirstBoard => Boards[0];
     }
 
+    /// <summary>Progress rules of one data room: its chapters, whether more are planned, and its formal milestones.</summary>
+    public sealed class RoomRules
+    {
+        public string AreaId;
+        public List<(int from, int to)> Chapters = new List<(int, int)>();
+        public bool HasPlannedChapters;
+        public List<(string id, string[] prerequisites)> Milestones = new List<(string, string[])>();
+    }
+
     public sealed class AnchorDef
     {
         public readonly string AnchorId;

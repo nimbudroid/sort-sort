@@ -20,6 +20,9 @@ namespace SortEverything.Domain
         public long ActiveMs;
         public bool OptionalBoardOnly;
         public List<string> AreasUnlocked = new List<string>();
+        public List<string> ChaptersCompleted = new List<string>();   // chapter:<areaId>:<n>
+        public List<string> MilestonesEarned = new List<string>();
+        public List<string> AreasReady = new List<string>();
     }
 
     /// <summary>
@@ -92,6 +95,60 @@ namespace SortEverything.Domain
                 opened.Add(kv.Key);
             }
             return opened;
+        }
+
+        public static string ChapterId(string areaId, int chapter) => $"chapter:{areaId}:{chapter}";
+        public static string AreaReadyId(string areaId) => $"area_ready:{areaId}";
+
+        /// <summary>Ordinary (non-planning) scenes: required for chapters and Area Ready; planning stays optional.</summary>
+        static bool Ordinary(LevelDef l) => !l.RequiredBoard.IsPlanning;
+
+        /// <summary>
+        /// House progress for data rooms, derived only from completion seals and idempotent: opens rooms, grants chapter
+        /// recognitions (every ordinary scene of the chapter sealed), formal room milestones (authored prerequisites)
+        /// and Area Ready (every ordinary scene of a room whose chapters are all authored). Runs on completion and at
+        /// boot. Replays add nothing; coins, cosmetics and optional puzzles never count.
+        /// </summary>
+        /// <summary>
+        /// A chapter is done when its ordinary scenes are sealed and any planning puzzle in it is solved or left for later
+        /// (planning never blocks progress, but the chapter does not announce itself before the player reaches it).
+        /// </summary>
+        public static bool ChapterDone(SaveData s, IReadOnlyList<LevelDef> roomLevels, int from, int to)
+        {
+            var inChapter = roomLevels.Where(l => l.OrdinalInArea >= from && l.OrdinalInArea <= to).ToList();
+            if (inChapter.Count == 0 || !inChapter.Any(Ordinary)) return false;
+            return inChapter.All(l => s.HasSeal(l.LevelId) || (!Ordinary(l) && s.IsDeferred(l.LevelId)));
+        }
+
+        public static CompletionFacts ApplyHouseProgress(SaveData s, Catalogue cat, CompletionFacts facts = null)
+        {
+            facts = facts ?? new CompletionFacts();
+            facts.AreasUnlocked.AddRange(UnlockAreas(s, cat));
+            foreach (var room in cat.Rooms)
+            {
+                var levels = cat.InstalledInArea(room.AreaId);
+                if (levels.Count == 0) continue;
+                for (int i = 0; i < room.Chapters.Count; i++)
+                {
+                    var (from, to) = room.Chapters[i];
+                    var id = ChapterId(room.AreaId, i + 1);
+                    if (ChapterDone(s, levels, from, to) && !s.recognitions.Contains(id))
+                    { s.recognitions.Add(id); facts.ChaptersCompleted.Add(id); }
+                }
+                foreach (var (id, prereq) in room.Milestones)
+                {
+                    if (prereq.Length == 0 || s.journeyMilestoneIds.Contains(id) || !prereq.All(s.HasSeal)) continue;
+                    s.journeyMilestoneIds.Add(id); facts.MilestonesEarned.Add(id);
+                }
+                var ready = AreaReadyId(room.AreaId);
+                if (!room.HasPlannedChapters && !s.recognitions.Contains(ready) && levels.Where(Ordinary).All(l => s.HasSeal(l.LevelId)))
+                {
+                    s.recognitions.Add(ready);
+                    if (!s.areaCompletionIds.Contains(room.AreaId)) s.areaCompletionIds.Add(room.AreaId);
+                    facts.AreasReady.Add(room.AreaId);
+                }
+            }
+            return facts;
         }
 
         public static string BoardMarker(string levelId, string boardId) => $"board_complete:{levelId}:{boardId}";
@@ -294,7 +351,7 @@ namespace SortEverything.Domain
 
             s.deferredLevelIds.Remove(level.LevelId);
             AdvanceCursor(s, cat, level.AreaId);
-            facts.AreasUnlocked.AddRange(UnlockAreas(s, cat));
+            ApplyHouseProgress(s, cat, facts);
 
             if (level.ProjectAnchorId == "finished_020" && !s.recognitions.Contains(KitchenReady)
                 && KitchenCatalogue.OrdinaryScenes.All(n => s.HasSeal(KitchenCatalogue.LevelId(n))))
@@ -353,6 +410,7 @@ namespace SortEverything.Domain
             if (a != null && a.Current.status != BoardStatus.Solved) a.Current.status = BoardStatus.Deferred;
             if (!s.deferredLevelIds.Contains(level.LevelId)) s.deferredLevelIds.Add(level.LevelId);
             AdvanceCursor(s, cat, level.AreaId);
+            ApplyHouseProgress(s, cat); // leaving a planning puzzle for later can close its chapter
             return true;
         }
 

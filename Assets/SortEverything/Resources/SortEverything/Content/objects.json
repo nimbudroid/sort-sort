@@ -385,6 +385,111 @@
         "plant"
       ],
       "art": ""
+    },
+    {
+      "id": "board_game",
+      "code": "BG",
+      "name": "Board game",
+      "category": "games",
+      "color": "#3E7FB8",
+      "relativeSize": 1.25,
+      "material": "carton",
+      "tags": [
+        "game"
+      ],
+      "art": ""
+    },
+    {
+      "id": "jigsaw_puzzle",
+      "code": "JP",
+      "name": "Jigsaw puzzle",
+      "category": "games",
+      "color": "#E8B34A",
+      "relativeSize": 1.2,
+      "material": "carton",
+      "tags": [
+        "game"
+      ],
+      "art": ""
+    },
+    {
+      "id": "playing_cards",
+      "code": "PC",
+      "name": "Playing cards",
+      "category": "games",
+      "color": "#F4F1EA",
+      "relativeSize": 0.95,
+      "material": "paper",
+      "tags": [
+        "game"
+      ],
+      "art": ""
+    },
+    {
+      "id": "glass",
+      "code": "GL",
+      "name": "Glass",
+      "category": "glassware",
+      "color": "#D6ECF2",
+      "relativeSize": 0.95,
+      "material": "glass",
+      "tags": [
+        "glass"
+      ],
+      "art": ""
+    },
+    {
+      "id": "water_jug",
+      "code": "WJ",
+      "name": "Water jug",
+      "category": "glassware",
+      "color": "#BFDDEA",
+      "relativeSize": 1.2,
+      "material": "glass",
+      "tags": [
+        "glass"
+      ],
+      "art": ""
+    },
+    {
+      "id": "cloth_napkin",
+      "code": "CL",
+      "name": "Cloth napkin",
+      "category": "linens",
+      "color": "#E58B6E",
+      "relativeSize": 1.0,
+      "material": "fabric",
+      "tags": [
+        "linen"
+      ],
+      "art": ""
+    },
+    {
+      "id": "placemat",
+      "code": "PM",
+      "name": "Placemat",
+      "category": "linens",
+      "color": "#D8A65A",
+      "relativeSize": 1.25,
+      "material": "fabric",
+      "tags": [
+        "linen"
+      ],
+      "art": ""
+    },
+    {
+      "id": "bud_vase",
+      "code": "BV",
+      "name": "Bud vase",
+      "category": "decor",
+      "color": "#F2F0EC",
+      "relativeSize": 1.0,
+      "material": "ceramic",
+      "tags": [
+        "decor",
+        "flower"
+      ],
+      "art": ""
     }
   ]
 }

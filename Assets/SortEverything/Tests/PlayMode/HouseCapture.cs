@@ -83,15 +83,47 @@ namespace SortEverything.Tests
                 Board().DebugSortFraction(1f);
                 yield return new WaitForSecondsRealtime(2.6f);
             }
-            app.OpenLevel("living_room_005", BoardScreen.EntryMode.Default);
-            yield return Shot("10_lr5_arrival", 0.6f);
+            foreach (var id in new[] { "living_room_005", "living_room_006", "living_room_007" })
+            {
+                app.OpenLevel(id, BoardScreen.EntryMode.Default);
+                Board().DebugDismissOffers();
+                yield return Shot("10_" + id + "_start", 0.5f);
+                Board().DebugSortFraction(1f);
+                yield return Shot("10_" + id + "_result", 2.8f);
+            }
+            app.OpenLevel("living_room_008", BoardScreen.EntryMode.Default);
+            yield return Shot("11_lr8_arrival", 0.6f);
             Board().DebugSortFraction(1f);
-            yield return Shot("11_lr5_transform", 1.6f);
-            yield return Shot("12_lr5_result", 2.2f);
+            yield return Shot("12_lr8_transform", 1.6f);
+            yield return Shot("13_lr8_result_area_ready", 2.2f);
             app.ShowHome();
-            yield return Shot("13_home_chapter1_restored");
+            yield return Shot("14_home_living_room_ready");
+
+            // Kitchen 6–10 done (as if played): the Dining Room opens at boot-time catch-up rules.
+            app.Session.Commit(s =>
+            {
+                for (int n = 6; n <= 10; n++) { s.seals.Add(KitchenCatalogue.LevelId(n)); s.traceIds.Add(Progression.TraceId(KitchenCatalogue.LevelId(n))); }
+                Progression.ApplyHouseProgress(s, app.Catalogue);
+                return true;
+            });
+            app.ShowHome();
+            yield return Shot("15_home_dining_open", 0.4f);
+            for (int i = 1; i <= 6; i++)
+            {
+                var id = $"dining_room_{i:000}";
+                app.OpenLevel(id, BoardScreen.EntryMode.Default);
+                Board().DebugDismissOffers();
+                yield return Shot($"16_{id}_start", 0.6f);
+                Board().DebugSortFraction(1f);
+                if (i == 6) yield return Shot("17_dining6_transform", 1.6f);
+                yield return Shot($"16_{id}_result", i == 6 ? 2.2f : 2.8f);
+            }
+            app.ShowHome();
+            yield return Shot("18_home_two_rooms_ready");
+            app.ShowArea("house_dining_room");
+            yield return Shot("19_dining_scenes");
             app.ShowCollection();
-            yield return Shot("14_house_collection");
+            yield return Shot("20_house_collection");
             cam.targetTexture = null; rtex.Release();
             new Runtime.FileSaveStore(dir).DeleteAllForDevelopment();
         }

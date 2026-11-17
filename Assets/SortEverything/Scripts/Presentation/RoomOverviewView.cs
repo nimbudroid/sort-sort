@@ -27,7 +27,7 @@ namespace SortEverything.Presentation
                 var reg = regions[r];
                 var regionLevels = levels.Where(l => l.OrdinalInArea >= reg.from && l.OrdinalInArea <= reg.to).ToList();
                 bool planned = regionLevels.Count == 0;
-                bool restored = !planned && regionLevels.All(l => save.HasSeal(l.LevelId));
+                bool restored = !planned && Progression.ChapterDone(save, levels, reg.from, reg.to);
                 float x = pad + r * (cw + pad);
 
                 var card = UIKit.Panel(rt, "Region_" + r, SpriteFactory.Hex("#E9DCC8"), 12);

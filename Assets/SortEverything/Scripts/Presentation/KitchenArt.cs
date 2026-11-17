@@ -133,6 +133,7 @@ namespace SortEverything.Presentation
                 case "honey_wood": return Wood();
                 case "rug": return Rug(baseHex);
                 case "wallpaper_sage": return Wallpaper("#DCE5D2", "#C9D6BD", "#F3EBDD");
+                case "wallpaper_terracotta": return Wallpaper("#F0D3BF", "#E6C1A8", "#FFF4E6");
                 default: return ButcherBlock(baseHex);
             }
         }

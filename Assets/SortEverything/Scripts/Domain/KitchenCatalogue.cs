@@ -326,6 +326,8 @@ namespace SortEverything.Domain
         public readonly BuildProfile Profile;
         /// <summary>Rooms unlocked by a level's first completion (areaId → levelId), from area data.</summary>
         public readonly Dictionary<string, string> AreaUnlocks = new Dictionary<string, string>();
+        /// <summary>Chapter and milestone rules of the data rooms (the Kitchen keeps its own anchors).</summary>
+        public readonly List<RoomRules> Rooms = new List<RoomRules>();
         readonly Dictionary<string, LevelDef> _byId;
 
         public static readonly string[] ProfileIds = { "kitchen_gate_08", "kitchen_20" };
@@ -339,10 +341,11 @@ namespace SortEverything.Domain
         public static Catalogue CreateKitchen(string profileId) => CreateKitchen(profileId, null);
 
         /// <summary>The full House: the Kitchen, data rooms and their unlock rules (areaId → unlocking levelId).</summary>
-        public static Catalogue CreateHouse(string profileId, IReadOnlyList<LevelDef> dataLevels, IEnumerable<KeyValuePair<string, string>> unlocks)
+        public static Catalogue CreateHouse(string profileId, IReadOnlyList<LevelDef> dataLevels, IEnumerable<KeyValuePair<string, string>> unlocks, IEnumerable<RoomRules> rooms = null)
         {
             var c = CreateKitchen(profileId, dataLevels);
             if (unlocks != null) foreach (var kv in unlocks) if (!string.IsNullOrEmpty(kv.Value)) c.AreaUnlocks[kv.Key] = kv.Value;
+            if (rooms != null) c.Rooms.AddRange(rooms);
             return c;
         }
 

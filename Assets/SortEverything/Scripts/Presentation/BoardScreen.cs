@@ -789,17 +789,29 @@ namespace SortEverything.Presentation
                 : comp != null && !string.IsNullOrEmpty(comp.title) ? comp.title : Strings.Get("result.sorted");
             UIKit.Label(list, "Title", title, 24, UIKit.Ink, TextAnchor.MiddleCenter, FontStyle.Bold).Size(34);
             string sub = comp != null && !string.IsNullOrEmpty(comp.subtitle) ? comp.subtitle
-                : Strings.Get(_level.PurposeKey) + " — " + _view.PropBacking.GetComponentInChildren<Text>().text;
+                : _level.AreaId == KitchenCatalogue.AreaId ? Strings.Get(_level.PurposeKey) + " — " + _view.PropBacking.GetComponentInChildren<Text>().text
+                : Strings.Get(_level.PurposeKey);
             UIKit.Label(list, "Purpose", sub, 13, UIKit.InkSoft).Size(comp != null ? 34 : 20);
-            // Rooms are built chapter by chapter: name the chapter the player just finished.
+            // Room progress from this completion: Area Ready, milestones, chapters (all from the save, granted once).
             var thisRoom = ContentDb.Area(_level.AreaId);
-            var chapter = _level.AreaId == KitchenCatalogue.AreaId ? null : thisRoom.chapters.FirstOrDefault(c => _level.OrdinalInArea >= c.from && _level.OrdinalInArea <= c.to);
-            if (chapter != null && chapter.to == _level.OrdinalInArea && facts.NewSeal)
+            foreach (var ready in facts.AreasReady)
+                UIKit.Label(list, "AreaReady", $"{Strings.Get("area." + ready)} ready!", 20, UIKit.Primary, TextAnchor.MiddleCenter, FontStyle.Bold).Size(28);
+            foreach (var mid in facts.MilestonesEarned)
             {
-                UIKit.Label(list, "Chapter", $"Chapter complete · {chapter.name}", 15, UIKit.Primary, TextAnchor.MiddleCenter, FontStyle.Bold).Size(22);
-                if (sampleEnd) UIKit.Label(list, "More", $"More {Strings.Get("area." + _level.AreaId)} chapters are on the way.", 12, UIKit.InkSoft).Size(18);
+                var m = ContentDb.Areas.areas.SelectMany(x => x.milestones).FirstOrDefault(x => x.id == mid);
+                if (m != null && !facts.AreasReady.Contains(_level.AreaId)) UIKit.Label(list, "Milestone", m.name, 14, UIKit.Gold, TextAnchor.MiddleCenter, FontStyle.Bold).Size(20);
             }
-            else if (sampleEnd) UIKit.Label(list, "Sample", Strings.Get("result.sample_complete"), 14, UIKit.Primary, TextAnchor.MiddleCenter, FontStyle.Bold).Size(20);
+            foreach (var ch in facts.ChaptersCompleted.Where(c => c.StartsWith("chapter:" + _level.AreaId + ":")))
+            {
+                int n = int.Parse(ch.Substring(ch.LastIndexOf(':') + 1));
+                var chapter = n - 1 < thisRoom.chapters.Length ? thisRoom.chapters[n - 1] : null;
+                UIKit.Label(list, "Chapter", $"Chapter {n} complete · {chapter?.name}", 15, UIKit.Primary, TextAnchor.MiddleCenter, FontStyle.Bold).Size(22);
+                var nextCh = n < thisRoom.chapters.Length ? thisRoom.chapters[n] : null;
+                if (nextCh != null && !facts.AreasReady.Contains(_level.AreaId))
+                    UIKit.Label(list, "NextChapter", nextCh.planned ? $"Next: {nextCh.name} — coming later" : $"Next: {nextCh.name}", 12, UIKit.InkSoft).Size(18);
+            }
+            if (sampleEnd && facts.ChaptersCompleted.Count == 0 && facts.AreasReady.Count == 0 && _level.AreaId == KitchenCatalogue.AreaId)
+                UIKit.Label(list, "Sample", Strings.Get("result.sample_complete"), 14, UIKit.Primary, TextAnchor.MiddleCenter, FontStyle.Bold).Size(20);
 
             var gains = new List<string>();
             if (facts.CoinsEarned > 0) gains.Add($"+{facts.CoinsEarned} coins (total {Save.wallet})");

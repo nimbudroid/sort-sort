@@ -109,6 +109,7 @@ namespace SortEverything.Domain
         public CategoryArchetype[] containerOverrides = Array.Empty<CategoryArchetype>(); // room-specific container looks
         public string sharedArchetype = "";       // room-specific shared container ("" = global)
         public OverviewRegionData[] regions = Array.Empty<OverviewRegionData>();      // room overview (data rooms)
+        public MilestoneData[] milestones = Array.Empty<MilestoneData>();            // formal journey milestones (midpoint, final)
 
         public MessData MessFor(string levelId)
         {
@@ -125,7 +126,13 @@ namespace SortEverything.Domain
 
     [Serializable] public sealed class AreasFile { public AreaData[] areas = Array.Empty<AreaData>(); }
 
-    /// <summary>A five-scene chapter of a room (ordinals are inclusive, within the room).</summary>
+    /// <summary>
+    /// A formal journey milestone of a room: a unique authored ID granted once when every prerequisite scene has its
+    /// completion seal. Prerequisites list ordinary scenes only (never optional planning puzzles).
+    /// </summary>
+    [Serializable] public sealed class MilestoneData { public string id; public string name; public string[] prerequisites = Array.Empty<string>(); }
+
+    /// <summary>A chapter of a room (ordinals are inclusive, within the room).</summary>
     [Serializable] public sealed class ChapterData { public string name; public int from = 1, to = 5; public bool planned; }
 
     /// <summary>

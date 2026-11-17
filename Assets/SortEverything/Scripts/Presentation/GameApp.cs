@@ -113,7 +113,7 @@ namespace SortEverything.Presentation
             yield return null; // let the safe area settle
             var config = GameConfig.LoadFromResources();
             ContentDb.RegisterStrings();
-            var catalogue = Catalogue.CreateHouse(config.buildProfileId, ContentDb.DataLevels, ContentDb.AreaUnlocks);
+            var catalogue = ContentDb.House(config.buildProfileId);
             var store = FileSaveStore.Default();
             var telemetry = new Telemetry(System.IO.Path.Combine(Application.persistentDataPath, "SortEverything", "telemetry.jsonl"), config.telemetryEnabled)
             {
@@ -128,7 +128,9 @@ namespace SortEverything.Presentation
             }
             // Rooms whose unlocking scene is already sorted open now (saves from before a room existed).
             var probe = Progression.Clone(Save);
-            if (Progression.UnlockAreas(probe, catalogue).Count > 0) Session.Commit(s => { Progression.UnlockAreas(s, catalogue); return true; });
+            var catchUp = Progression.ApplyHouseProgress(probe, catalogue);
+            if (catchUp.AreasUnlocked.Count + catchUp.ChaptersCompleted.Count + catchUp.MilestonesEarned.Count + catchUp.AreasReady.Count > 0)
+                Session.Commit(s => { Progression.ApplyHouseProgress(s, catalogue); return true; });
             telemetry.ParticipantId = Save.participantId;
             telemetry.Emit("session_start", "\"entry\":\"" + outcome + "\"");
             Audio.Init(Save.settings);
@@ -258,7 +260,8 @@ namespace SortEverything.Presentation
             card.Size(open ? 36 + overviewH + 58 : 96);
             var name = UIKit.Label(card.transform, "Name", Strings.Get("area." + room.id), 17, open ? UIKit.Ink : UIKit.InkSoft, TextAnchor.MiddleLeft, FontStyle.Bold);
             name.rectTransform.TopLeft(12, 6, 180, 24);
-            var prog = UIKit.Label(card.transform, "Progress", open ? $"{done}/{levels.Count} scenes" : "Locked", 12, open ? UIKit.InkSoft : UIKit.InkSoft, TextAnchor.MiddleRight, FontStyle.Bold);
+            bool ready = Save.recognitions.Contains(Progression.AreaReadyId(room.id)) || (kitchen && Save.recognitions.Contains(Progression.KitchenReady));
+            var prog = UIKit.Label(card.transform, "Progress", !open ? "Locked" : ready ? $"Ready · {done}/{levels.Count}" : $"{done}/{levels.Count} scenes", 12, ready ? UIKit.Primary : UIKit.InkSoft, TextAnchor.MiddleRight, FontStyle.Bold);
             prog.rectTransform.TopLeft(196, 6, 128, 24);
             if (!open)
             {

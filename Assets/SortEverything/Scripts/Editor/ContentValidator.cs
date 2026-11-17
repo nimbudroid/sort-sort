@@ -72,7 +72,7 @@ namespace SortEverything.Editor
             }
 
             // ---- Areas + contrast (adjust the surface, not the items) ----
-            var houseForContrast = Catalogue.CreateHouse("kitchen_20", ContentDb.DataLevels, ContentDb.AreaUnlocks);
+            var houseForContrast = ContentDb.House("kitchen_20");
             foreach (var area in ContentDb.Areas.areas)
             {
                 if (!ColorUtility.TryParseHtmlString(area.surfaceColor, out var surface)) { issues.Add($"area {area.id}: surfaceColor '{area.surfaceColor}' is not a color."); continue; }
@@ -97,7 +97,7 @@ namespace SortEverything.Editor
             }
 
             // ---- Rooms (House structure) ----
-            var house = Catalogue.CreateHouse("kitchen_20", ContentDb.DataLevels, ContentDb.AreaUnlocks);
+            var house = ContentDb.House("kitchen_20");
             foreach (var area in ContentDb.Areas.areas)
             {
                 string A = $"room {area.id}";
@@ -112,12 +112,33 @@ namespace SortEverything.Editor
                     foreach (var id in r.restored.Concat(r.clutter)) if (!objects.ContainsKey(id)) issues.Add($"{A}/{r.name}: unknown object '{id}'.");
                     foreach (var f in r.furniture) if (!SceneArt.Known.Contains(f) && Resources.Load<Sprite>("SortEverything/Art/Props/" + f) == null) issues.Add($"{A}/{r.name}: unknown furniture '{f}'.");
                 }
+                if (area.id != KitchenCatalogue.AreaId && levels.Count > 0)
+                {
+                    if (area.chapters.Length != 3) issues.Add($"{A}: rooms after the Kitchen have exactly three chapters.");
+                    int covered = area.chapters.Where(c => !c.planned).Sum(c => c.to - c.from + 1);
+                    if (!area.chapters.Any(c => c.planned) && covered != levels.Count) issues.Add($"{A}: chapters cover {covered} scenes but the room has {levels.Count}.");
+                    if (!area.chapters.Any(c => c.planned) && area.milestones.Length != 2) issues.Add($"{A}: a finished room has two milestones (midpoint and final).");
+                    foreach (var m in area.milestones)
+                    {
+                        if (string.IsNullOrEmpty(m.id)) issues.Add($"{A}: a milestone has no id.");
+                        foreach (var pid in m.prerequisites)
+                        {
+                            var pl = house.Level(pid);
+                            if (pl == null || pl.AreaId != area.id) issues.Add($"{A}/{m.id}: prerequisite '{pid}' is not a scene of this room.");
+                            else if (pl.RequiredBoard.IsPlanning) issues.Add($"{A}/{m.id}: prerequisite '{pid}' is an optional planning puzzle.");
+                        }
+                    }
+                }
                 foreach (var oc in area.containerOverrides)
                     if (containers.archetypes.All(a => a.id != oc.archetype)) issues.Add($"{A}: container override uses missing archetype '{oc.archetype}'.");
                 CheckGlyphs(area.name, A, FontCoverage(FontPath, out _), issues);
                 CheckGlyphs(area.unlockText, A, FontCoverage(FontPath, out _), issues);
                 CheckGlyphs(area.tagline, A, FontCoverage(FontPath, out _), issues);
             }
+
+            var allMilestones = ContentDb.Areas.areas.SelectMany(a => a.milestones).Select(m => m.id).ToList();
+            foreach (var dup in allMilestones.GroupBy(x => x).Where(g => g.Count() > 1)) issues.Add($"milestone id '{dup.Key}' is used twice.");
+            foreach (var m in allMilestones) if (KitchenCatalogue.Anchors.Any(a => a.AnchorId == m) || m == "kitchen_ready") issues.Add($"milestone id '{m}' collides with a Kitchen milestone.");
 
             // ---- Data level files (references) ----
             foreach (var (name, file) in ContentDb.LevelFiles)
